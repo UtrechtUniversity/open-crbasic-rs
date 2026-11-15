@@ -9,6 +9,7 @@ pub mod diagnostics;
 pub mod lexer;
 pub mod mode;
 pub mod parser;
+pub mod preprocess;
 pub mod profiles;
 pub mod pyre;
 pub mod pystr;
