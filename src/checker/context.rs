@@ -494,6 +494,7 @@ pub struct Context {
     literal_names_cell: OnceCell<BTreeSet<String>>,
     string_consts_cell: OnceCell<BTreeSet<String>>,
     alias_names_cell: OnceCell<BTreeSet<String>>,
+    measurement_aliases_cell: OnceCell<instr_measure::MeasurementAliasLookup>,
     serialin_types_map_cell: OnceCell<OrderedMap<String, String>>,
 }
 
@@ -547,6 +548,7 @@ impl Context {
             literal_names_cell: OnceCell::new(),
             string_consts_cell: OnceCell::new(),
             alias_names_cell: OnceCell::new(),
+            measurement_aliases_cell: OnceCell::new(),
             serialin_types_map_cell: OnceCell::new(),
         }
     }
@@ -1514,8 +1516,14 @@ impl Context {
     }
 
     /// Port of `checker/context.py::Context.measurement_aliases`.
-    pub fn measurement_aliases(self: &Rc<Self>) {
-        instr_measure::_build_measurement_aliases(&self.program);
+    pub fn measurement_aliases(self: &Rc<Self>) -> &instr_measure::MeasurementAliasLookup {
+        self.measurement_aliases_cell.get_or_init(|| {
+            instr_measure::_build_measurement_aliases(
+                &self.program,
+                &self.scope_tables(true, false),
+                self.env(),
+            )
+        })
     }
 }
 

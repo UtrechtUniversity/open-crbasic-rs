@@ -586,7 +586,7 @@ pub fn check_background_calibration_with(
     let statements = &program.statements;
     let last_line = statements.last().map_or(1, |s| s.line());
 
-    if instr_measure::is_sequential(program, profile) {
+    if instr_measure::is_sequential(program, profile, env) {
         return;
     }
     // TODO: populate `busy` and `timed` from `scan_time::budgets` and `scan_time::MODELS`
@@ -671,7 +671,7 @@ pub fn check_slow_scan_skips_with(
         return;
     }
     let tasks: BTreeSet<&str> = tasks_arr.iter().filter_map(Json::as_str).collect();
-    if instr_measure::is_sequential(program, profile) {
+    if instr_measure::is_sequential(program, profile, env) {
         return;
     }
     let rules = profile.pipeline_tasks().get("tasks");

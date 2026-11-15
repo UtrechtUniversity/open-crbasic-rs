@@ -21,53 +21,6 @@ use super::part3::{_SERIALIN_DEST_MESSAGE, _serialin_bad_destination};
 use super::part5::_cdm_type_value;
 
 const _EMAIL_FUNCTIONS: &[&str] = &["EMAILRECV", "EMAILSEND"];
-fn _p4_index_value(arg: Option<&Expr>, env: Option<&Env>) -> Option<i64> {
-    let arg = arg?;
-    if let Expr::Number(n) = arg
-        && let crate::syntax::NumberValue::Int(v) = n.value
-    {
-        return Some(v);
-    }
-    let env = env?;
-    match consteval::value_of(Some(arg), env).ok()? {
-        ConstValue::Int(v) => Some(v),
-        _ => None,
-    }
-}
-
-fn _p4_flat_offset(dest: &Expr, shape: &[i64], env: Option<&Env>) -> Option<i64> {
-    let args = match dest {
-        Expr::Name(_) => return Some(0),
-        Expr::Index(ix) => {
-            if ix.args.is_empty() || ix.args.iter().all(Option::is_none) {
-                return Some(0);
-            }
-            &ix.args
-        }
-        _ => return None,
-    };
-    let mut index = Vec::with_capacity(args.len());
-    for a in args {
-        index.push(_p4_index_value(a.as_deref(), env)?);
-    }
-    if index.len() == 1 {
-        return (index[0] >= 1).then_some(index[0] - 1);
-    }
-    if index.len() != shape.len()
-        || index
-            .iter()
-            .zip(shape.iter())
-            .any(|(&k, &n)| !(1..=n).contains(&k))
-    {
-        return None;
-    }
-    let mut offset = 0_i64;
-    for (&k, &n) in index.iter().zip(shape.iter()) {
-        offset = offset * n + (k - 1);
-    }
-    Some(offset)
-}
-
 fn _p4_find_instr_stmt<'a>(program: &'a Program, target: &Instruction) -> Option<&'a StmtRef> {
     program.statements.iter().find(|s| match s.as_ref() {
         Stmt::Instruction(instr) => std::ptr::eq(instr, target),
@@ -499,7 +452,7 @@ pub fn check_sdi12_nan_fill(
             return;
         }
     }
-    let offset = _p4_flat_offset(dest, &shape, Some(env));
+    let offset = crate::checker::instr_measure::_flat_offset(dest, &shape, Some(env));
     let total: i64 = shape.iter().copied().product();
     let Ok(fill) = consteval::value_of(st.args[6].as_deref(), env) else {
         return;

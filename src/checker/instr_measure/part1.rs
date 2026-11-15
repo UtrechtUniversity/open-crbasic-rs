@@ -23,34 +23,8 @@ use crate::syntax::{
 
 use super::{part2, part3};
 
-fn _flatten_inline_stmts(stmts: &[StmtRef]) -> Vec<StmtRef> {
-    let mut out = Vec::with_capacity(stmts.len());
-    for st in stmts {
-        out.push(st.clone());
-        if let Stmt::If(if_stmt) = st.as_ref() {
-            if let Some(inline) = &if_stmt.inline {
-                out.extend(_flatten_inline_stmts(inline));
-            }
-            if let Some(inline_else) = &if_stmt.inline_else {
-                out.extend(_flatten_inline_stmts(inline_else));
-            }
-        }
-    }
-    out
-}
-
-/// Port of `checker/instr_measure.py::check`.
-pub fn check(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::check (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::check`.
-pub fn check_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_measure.py::check
+pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics, env: &Env) {
     let measure = profile.measure();
     if measure.is_empty() {
         return;
@@ -58,11 +32,11 @@ pub fn check_with(
     let mut file_reported = false;
     let mut sequential: Option<bool> = None;
     let mut slow = false;
-    let statements = _flatten_inline_stmts(&program.statements);
+    let statements = crate::checker::instr_data::_with_inline(&program.statements);
     let mut tablefile_context: Option<((BTreeSet<String>, BTreeSet<String>), var_types::Typer)> =
         None;
     if profile.instructions().contains("TIMEDCONTROL") {
-        _check_timed_sdm_with(program, &statements, profile, env, diags);
+        _check_timed_sdm(program, &statements, profile, env, diags);
     }
     for (pos, stmt_ref) in statements.iter().enumerate() {
         let Stmt::Instruction(stmt) = stmt_ref.as_ref() else {
@@ -71,20 +45,27 @@ pub fn check_with(
         let kw = pystr::upper(&stmt.keyword);
         slow = kw == "SLOWSEQUENCE" || (slow && kw != "ENDPROG");
         if kw == "SW12" && measure.get("sw12_ports").is_some() {
-            _check_sw12_with(stmt, measure, env, diags);
+            _check_sw12(stmt, measure, env, diags);
         }
         if kw == "DELAY"
             && let Some(delay_cfg) = measure.get("delay")
         {
             if sequential.is_none() {
-                sequential = Some(part2::is_sequential(program, profile));
+                sequential = Some(part2::is_sequential(program, profile, env));
             }
             let prefix = Rc::new(Program::new(&program.name, statements[..=pos].to_vec()));
             let scope =
                 context::of(&prefix, Some(profile), Some(env.clone())).scoped_view(stmt_ref, true);
             let mut typer = var_types::Typer::new(program, Some(&scope), Some(profile));
-            let _ = delay_cfg;
-            part2::_check_delay(stmt, diags, sequential.unwrap_or(false), slow, &mut typer);
+            part2::_check_delay(
+                stmt,
+                delay_cfg,
+                env,
+                diags,
+                sequential.unwrap_or(false),
+                slow,
+                &mut typer,
+            );
         }
         if kw == "EXCITEV"
             && measure
@@ -93,7 +74,7 @@ pub fn check_with(
                 .and_then(Json::as_bool)
                 .unwrap_or(false)
             && stmt.args.len() == 3
-            && let Some(delay) = _int_value_with(stmt.args[2].as_deref(), env)
+            && let Some(delay) = _int_value(stmt.args[2].as_deref(), env)
             && scan_time::task_memory_overflow(
                 (scan_time::excite_delay_us(delay as f64) - 10).max(0),
             )
@@ -101,33 +82,33 @@ pub fn check_with(
             _task_memory_full(stmt, diags);
         }
         if kw == "CS616" && measure.get("cs616_min_reps_pos").is_some() {
-            part2::_check_cs616_reps(stmt, diags);
+            part2::_check_cs616_reps(stmt, measure, env, diags);
         }
         if kw == "PERIODAVG" && profile.single_pass {
-            _check_periodavg_channels_with(stmt, profile, env, diags);
+            _check_periodavg_channels(stmt, profile, env, diags);
         }
         if (kw == "EXCITEV" || kw == "EXCITEI") && measure.get("excite_max_mv").is_some() {
-            part2::_check_excite_magnitude(stmt, diags);
+            part2::_check_excite_magnitude(stmt, measure, env, diags);
         }
         if kw == "GPS"
             && let Some(gps) = measure.get("gps")
         {
-            _check_structure_members_with(stmt, program, gps, env, diags);
-            _check_gps_nmea_with(stmt_ref, program, env, diags);
-            _check_gps_port_with(stmt, gps, env, diags);
+            _check_structure_members(stmt, program, gps, env, diags);
+            _check_gps_nmea(stmt_ref, program, env, diags);
+            _check_gps_port(stmt, gps, env, diags);
         }
         if kw == "CH400STATUS" && profile.instructions().contains("CH400STATUS") {
-            _check_ch400status_with(stmt, env, diags);
+            _check_ch400status(stmt, env, diags);
         }
         if kw == "FFT" && profile.instructions().contains("FFT") {
             let scope_view =
                 context::of(program, Some(profile), Some(env.clone())).scoped_view(stmt_ref, false);
             let ctx = context::of(&scope_view, Some(profile), Some(env.clone()));
             let dims = ctx.declared_all_dims();
-            _check_fft_source_with(stmt, dims, env, diags);
+            _check_fft_source(stmt, dims, env, diags);
         }
         if kw == "SDI12RECORDER" && profile.single_pass {
-            _check_sdi12_structure_dest_with(stmt, program, diags);
+            _check_sdi12_structure_dest(stmt, program, diags);
         }
         if kw == "TABLEFILE"
             && let Some(tf_cfg) = measure.get("tablefile")
@@ -141,29 +122,21 @@ pub fn check_with(
                     var_types::Typer::new(program, None, Some(profile)),
                 )
             });
-            _check_tablefile_with(stmt, tf_cfg, env, diags, profile, names, typer);
+            _check_tablefile(stmt, tf_cfg, env, diags, profile, names, typer);
         }
         if let Some(rules) = measure.get("string_prefixes").and_then(Json::as_array) {
             for rule in rules {
                 let instr = rule.get("instr").and_then(Json::as_str).unwrap_or("");
                 if kw == instr && !(file_reported && rule.get("ext").is_some()) {
-                    file_reported =
-                        _check_string_prefix_with(stmt, rule, env, diags) || file_reported;
+                    file_reported = _check_string_prefix(stmt, rule, env, diags) || file_reported;
                 }
             }
         }
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_timed_sdm`.
-pub fn _check_timed_sdm(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/instr_measure.py::_check_timed_sdm (omitted: statements: list, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_check_timed_sdm`.
-pub fn _check_timed_sdm_with(
+/// Port of checker/instr_measure.py::_check_timed_sdm
+pub fn _check_timed_sdm(
     program: &ProgramRef,
     statements: &[StmtRef],
     profile: &'static Profile,
@@ -180,7 +153,7 @@ pub fn _check_timed_sdm_with(
         longconv::float_names_in(statements),
         longconv::literal_names_in(statements),
     );
-    let sequential = part2::is_sequential(program, profile);
+    let sequential = part2::is_sequential(program, profile, env);
     let mut aliases: OrderedMap<String, (String, i64)> = OrderedMap::new();
     let mut registered: BTreeSet<(String, i64)> = BTreeSet::new();
     let mut in_program = false;
@@ -209,7 +182,7 @@ pub fn _check_timed_sdm_with(
             return None;
         }
         let dims = tables.dims.get(&name)?;
-        let offset = part3::_flat_offset(arg, dims.clone())?;
+        let offset = part3::_flat_offset(arg, dims, Some(env))?;
         Some((name, offset))
     };
 
@@ -283,17 +256,8 @@ pub fn _check_timed_sdm_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_periodavg_channels`.
+/// Port of checker/instr_measure.py::_check_periodavg_channels
 pub fn _check_periodavg_channels(
-    _stmt: &Instruction,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_measure.py::_check_periodavg_channels (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_periodavg_channels`.
-pub fn _check_periodavg_channels_with(
     stmt: &Instruction,
     profile: &Profile,
     env: &Env,
@@ -308,7 +272,7 @@ pub fn _check_periodavg_channels_with(
     else {
         return;
     };
-    let reps = _int_value_with(stmt.args[1].as_deref(), env);
+    let reps = _int_value(stmt.args[1].as_deref(), env);
     let maximum: i64 = if profile.name == "cr300" { 4 } else { 6 };
     if (channel < -1 && channel != longconv::INT_MIN) || channel > 9 {
         return;
@@ -356,18 +320,8 @@ pub fn _check_periodavg_channels_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::check_const_ranges`.
-pub fn check_const_ranges(_profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::check_const_ranges (omitted: flat: list, env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::check_const_ranges`.
-pub fn check_const_ranges_with(
-    flat: &[StmtRef],
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_measure.py::check_const_ranges
+pub fn check_const_ranges(flat: &[StmtRef], profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     let mut by_instr: std::collections::BTreeMap<String, Vec<&Json>> =
         std::collections::BTreeMap::new();
     if let Some(rules) = profile
@@ -401,31 +355,24 @@ pub fn check_const_ranges_with(
         }
         let tccomp = !stmt.args.is_empty()
             && kw == "CDM_TCCOMP"
-            && _int_value_with(stmt.args[0].as_deref(), env) == Some(224);
+            && _int_value(stmt.args[0].as_deref(), env) == Some(224);
         if let Some(rules) = by_instr.get(&kw) {
             for rule in rules {
                 let pos = rule.get("pos").and_then(Json::as_i64).unwrap_or(0);
                 if tccomp && pos == 5 {
-                    _tccomp_before_channel_with(stmt, env, profile, &names, diags);
+                    _tccomp_before_channel(stmt, env, profile, &names, diags);
                 }
-                _apply_const_rule_with(stmt, rule, env, profile, &names, diags);
+                _apply_const_rule(stmt, rule, env, profile, &names, diags);
                 if tccomp && pos == 5 {
-                    _tccomp_after_channel_with(stmt, env, profile, &names, diags);
+                    _tccomp_after_channel(stmt, env, profile, &names, diags);
                 }
             }
         }
     }
 }
 
-/// Port of `checker/instr_measure.py::_tccomp_before_channel`.
-pub fn _tccomp_before_channel() {
-    todo!(
-        "checker/instr_measure.py::_tccomp_before_channel (omitted: stmt: untyped, env: untyped, profile: untyped, names: untyped, diags: untyped)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_tccomp_before_channel`.
-pub fn _tccomp_before_channel_with(
+/// Port of checker/instr_measure.py::_tccomp_before_channel
+pub fn _tccomp_before_channel(
     stmt: &Instruction,
     env: &Env,
     profile: &Profile,
@@ -433,7 +380,7 @@ pub fn _tccomp_before_channel_with(
     diags: &mut Diagnostics,
 ) {
     let empty_rule = Json::Object(Vec::new());
-    if let Some(channel) = _long_arg_with(stmt, 5, &empty_rule, env, profile, names)
+    if let Some(channel) = _long_arg(stmt, 5, &empty_rule, env, profile, names)
         && channel < 0
     {
         diags.error_basic(
@@ -444,15 +391,8 @@ pub fn _tccomp_before_channel_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_tccomp_after_channel`.
-pub fn _tccomp_after_channel() {
-    todo!(
-        "checker/instr_measure.py::_tccomp_after_channel (omitted: stmt: untyped, env: untyped, profile: untyped, names: untyped, diags: untyped)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_tccomp_after_channel`.
-pub fn _tccomp_after_channel_with(
+/// Port of checker/instr_measure.py::_tccomp_after_channel
+pub fn _tccomp_after_channel(
     stmt: &Instruction,
     env: &Env,
     profile: &Profile,
@@ -460,8 +400,8 @@ pub fn _tccomp_after_channel_with(
     diags: &mut Diagnostics,
 ) {
     let empty_rule = Json::Object(Vec::new());
-    let channel = _long_arg_with(stmt, 5, &empty_rule, env, profile, names);
-    let reps = _long_arg_with(stmt, 4, &empty_rule, env, profile, names);
+    let channel = _long_arg(stmt, 5, &empty_rule, env, profile, names);
+    let reps = _long_arg(stmt, 4, &empty_rule, env, profile, names);
     if let (Some(mut ch), Some(r)) = (channel, reps) {
         if !(1..=20).contains(&ch) {
             ch = 1;
@@ -474,7 +414,7 @@ pub fn _tccomp_after_channel_with(
             );
         }
     }
-    if let Some(tc_type) = _long_arg_with(stmt, 6, &empty_rule, env, profile, names)
+    if let Some(tc_type) = _long_arg(stmt, 6, &empty_rule, env, profile, names)
         && !(0..=7).contains(&tc_type)
     {
         diags.error_basic(
@@ -485,15 +425,8 @@ pub fn _tccomp_after_channel_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_apply_cdm_channel`.
-pub fn _apply_cdm_channel() {
-    todo!(
-        "checker/instr_measure.py::_apply_cdm_channel (omitted: stmt: untyped, rule: untyped, env: untyped, profile: untyped, names: untyped, diags: untyped)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_apply_cdm_channel`.
-pub fn _apply_cdm_channel_with(
+/// Port of checker/instr_measure.py::_apply_cdm_channel
+pub fn _apply_cdm_channel(
     stmt: &Instruction,
     rule: &Json,
     env: &Env,
@@ -504,14 +437,14 @@ pub fn _apply_cdm_channel_with(
     if stmt.args.is_empty() {
         return;
     }
-    let mod_key = _int_value_with(stmt.args[0].as_deref(), env)
+    let mod_key = _int_value(stmt.args[0].as_deref(), env)
         .map_or_else(|| "None".to_owned(), |v| v.to_string());
     let last = rule
         .get("channel_by_module")
         .and_then(|m| m.get(&mod_key))
         .and_then(Json::as_i64);
     let pos = rule.get("pos").and_then(Json::as_i64).unwrap_or(0);
-    let value = _long_arg_with(stmt, pos, rule, env, profile, names);
+    let value = _long_arg(stmt, pos, rule, env, profile, names);
     let (Some(last), Some(mut value)) = (last, value) else {
         return;
     };
@@ -524,7 +457,7 @@ pub fn _apply_cdm_channel_with(
     let role = rule.get("role").and_then(Json::as_str).unwrap_or("");
     match role {
         "panel_temp" => {
-            let reps = _long_arg_with(stmt, 4, rule, env, profile, names);
+            let reps = _long_arg(stmt, 4, rule, env, profile, names);
             if last == 30 && value < 0 {
                 diags.error_basic(
                     stmt.base.node.line,
@@ -581,7 +514,7 @@ pub fn _apply_cdm_channel_with(
         }
         "rc" => {
             let reps = if stmt.args.len() >= 4 {
-                _long_arg_with(stmt, 4, rule, env, profile, names)
+                _long_arg(stmt, 4, rule, env, profile, names)
             } else {
                 None
             };
@@ -601,15 +534,8 @@ pub fn _apply_cdm_channel_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_apply_const_rule`.
-pub fn _apply_const_rule() {
-    todo!(
-        "checker/instr_measure.py::_apply_const_rule (omitted: stmt: untyped, rule: untyped, env: untyped, profile: untyped, names: untyped, diags: untyped)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_apply_const_rule`.
-pub fn _apply_const_rule_with(
+/// Port of checker/instr_measure.py::_apply_const_rule
+pub fn _apply_const_rule(
     stmt: &Instruction,
     rule: &Json,
     env: &Env,
@@ -618,13 +544,13 @@ pub fn _apply_const_rule_with(
     diags: &mut Diagnostics,
 ) {
     if rule.get("channel_by_module").is_some() {
-        _apply_cdm_channel_with(stmt, rule, env, profile, names, diags);
+        _apply_cdm_channel(stmt, rule, env, profile, names, diags);
         return;
     }
     if let Some(skip_modules) = rule.get("skip_modules").and_then(Json::as_array)
         && !stmt.args.is_empty()
     {
-        let mod_key = _int_value_with(stmt.args[0].as_deref(), env)
+        let mod_key = _int_value(stmt.args[0].as_deref(), env)
             .map_or_else(|| "None".to_owned(), |v| v.to_string());
         if skip_modules
             .iter()
@@ -634,7 +560,7 @@ pub fn _apply_const_rule_with(
         }
     }
     let pos = rule.get("pos").and_then(Json::as_i64).unwrap_or(0);
-    let Some(raw) = _raw_arg_with(stmt, pos, env) else {
+    let Some(raw) = _raw_arg(stmt, pos, env) else {
         return;
     };
     if rule
@@ -675,7 +601,7 @@ pub fn _apply_const_rule_with(
         return;
     }
     if let Some(invalid_raw) = rule.get("invalid_raw") {
-        if _matches_invalid_raw_with(&raw, invalid_raw) {
+        if _matches_invalid_raw(&raw, invalid_raw) {
             let val_str = consteval::to_long(&raw).to_string();
             let template = rule.get("message").and_then(Json::as_str).unwrap_or("");
             let msg = pystr::format_named(template, &[("value", &val_str)]);
@@ -683,7 +609,7 @@ pub fn _apply_const_rule_with(
         }
         return;
     }
-    let Some(value) = _long_arg_with(stmt, pos, rule, env, profile, names) else {
+    let Some(value) = _long_arg(stmt, pos, rule, env, profile, names) else {
         return;
     };
     if let Some(lower_gate) = rule.get("lower_gate").and_then(Json::as_i64)
@@ -710,7 +636,7 @@ pub fn _apply_const_rule_with(
         let mod_key = if stmt.args.is_empty() {
             "None".to_owned()
         } else {
-            _int_value_with(stmt.args[0].as_deref(), env)
+            _int_value(stmt.args[0].as_deref(), env)
                 .map_or_else(|| "None".to_owned(), |v| v.to_string())
         };
         let allowed = by_module.get(&mod_key).or_else(|| rule.get("values"));
@@ -733,7 +659,7 @@ pub fn _apply_const_rule_with(
         }
     }
     let show_pos = rule.get("show").and_then(Json::as_i64).unwrap_or(pos);
-    if let Some(shown) = _long_arg_with(stmt, show_pos, rule, env, profile, names) {
+    if let Some(shown) = _long_arg(stmt, show_pos, rule, env, profile, names) {
         let shown_str = shown.to_string();
         let template = rule.get("message").and_then(Json::as_str).unwrap_or("");
         let msg = pystr::format_named(template, &[("value", &shown_str)]);
@@ -741,13 +667,8 @@ pub fn _apply_const_rule_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_matches_invalid_raw`.
-pub fn _matches_invalid_raw() -> bool {
-    todo!("checker/instr_measure.py::_matches_invalid_raw (omitted: value: object, invalid: dict)")
-}
-
-/// Port of `checker/instr_measure.py::_matches_invalid_raw`.
-pub fn _matches_invalid_raw_with(value: &ConstValue, invalid: &Json) -> bool {
+/// Port of checker/instr_measure.py::_matches_invalid_raw
+pub fn _matches_invalid_raw(value: &ConstValue, invalid: &Json) -> bool {
     if invalid
         .get("strings")
         .and_then(Json::as_bool)
@@ -790,15 +711,8 @@ pub fn _matches_invalid_raw_with(value: &ConstValue, invalid: &Json) -> bool {
     }
 }
 
-/// Port of `checker/instr_measure.py::_long_arg`.
-pub fn _long_arg(_stmt: &Instruction, _pos: i64, _profile: &Profile) -> Option<i64> {
-    todo!(
-        "checker/instr_measure.py::_long_arg (omitted: rule: dict, env: consteval.Env, names: untyped)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_long_arg`.
-pub fn _long_arg_with(
+/// Port of checker/instr_measure.py::_long_arg
+pub fn _long_arg(
     stmt: &Instruction,
     pos: i64,
     rule: &Json,
@@ -807,7 +721,7 @@ pub fn _long_arg_with(
     names: &(BTreeSet<String>, BTreeSet<String>),
 ) -> Option<i64> {
     const INF_MAX_THRESHOLD: f64 = 3.402_823_466_385_288_6e38; // 2**128 - 2**103
-    let value = _raw_arg_with(stmt, pos, env)?;
+    let value = _raw_arg(stmt, pos, env)?;
     if rule
         .get("string_zero")
         .and_then(Json::as_bool)
@@ -863,27 +777,15 @@ pub fn _long_arg_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_raw_arg`.
-pub fn _raw_arg(_stmt: &Instruction, _pos: i64) {
-    todo!("checker/instr_measure.py::_raw_arg (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_raw_arg`.
-pub fn _raw_arg_with(stmt: &Instruction, pos: i64, env: &Env) -> Option<ConstValue> {
+/// Port of checker/instr_measure.py::_raw_arg
+pub fn _raw_arg(stmt: &Instruction, pos: i64, env: &Env) -> Option<ConstValue> {
     let idx = usize::try_from(pos - 1).ok()?;
     let arg = stmt.args.get(idx)?.as_deref()?;
-    _fnotch_value_with(Some(arg), env)
+    _fnotch_value(Some(arg), env)
 }
 
-/// Port of `checker/instr_measure.py::_check_string_prefix`.
-pub fn _check_string_prefix(_stmt: &Instruction, _diags: &mut Diagnostics) -> bool {
-    todo!(
-        "checker/instr_measure.py::_check_string_prefix (omitted: rule: dict, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_check_string_prefix`.
-pub fn _check_string_prefix_with(
+/// Port of checker/instr_measure.py::_check_string_prefix
+pub fn _check_string_prefix(
     stmt: &Instruction,
     rule: &Json,
     env: &Env,
@@ -896,7 +798,7 @@ pub fn _check_string_prefix_with(
     if idx >= stmt.args.len() || stmt.args[idx].is_none() {
         return false;
     }
-    let Some(ConstValue::Str(value)) = _const_value_with(stmt.args[idx].as_deref(), env) else {
+    let Some(ConstValue::Str(value)) = _const_value(stmt.args[idx].as_deref(), env) else {
         return false;
     };
     let drive = pystr::slice(&value, None, Some(4));
@@ -916,7 +818,7 @@ pub fn _check_string_prefix_with(
     }
     let ext_rule = rule.get("ext").and_then(Json::as_str);
     let option = if ext_rule.is_some() && stmt.args.len() > 1 {
-        _int_value_with(stmt.args[1].as_deref(), env)
+        _int_value(stmt.args[1].as_deref(), env)
     } else {
         None
     };
@@ -941,20 +843,15 @@ pub fn _check_string_prefix_with(
     false
 }
 
-/// Port of `checker/instr_measure.py::_check_ch400status`.
-pub fn _check_ch400status(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_ch400status (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_ch400status`.
-pub fn _check_ch400status_with(stmt: &Instruction, env: &Env, diags: &mut Diagnostics) {
+/// Port of checker/instr_measure.py::_check_ch400status
+pub fn _check_ch400status(stmt: &Instruction, env: &Env, diags: &mut Diagnostics) {
     if stmt.args.len() < 2 {
         return;
     }
-    let Some(value) = _int_value_with(stmt.args[0].as_deref(), env) else {
+    let Some(value) = _int_value(stmt.args[0].as_deref(), env) else {
         return;
     };
-    let Some(unit_val) = _const_value_with(stmt.args[1].as_deref(), env) else {
+    let Some(unit_val) = _const_value(stmt.args[1].as_deref(), env) else {
         return;
     };
     let unit = match unit_val {
@@ -977,13 +874,8 @@ pub fn _check_ch400status_with(stmt: &Instruction, env: &Env, diags: &mut Diagno
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_fft_source`.
-pub fn _check_fft_source(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_fft_source (omitted: dims: dict, env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_fft_source`.
-pub fn _check_fft_source_with(
+/// Port of checker/instr_measure.py::_check_fft_source
+pub fn _check_fft_source(
     stmt: &Instruction,
     dims: &OrderedMap<String, Vec<i64>>,
     env: &Env,
@@ -1000,7 +892,7 @@ pub fn _check_fft_source_with(
         Expr::Index(ix) => &ix.name,
         _ => return,
     };
-    let Some(n) = _int_value_with(stmt.args[2].as_deref(), env) else {
+    let Some(n) = _int_value(stmt.args[2].as_deref(), env) else {
         return;
     };
     let Some(shape) = dims.get(&pystr::upper(src_name)) else {
@@ -1009,7 +901,7 @@ pub fn _check_fft_source_with(
     if n < 1 || (n & (n - 1)) != 0 {
         return;
     }
-    let offset = part3::_flat_offset(arg0, shape.clone());
+    let offset = part3::_flat_offset(arg0, shape, None);
     if let Some(off) = offset
         && shape.iter().product::<i64>() - off < n
     {
@@ -1021,13 +913,8 @@ pub fn _check_fft_source_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_sdi12_structure_dest`.
-pub fn _check_sdi12_structure_dest(stmt: &Instruction, program: &Program, diags: &mut Diagnostics) {
-    _check_sdi12_structure_dest_with(stmt, &Rc::new(program.clone()), diags);
-}
-
-/// Port of `checker/instr_measure.py::_check_sdi12_structure_dest`.
-pub fn _check_sdi12_structure_dest_with(
+/// Port of checker/instr_measure.py::_check_sdi12_structure_dest
+pub fn _check_sdi12_structure_dest(
     stmt: &Instruction,
     program: &ProgramRef,
     diags: &mut Diagnostics,
@@ -1065,20 +952,8 @@ pub fn _check_sdi12_structure_dest_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_tablefile`.
+/// Port of checker/instr_measure.py::_check_tablefile
 pub fn _check_tablefile(
-    _stmt: &Instruction,
-    _diags: &mut Diagnostics,
-    _profile: &Profile,
-    _typer: &mut crate::checker::var_types::Typer,
-) {
-    todo!(
-        "checker/instr_measure.py::_check_tablefile (omitted: cfg: dict, env: consteval.Env, names: tuple[frozenset[str], frozenset[str]])"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_check_tablefile`.
-pub fn _check_tablefile_with(
     stmt: &Instruction,
     cfg: &Json,
     env: &Env,
@@ -1090,7 +965,7 @@ pub fn _check_tablefile_with(
     let name = stmt
         .args
         .first()
-        .and_then(|a| _name_text_with(a.as_deref(), env));
+        .and_then(|a| _name_text(a.as_deref(), env));
     let Some(name) = name.filter(|s| !s.is_empty()) else {
         return;
     };
@@ -1177,13 +1052,8 @@ pub fn _check_tablefile_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_name_text`.
-pub fn _name_text(_arg: Option<&Expr>) -> Option<String> {
-    todo!("checker/instr_measure.py::_name_text (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_name_text`.
-pub fn _name_text_with(arg: Option<&Expr>, env: &Env) -> Option<String> {
+/// Port of checker/instr_measure.py::_name_text
+pub fn _name_text(arg: Option<&Expr>, env: &Env) -> Option<String> {
     let arg = arg?;
     if let Expr::Member(m) = arg
         && m.args.is_none()
@@ -1197,25 +1067,18 @@ pub fn _name_text_with(arg: Option<&Expr>, env: &Env) -> Option<String> {
     if let Expr::Binary(b) = arg
         && (b.op == "+" || b.op == "&")
     {
-        let left = _name_text_with(b.left.as_deref(), env)?;
-        let right = _name_text_with(b.right.as_deref(), env)?;
+        let left = _name_text(b.left.as_deref(), env)?;
+        let right = _name_text(b.right.as_deref(), env)?;
         return Some(format!("{left}{right}"));
     }
-    match _const_value_with(Some(arg), env)? {
+    match _const_value(Some(arg), env)? {
         ConstValue::Str(s) => Some(s),
         _ => None,
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_structure_members`.
-pub fn _check_structure_members(_stmt: &Instruction, _program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/instr_measure.py::_check_structure_members (omitted: cfg: dict, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_check_structure_members`.
-pub fn _check_structure_members_with(
+/// Port of checker/instr_measure.py::_check_structure_members
+pub fn _check_structure_members(
     stmt: &Instruction,
     program: &ProgramRef,
     cfg: &Json,
@@ -1240,7 +1103,7 @@ pub fn _check_structure_members_with(
     let Some(type_name) = var_types_map.get(&pystr::upper(dest_name)) else {
         return;
     };
-    let members = _structure_members_with(program, type_name);
+    let members = _structure_members(program, type_name);
     for rule in rules {
         let member_key = rule.get("member").and_then(Json::as_str).unwrap_or("");
         let Some(member) = members.get(member_key) else {
@@ -1255,7 +1118,7 @@ pub fn _check_structure_members_with(
             .get("min_string_size")
             .and_then(Json::as_i64)
             .unwrap_or(0);
-        if let Some(size) = _int_value_with(member.string_size.as_deref(), env)
+        if let Some(size) = _int_value(member.string_size.as_deref(), env)
             && size < min_size
         {
             let msg = rule.get("message").and_then(Json::as_str).unwrap_or("");
@@ -1264,13 +1127,8 @@ pub fn _check_structure_members_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_structure_members`.
-pub fn _structure_members(_program: &Program, _type_name: &str) {
-    todo!("checker/instr_measure.py::_structure_members")
-}
-
-/// Port of `checker/instr_measure.py::_structure_members`.
-pub fn _structure_members_with(program: &Program, type_name: &str) -> OrderedMap<String, VarDecl> {
+/// Port of checker/instr_measure.py::_structure_members
+pub fn _structure_members(program: &Program, type_name: &str) -> OrderedMap<String, VarDecl> {
     let mut members: OrderedMap<String, VarDecl> = OrderedMap::new();
     let mut active = false;
     for candidate in &program.statements {
@@ -1298,13 +1156,8 @@ pub fn _structure_members_with(program: &Program, type_name: &str) -> OrderedMap
     members
 }
 
-/// Port of `checker/instr_measure.py::check_pass1_values`.
-pub fn check_pass1_values(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::check_pass1_values (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::check_pass1_values`.
-pub fn check_pass1_values_with(
+/// Port of checker/instr_measure.py::check_pass1_values
+pub fn check_pass1_values(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1377,15 +1230,15 @@ pub fn check_pass1_values_with(
             if let Some(arr) = entry.as_array() {
                 for p in arr {
                     if let Some(pos) = p.as_i64() {
-                        _check_range_code_with(stmt, measure, pos, env, diags);
+                        _check_range_code(stmt, measure, pos, env, diags);
                     }
                 }
             } else if let Some(pos) = entry.as_i64() {
-                _check_range_code_with(stmt, measure, pos, env, diags);
+                _check_range_code(stmt, measure, pos, env, diags);
             }
         }
         if let Some(pos) = fn_entry.and_then(Json::as_i64) {
-            _check_fnotch_min_with(stmt, fnotch, pos, env, diags, integ_num);
+            _check_fnotch_min(stmt, fnotch, pos, env, diags, integ_num);
         }
     }
 }
@@ -1398,13 +1251,8 @@ fn _inf_name_value(name_upper: &str) -> Option<f64> {
     }
 }
 
-/// Port of `checker/instr_measure.py::_fnotch_value`.
-pub fn _fnotch_value(_arg: Option<&Expr>) {
-    todo!("checker/instr_measure.py::_fnotch_value (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_fnotch_value`.
-pub fn _fnotch_value_with(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
+/// Port of checker/instr_measure.py::_fnotch_value
+pub fn _fnotch_value(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     let mut inner = arg;
     let mut sign = 1.0_f64;
     while let Some(Expr::Unary(u)) = inner
@@ -1421,21 +1269,11 @@ pub fn _fnotch_value_with(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
             return Some(ConstValue::Float(sign * val));
         }
     }
-    _const_value_with(arg, env)
+    _const_value(arg, env)
 }
 
-/// Port of `checker/instr_measure.py::_check_fnotch_min`.
+/// Port of checker/instr_measure.py::_check_fnotch_min
 pub fn _check_fnotch_min(
-    _stmt: &Instruction,
-    _pos: i64,
-    _diags: &mut Diagnostics,
-    _integ_num: f64,
-) {
-    todo!("checker/instr_measure.py::_check_fnotch_min (omitted: cfg: dict, env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_fnotch_min`.
-pub fn _check_fnotch_min_with(
     stmt: &Instruction,
     cfg: &Json,
     pos: i64,
@@ -1452,7 +1290,7 @@ pub fn _check_fnotch_min_with(
     let Some(arg) = stmt.args[idx].as_deref() else {
         return;
     };
-    let Some(val) = _fnotch_value_with(Some(arg), env) else {
+    let Some(val) = _fnotch_value(Some(arg), env) else {
         return;
     };
     let bad = match val {
@@ -1495,13 +1333,8 @@ fn _fnotch_float_bad(value: f64, cfg: &Json, integ_num: f64) -> bool {
     }
 }
 
-/// Port of `checker/instr_measure.py::_const_value`.
-pub fn _const_value(_arg: Option<&Expr>) {
-    todo!("checker/instr_measure.py::_const_value (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_const_value`.
-pub fn _const_value_with(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
+/// Port of checker/instr_measure.py::_const_value
+pub fn _const_value(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     let arg = arg?;
     if !consteval::is_constant(Some(arg), env) {
         return None;
@@ -1509,27 +1342,17 @@ pub fn _const_value_with(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     consteval::value_of(Some(arg), env).ok()
 }
 
-/// Port of `checker/instr_measure.py::_int_value`.
-pub fn _int_value(_arg: Option<&Expr>) -> Option<i64> {
-    todo!("checker/instr_measure.py::_int_value (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_int_value`.
-pub fn _int_value_with(arg: Option<&Expr>, env: &Env) -> Option<i64> {
-    match _const_value_with(arg, env)? {
+/// Port of checker/instr_measure.py::_int_value
+pub fn _int_value(arg: Option<&Expr>, env: &Env) -> Option<i64> {
+    match _const_value(arg, env)? {
         ConstValue::Int(i) => Some(i),
         ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() => pystr::py_int_from_f64(f),
         _ => None,
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_gps_nmea`.
-pub fn _check_gps_nmea(_stmt: &Instruction, _program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_gps_nmea (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_gps_nmea`.
-pub fn _check_gps_nmea_with(
+/// Port of checker/instr_measure.py::_check_gps_nmea
+pub fn _check_gps_nmea(
     stmt_ref: &StmtRef,
     program: &ProgramRef,
     env: &Env,
@@ -1576,7 +1399,7 @@ pub fn _check_gps_nmea_with(
                     other => other,
                 };
                 let size = if let Some(se) = size_expr {
-                    _int_value_with(Some(se), env)
+                    _int_value(Some(se), env)
                 } else {
                     Some(24)
                 };
@@ -1596,17 +1419,12 @@ pub fn _check_gps_nmea_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_gps_port`.
-pub fn _check_gps_port(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_gps_port (omitted: cfg: dict, env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_gps_port`.
-pub fn _check_gps_port_with(stmt: &Instruction, cfg: &Json, env: &Env, diags: &mut Diagnostics) {
+/// Port of checker/instr_measure.py::_check_gps_port
+pub fn _check_gps_port(stmt: &Instruction, cfg: &Json, env: &Env, diags: &mut Diagnostics) {
     if stmt.args.len() < 2 {
         return;
     }
-    let Some(port) = _int_value_with(stmt.args[1].as_deref(), env) else {
+    let Some(port) = _int_value(stmt.args[1].as_deref(), env) else {
         return;
     };
     let valid_ports = cfg
@@ -1622,15 +1440,8 @@ pub fn _check_gps_port_with(stmt: &Instruction, cfg: &Json, env: &Env, diags: &m
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_range_code`.
-pub fn _check_range_code(_stmt: &Instruction, _pos: i64, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/instr_measure.py::_check_range_code (omitted: measure: dict, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/instr_measure.py::_check_range_code`.
-pub fn _check_range_code_with(
+/// Port of checker/instr_measure.py::_check_range_code
+pub fn _check_range_code(
     stmt: &Instruction,
     measure: &Json,
     pos: i64,
@@ -1643,7 +1454,7 @@ pub fn _check_range_code_with(
     if idx >= stmt.args.len() {
         return;
     }
-    let Some(value) = _const_value_with(stmt.args[idx].as_deref(), env) else {
+    let Some(value) = _const_value(stmt.args[idx].as_deref(), env) else {
         return;
     };
     let is_valid = match value {
@@ -1670,17 +1481,12 @@ pub fn _check_range_code_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_sw12`.
-pub fn _check_sw12(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_sw12 (omitted: measure: dict, env: consteval.Env)")
-}
-
-/// Port of `checker/instr_measure.py::_check_sw12`.
-pub fn _check_sw12_with(stmt: &Instruction, measure: &Json, env: &Env, diags: &mut Diagnostics) {
+/// Port of checker/instr_measure.py::_check_sw12
+pub fn _check_sw12(stmt: &Instruction, measure: &Json, env: &Env, diags: &mut Diagnostics) {
     if stmt.args.is_empty() {
         return;
     }
-    let mut value = _int_value_with(stmt.args[0].as_deref(), env);
+    let mut value = _int_value(stmt.args[0].as_deref(), env);
     if matches!(stmt.args[0].as_deref(), Some(Expr::String(_)))
         && measure
             .get("string_port_int_min")
@@ -1716,14 +1522,14 @@ pub const _DELAY_US_PER_UNIT: [(i64, i64); 6] = [
     (5, 86_400_000_000),
 ];
 
-fn delay_us_per_unit(unit: i64) -> Option<i64> {
+pub(super) fn delay_us_per_unit(unit: i64) -> Option<i64> {
     _DELAY_US_PER_UNIT
         .iter()
         .find(|(k, _)| *k == unit)
         .map(|(_, v)| *v)
 }
 
-/// Port of `checker/instr_measure.py::_delay_option_byte`.
+/// Port of checker/instr_measure.py::_delay_option_byte
 pub fn _delay_option_byte(value: i64) -> i64 {
     if !(-(1_i64 << 31)..(1_i64 << 31)).contains(&value) {
         return 0;
@@ -1733,7 +1539,7 @@ pub fn _delay_option_byte(value: i64) -> i64 {
 
 pub const _TASK_MEMORY_COPIES: usize = 100;
 
-/// Port of `checker/instr_measure.py::_task_memory_full`.
+/// Port of checker/instr_measure.py::_task_memory_full
 pub fn _task_memory_full(stmt: &Instruction, diags: &mut Diagnostics) {
     for _ in 0.._TASK_MEMORY_COPIES {
         diags.error_basic(
@@ -1833,16 +1639,16 @@ mod tests {
         let mut diags = Diagnostics::new();
 
         let ok = instr(1, "SW12", vec![num_i(1), num_i(1)]);
-        _check_sw12_with(&ok, cr6.measure(), &env, &mut diags);
+        _check_sw12(&ok, cr6.measure(), &env, &mut diags);
         assert_eq!(diags.items.len(), 0);
 
         let bad = instr(2, "SW12", vec![num_i(99), num_i(1)]);
-        _check_sw12_with(&bad, cr6.measure(), &env, &mut diags);
+        _check_sw12(&bad, cr6.measure(), &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Invalid SW12 port 99.");
 
         let str_port = instr(3, "SW12", vec![str_lit("x"), num_i(0)]);
-        _check_sw12_with(&str_port, cr6.measure(), &env, &mut diags);
+        _check_sw12(&str_port, cr6.measure(), &env, &mut diags);
         assert_eq!(diags.items.len(), 2);
         assert_eq!(diags.items[1].message, "Invalid SW12 port -2147483648.");
     }
@@ -1854,17 +1660,17 @@ mod tests {
         let mut diags = Diagnostics::new();
 
         let ok_rc = instr(1, "VoltSe", vec![name_expr("x"), num_i(1), num_i(800)]);
-        _check_range_code_with(&ok_rc, cr6.measure(), 3, &env, &mut diags);
+        _check_range_code(&ok_rc, cr6.measure(), 3, &env, &mut diags);
         assert_eq!(diags.items.len(), 0);
 
         let bad_rc = instr(2, "VoltSe", vec![name_expr("x"), num_i(1), str_lit("800")]);
-        _check_range_code_with(&bad_rc, cr6.measure(), 3, &env, &mut diags);
+        _check_range_code(&bad_rc, cr6.measure(), 3, &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert!(diags.items[0].message.contains("Invalid range code"));
 
         // fN1: 0 and INF pass; 1.0 (< 1.430525) fails twice for THERM107
         let ok_fn = instr(3, "PanelTemp", vec![name_expr("p"), num_f(0.0, "0")]);
-        _check_fnotch_min_with(
+        _check_fnotch_min(
             &ok_fn,
             cr6.fnotch(),
             2,
@@ -1880,7 +1686,7 @@ mod tests {
             operand: name_expr("INF"),
         })));
         let ok_inf = instr(4, "PanelTemp", vec![name_expr("p"), neg_inf]);
-        _check_fnotch_min_with(
+        _check_fnotch_min(
             &ok_inf,
             cr6.fnotch(),
             2,
@@ -1902,7 +1708,7 @@ mod tests {
                 num_f(1.0, "1.0"),
             ],
         );
-        _check_fnotch_min_with(
+        _check_fnotch_min(
             &bad_fn,
             cr6.fnotch(),
             6,
@@ -1929,19 +1735,19 @@ mod tests {
         let gps_cfg = cr6.measure().get("gps").unwrap();
 
         let bad_port = instr(1, "GPS", vec![name_expr("g"), num_i(2)]);
-        _check_gps_port_with(&bad_port, gps_cfg, &env, &mut diags);
+        _check_gps_port(&bad_port, gps_cfg, &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
 
         let bad_pps = instr(2, "GPS", vec![name_expr("g"), num_i(1)]);
-        _check_gps_port_with(&bad_pps, gps_cfg, &env, &mut diags);
+        _check_gps_port(&bad_pps, gps_cfg, &env, &mut diags);
         assert_eq!(diags.items.len(), 2);
 
         let ok_pps = instr(3, "GPS", vec![name_expr("g"), num_i(11)]);
-        _check_gps_port_with(&ok_pps, gps_cfg, &env, &mut diags);
+        _check_gps_port(&ok_pps, gps_cfg, &env, &mut diags);
         assert_eq!(diags.items.len(), 2);
 
         let bad_ch400 = instr(4, "CH400Status", vec![num_i(500), num_i(1)]);
-        _check_ch400status_with(&bad_ch400, &env, &mut diags);
+        _check_ch400status(&bad_ch400, &env, &mut diags);
         assert_eq!(diags.items.len(), 3);
         assert_eq!(
             diags.items[2].message,
@@ -1949,7 +1755,7 @@ mod tests {
         );
 
         let ok_ch400 = instr(5, "CH400Status", vec![num_i(1000), num_i(1)]);
-        _check_ch400status_with(&ok_ch400, &env, &mut diags);
+        _check_ch400status(&ok_ch400, &env, &mut diags);
         assert_eq!(diags.items.len(), 3);
     }
 
@@ -1970,10 +1776,7 @@ mod tests {
                 args: None,
             }))),
         });
-        assert_eq!(
-            _name_text_with(Some(&concat), &env).as_deref(),
-            Some("CRD:out_")
-        );
+        assert_eq!(_name_text(Some(&concat), &env).as_deref(), Some("CRD:out_"));
 
         let rule = cr6
             .measure()
@@ -1982,13 +1785,11 @@ mod tests {
             .unwrap()[0]
             .clone();
         let bad_drive = instr(1, "FileManage", vec![str_lit("XYZ:foo.cr6"), num_i(0)]);
-        assert!(_check_string_prefix_with(
-            &bad_drive, &rule, &env, &mut diags
-        ));
+        assert!(_check_string_prefix(&bad_drive, &rule, &env, &mut diags));
         assert_eq!(diags.items[0].message, "FileManage invalid drive: XYZ:.");
 
         let bad_ext = instr(2, "FileManage", vec![str_lit("CPU:foo.txt"), num_i(2)]);
-        assert!(_check_string_prefix_with(&bad_ext, &rule, &env, &mut diags));
+        assert!(_check_string_prefix(&bad_ext, &rule, &env, &mut diags));
         assert_eq!(
             diags.items[1].message,
             "FileManage name CPU:foo.txt invalid extension."
@@ -2014,7 +1815,7 @@ mod tests {
                 num_i(1),
             ],
         );
-        _check_periodavg_channels_with(&st, cr300, &env, &mut diags);
+        _check_periodavg_channels(&st, cr300, &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Reps exceeds valid channels.");
 
@@ -2032,7 +1833,7 @@ mod tests {
                 num_i(1),
             ],
         );
-        _check_periodavg_channels_with(&st_port, cr300, &env, &mut diags);
+        _check_periodavg_channels(&st_port, cr300, &env, &mut diags);
         assert_eq!(diags.items.len(), 4);
         assert_eq!(diags.items[1].message, "Invalid channel: 8.");
         assert_eq!(diags.items[2].message, "Reps exceeds valid channels.");

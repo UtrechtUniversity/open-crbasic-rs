@@ -10,6 +10,9 @@
     reason = "port keeps Python signatures, leading-underscore names, and int->float semantics"
 )]
 
+use super::part1::{_const_value, _delay_option_byte, _int_value, _task_memory_full};
+use super::part3::{_flat_offset, _index_value};
+use crate::checker::instr_rules::_scan_raw;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
@@ -39,45 +42,13 @@ static NEXT_SCAN_RE: LazyLock<pyre::Regex> =
 static NEXT_SUBSCAN_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*Next\s+SubScan\b", 0));
 
-const DELAY_US_PER_UNIT_LOCAL: [i64; 6] = [
-    1,
-    1_000,
-    1_000_000,
-    60_000_000,
-    3_600_000_000,
-    86_400_000_000,
-];
-
-const TASK_MEMORY_COPIES_LOCAL: usize = 100;
-
 fn delay_us_factor(unit: i64) -> Option<i64> {
-    usize::try_from(unit)
-        .ok()
-        .and_then(|i| DELAY_US_PER_UNIT_LOCAL.get(i).copied())
-}
-
-// TODO(integrator-2): wire to `part1::_const_value_with` once `part1` is ported.
-fn const_value_local(arg: Option<&Expr>, env: &Env) -> Option<ConstValue> {
-    let e = arg?;
-    if !consteval::is_constant(Some(e), env) {
-        return None;
-    }
-    consteval::value_of(Some(e), env).ok()
-}
-
-// TODO(integrator-2): wire to `part1::_int_value_with` once `part1` is ported.
-fn int_value_local(arg: Option<&Expr>, env: &Env) -> Option<i64> {
-    match const_value_local(arg, env)? {
-        ConstValue::Int(i) => Some(i),
-        ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() => pystr::py_int_from_f64(f),
-        ConstValue::BigInt(s) => s.parse::<i64>().ok(),
-        ConstValue::Float(_) | ConstValue::CFloat(_) | ConstValue::Str(_) => None,
-    }
+    super::part1::delay_us_per_unit(unit)
 }
 
 fn delay_option_from_const(arg: Option<&Expr>, env: &Env) -> Option<i64> {
-    match const_value_local(arg, env)? {
-        ConstValue::Int(i) => Some(delay_option_byte_local(i)),
+    match _const_value(arg, env)? {
+        ConstValue::Int(i) => Some(_delay_option_byte(i)),
         ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() => {
             if f > 3.402_823_5e38 {
                 Some(255)
@@ -89,7 +60,7 @@ fn delay_option_from_const(arg: Option<&Expr>, env: &Env) -> Option<i64> {
         }
         ConstValue::BigInt(s) => {
             if let Ok(i) = s.parse::<i64>() {
-                Some(delay_option_byte_local(i))
+                Some(_delay_option_byte(i))
             } else if let Ok(f) = s.parse::<f64>() {
                 Some(if f > 3.402_823_5e38 { 255 } else { 0 })
             } else {
@@ -100,116 +71,6 @@ fn delay_option_from_const(arg: Option<&Expr>, env: &Env) -> Option<i64> {
     }
 }
 
-// TODO(integrator-2): wire to `part1::_delay_option_byte` once `part1` is ported.
-fn delay_option_byte_local(value: i64) -> i64 {
-    if !(-2_147_483_648..2_147_483_648).contains(&value) {
-        return 0;
-    }
-    value.rem_euclid(256)
-}
-
-// TODO(integrator-2): wire to `part1::_task_memory_full` once `part1` is ported.
-fn task_memory_full_local(stmt: &Instruction, diags: &mut Diagnostics) {
-    for _ in 0..TASK_MEMORY_COPIES_LOCAL {
-        diags.error_basic(
-            stmt.base.node.line,
-            "Program too big for task memory",
-            &stmt.base.node.file,
-        );
-    }
-}
-
-// TODO(integrator-2): wire to `instr_rules::_scan_raw_with` once `instr_rules` is ported.
-fn scan_raw_local(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
-    let args = &stmt.args;
-    if args.len() < 2 {
-        return None;
-    }
-    let a0 = args[0].as_deref()?;
-    let a1 = args[1].as_deref()?;
-    if !(consteval::is_constant(Some(a0), env) && consteval::is_constant(Some(a1), env)) {
-        return None;
-    }
-    let value = consteval::value_of(Some(a0), env).ok()?;
-    let unit = consteval::value_of(Some(a1), env).ok()?;
-    if !consteval::is_finite_number(&value) {
-        return None;
-    }
-    let unit_i = match unit {
-        ConstValue::Int(u) if delay_us_factor(u).is_some() => u,
-        ConstValue::Float(f) | ConstValue::CFloat(f)
-            if pystr::is_integer(f) && (0.0..=5.0).contains(&f) =>
-        {
-            pystr::py_int_from_f64(f)?
-        }
-        _ => return None,
-    };
-    let val_i = match value {
-        ConstValue::Int(i) => i,
-        ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            if f <= -1.0 || f >= 2_147_483_648.0 {
-                return None;
-            }
-            pystr::py_int_from_f64(f)?
-        }
-        ConstValue::Str(_) | ConstValue::BigInt(_) => return None,
-    };
-    if !(0..=2_147_483_647).contains(&val_i) {
-        return None;
-    }
-    Some((val_i, unit_i))
-}
-
-// TODO(integrator-2): wire to `part3::_index_value_with` once `part3` is ported.
-fn index_value_local(arg: Option<&Expr>, env: Option<&Env>) -> Option<i64> {
-    if let Some(Expr::Number(n)) = arg
-        && let NumberValue::Int(v) = n.value
-    {
-        return Some(v);
-    }
-    let env = env?;
-    match const_value_local(arg, env)? {
-        ConstValue::Int(v) => Some(v),
-        _ => None,
-    }
-}
-
-// TODO(integrator-2): wire to `part3::_flat_offset_with` once `part3` is ported.
-fn flat_offset_local(dest: &Expr, shape: &[i64], env: Option<&Env>) -> Option<i64> {
-    let args = match dest {
-        Expr::Name(_) => return Some(0),
-        Expr::Index(idx) => &idx.args,
-        _ => return None,
-    };
-    if args.is_empty() || args.iter().all(Option::is_none) {
-        return Some(0);
-    }
-    let mut index = Vec::with_capacity(args.len());
-    for a in args {
-        index.push(index_value_local(a.as_deref(), env)?);
-    }
-    if index.len() == 1 {
-        return if index[0] >= 1 {
-            Some(index[0] - 1)
-        } else {
-            None
-        };
-    }
-    if index.len() != shape.len()
-        || index
-            .iter()
-            .zip(shape.iter())
-            .any(|(&k, &n)| k < 1 || k > n)
-    {
-        return None;
-    }
-    let mut offset = 0_i64;
-    for (&k, &n) in index.iter().zip(shape.iter()) {
-        offset = offset * n + (k - 1);
-    }
-    Some(offset)
-}
-
 fn expr_name_upper(expr: &Expr) -> Option<(&str, String)> {
     match expr {
         Expr::Name(n) => Some((&n.name, pystr::upper(&n.name))),
@@ -218,19 +79,8 @@ fn expr_name_upper(expr: &Expr) -> Option<(&str, String)> {
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_delay`.
+/// Port of checker/instr_measure.py::_check_delay
 pub fn _check_delay(
-    _stmt: &Instruction,
-    _diags: &mut Diagnostics,
-    _sequential: bool,
-    _slow: bool,
-    _typer: &mut Typer,
-) {
-    todo!("checker/instr_measure.py::_check_delay (omitted: cfg: dict, env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_delay`.
-pub fn _check_delay_with(
     stmt: &Instruction,
     cfg: &Json,
     env: &Env,
@@ -274,7 +124,7 @@ pub fn _check_delay_with(
     }
     let active_env = owned_env.as_ref().unwrap_or(env);
 
-    let interval_value = const_value_local(interval_arg, active_env);
+    let interval_value = _const_value(interval_arg, active_env);
     if matches!(interval_value, Some(ConstValue::Str(_)))
         || typer.of(interval_arg, 0).as_deref() == Some("STRING")
     {
@@ -310,7 +160,7 @@ pub fn _check_delay_with(
             );
             return;
         }
-        let unit = const_value_local(units_arg, active_env);
+        let unit = _const_value(units_arg, active_env);
         let interval_num = match &interval_value {
             Some(ConstValue::Int(i)) => Some(*i as f64),
             Some(ConstValue::Float(f) | ConstValue::CFloat(f)) if f.is_finite() => Some(*f),
@@ -337,12 +187,12 @@ pub fn _check_delay_with(
             .unwrap_or(false)
             && scan_time::task_memory_overflow(us)
         {
-            task_memory_full_local(stmt, diags);
+            _task_memory_full(stmt, diags);
         }
     } else if (option == Some(1) || (option == Some(0) && active_env.profile.single_pass))
         && let Some(limit1) = option1_limit
     {
-        if let Some(us) = _delay_interval_us_with(interval_arg, units_arg, active_env)
+        if let Some(us) = _delay_interval_us(interval_arg, units_arg, active_env)
             && us >= limit1 as f64
         {
             diags.error_basic(
@@ -389,21 +239,14 @@ pub fn _check_delay_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_delay_interval_us`.
-pub fn _delay_interval_us() -> Option<f64> {
-    todo!(
-        "checker/instr_measure.py::_delay_interval_us (omitted: interval_arg: untyped, units_arg: untyped, env: consteval.Env)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_delay_interval_us`.
-pub fn _delay_interval_us_with(
+/// Port of checker/instr_measure.py::_delay_interval_us
+pub fn _delay_interval_us(
     interval_arg: Option<&Expr>,
     units_arg: Option<&Expr>,
     env: &Env,
 ) -> Option<f64> {
-    let value = const_value_local(interval_arg, env)?;
-    let unit = const_value_local(units_arg, env)?;
+    let value = _const_value(interval_arg, env)?;
+    let unit = _const_value(units_arg, env)?;
     if !consteval::is_finite_number(&value) || !consteval::is_finite_number(&unit) {
         return None;
     }
@@ -429,20 +272,8 @@ pub fn _delay_interval_us_with(
     Some(val_f * (us_per_unit as f64))
 }
 
-/// Port of `checker/instr_measure.py::_check_cs616_reps`.
-pub fn _check_cs616_reps(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/instr_measure.py::_check_cs616_reps (omitted: measure: dict, env: consteval.Env)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_cs616_reps`.
-pub fn _check_cs616_reps_with(
-    stmt: &Instruction,
-    measure: &Json,
-    env: &Env,
-    diags: &mut Diagnostics,
-) {
+/// Port of checker/instr_measure.py::_check_cs616_reps
+pub fn _check_cs616_reps(stmt: &Instruction, measure: &Json, env: &Env, diags: &mut Diagnostics) {
     let Some(pos) = measure.get("cs616_min_reps_pos").and_then(Json::as_i64) else {
         return;
     };
@@ -452,7 +283,7 @@ pub fn _check_cs616_reps_with(
     if idx >= stmt.args.len() {
         return;
     }
-    if let Some(value) = int_value_local(stmt.args[idx].as_deref(), env)
+    if let Some(value) = _int_value(stmt.args[idx].as_deref(), env)
         && value <= 0
     {
         diags.error_basic(
@@ -463,15 +294,8 @@ pub fn _check_cs616_reps_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_excite_magnitude`.
-pub fn _check_excite_magnitude(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/instr_measure.py::_check_excite_magnitude (omitted: measure: dict, env: consteval.Env)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_excite_magnitude`.
-pub fn _check_excite_magnitude_with(
+/// Port of checker/instr_measure.py::_check_excite_magnitude
+pub fn _check_excite_magnitude(
     stmt: &Instruction,
     measure: &Json,
     env: &Env,
@@ -489,7 +313,7 @@ pub fn _check_excite_magnitude_with(
     if idx >= stmt.args.len() {
         return;
     }
-    let val = match const_value_local(stmt.args[idx].as_deref(), env) {
+    let val = match _const_value(stmt.args[idx].as_deref(), env) {
         Some(ConstValue::Int(i)) => Some((i as f64).abs()),
         Some(ConstValue::Float(f) | ConstValue::CFloat(f)) => Some(f.abs()),
         Some(ConstValue::BigInt(ref s)) => s.parse::<f64>().ok().map(f64::abs),
@@ -510,28 +334,13 @@ pub const _UNIT_NAMES: [(i64, &str); 3] = [(1, "mSec"), (2, "Sec"), (3, "Min")];
 pub const _OPENERS: [&str; 2] = ["SELECT", "WHILE"];
 pub const _CLOSERS: [&str; 4] = ["ENDIF", "ENDSELECT", "NEXTSUBSCAN", "WEND"];
 
-/// Port of `checker/instr_measure.py::is_sequential`.
-pub fn is_sequential(_program: &Program, _profile: &Profile) -> bool {
-    todo!("checker/instr_measure.py::is_sequential (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::is_sequential`.
-pub fn is_sequential_with(program: &Program, profile: &Profile, env: &Env) -> bool {
+/// Port of checker/instr_measure.py::is_sequential
+pub fn is_sequential(program: &Program, profile: &Profile, env: &Env) -> bool {
     mode::decide_with_env(&program.statements, profile, env) == "Sequential"
 }
 
-/// Port of `checker/instr_measure.py::check_scan_delay_budget`.
+/// Port of checker/instr_measure.py::check_scan_delay_budget
 pub fn check_scan_delay_budget(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-    _zero: bool,
-) {
-    todo!("checker/instr_measure.py::check_scan_delay_budget (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::check_scan_delay_budget`.
-pub fn check_scan_delay_budget_with(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -541,7 +350,7 @@ pub fn check_scan_delay_budget_with(
     if profile.name != "cr6" && profile.name != "cr1000x" {
         return;
     }
-    if is_sequential_with(program, profile, env) {
+    if is_sequential(program, profile, env) {
         return;
     }
     for b in scan_time::budgets_with(program, env, profile, zero) {
@@ -580,18 +389,8 @@ struct CpiScan {
     short: Vec<(i64, i64)>,
 }
 
-/// Port of `checker/instr_measure.py::check_cpi_time`.
-pub fn check_cpi_time(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::check_cpi_time (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::check_cpi_time`.
-pub fn check_cpi_time_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_measure.py::check_cpi_time
+pub fn check_cpi_time(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     if (profile.name != "cr6" && profile.name != "cr1000x") || program.statements.is_empty() {
         return;
     }
@@ -601,7 +400,7 @@ pub fn check_cpi_time_with(
     let mut cur_scan: Option<usize> = None;
     let mut sub: Option<(i64, i64)> = None;
     let mut sub_start: OrderedMap<i64, i64> = OrderedMap::new();
-    let sequential = is_sequential_with(program, profile, env);
+    let sequential = is_sequential(program, profile, env);
     let float_names = longconv::float_names_in(&program.statements);
     let literal_names = longconv::literal_names_in(&program.statements);
 
@@ -666,7 +465,7 @@ pub fn check_cpi_time_with(
         if let Stmt::Instruction(instr) = stmt.as_ref()
             && kw == "SCAN"
         {
-            let Some(raw) = scan_raw_local(instr, env) else {
+            let Some(raw) = _scan_raw(instr, env) else {
                 return;
             };
             let Some(factor) = delay_us_factor(raw.1) else {
@@ -695,7 +494,7 @@ pub fn check_cpi_time_with(
             let args: Vec<Option<ConstValue>> = instr
                 .args
                 .iter()
-                .map(|a| _value_with(a.as_deref(), env))
+                .map(|a| _value(a.as_deref(), env))
                 .collect();
             let count = if args.len() == 3 {
                 match args[2] {
@@ -813,7 +612,7 @@ pub fn check_cpi_time_with(
         {
             let iv = |idx: usize| {
                 if idx < instr.args.len() {
-                    int_value_local(instr.args[idx].as_deref(), env)
+                    _int_value(instr.args[idx].as_deref(), env)
                 } else {
                     None
                 }
@@ -875,13 +674,8 @@ pub fn check_cpi_time_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_value`.
-pub fn _value(_expr: Option<&Expr>) {
-    todo!("checker/instr_measure.py::_value (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_value`.
-pub fn _value_with(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
+/// Port of checker/instr_measure.py::_value
+pub fn _value(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     let e = expr?;
     if !consteval::is_constant(Some(e), env) {
         return None;
@@ -986,13 +780,8 @@ pub const _REPS_DEST_SIZE: [&str; 16] = [
     "CS616",
 ];
 
-/// Port of `checker/instr_measure.py::_measurement_output_count`.
-pub fn _measurement_output_count(_stmt: &Instruction, _reps: i64) -> i64 {
-    todo!("checker/instr_measure.py::_measurement_output_count (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_measurement_output_count`.
-pub fn _measurement_output_count_with(stmt: &Instruction, reps: i64, env: &Env) -> i64 {
+/// Port of checker/instr_measure.py::_measurement_output_count
+pub fn _measurement_output_count(stmt: &Instruction, reps: i64, env: &Env) -> i64 {
     let kw = pystr::upper(&stmt.keyword);
     let option_index = match kw.as_str() {
         "BRHALF4W" | "BRFULL6W" => Some(14),
@@ -1006,7 +795,7 @@ pub fn _measurement_output_count_with(stmt: &Instruction, reps: i64, env: &Env) 
     if stmt.args.len() <= idx {
         return reps;
     }
-    if int_value_local(stmt.args[idx].as_deref(), env) != Some(1) {
+    if _int_value(stmt.args[idx].as_deref(), env) != Some(1) {
         return reps;
     }
     if matches!(kw.as_str(), "BRHALF4W" | "BRFULL6W") {
@@ -1019,11 +808,11 @@ pub fn _measurement_output_count_with(stmt: &Instruction, reps: i64, env: &Env) 
 /// Alias destination entry: `(backing_elements, start_offset, diagnostic_name, declared_size)`.
 pub type MeasurementAliasEntry = (i64, i64, String, Option<i64>);
 
-/// Lookup handle returned by `_build_measurement_aliases_with`.
+/// Lookup handle returned by `_build_measurement_aliases`.
 #[derive(Debug, Clone)]
 pub struct MeasurementAliasLookup {
     program: ProgramRef,
-    tables: ScopeLookup,
+    tables: HashMap<usize, ScopeTables>,
     aliases: HashMap<usize, OrderedMap<String, MeasurementAliasEntry>>,
     parameters: HashMap<usize, BTreeSet<String>>,
     stmt_to_routine: HashMap<usize, usize>,
@@ -1038,7 +827,7 @@ impl MeasurementAliasLookup {
         allow_bare_index: bool,
     ) -> Option<MeasurementAliasEntry> {
         let (_, dest_upper) = expr_name_upper(dest)?;
-        let scope = self.tables.for_statement(stmt);
+        let scope = self.tables.get(&stmt_id(stmt))?;
         let routine_key = self
             .stmt_to_routine
             .get(&stmt_id(stmt))
@@ -1073,33 +862,19 @@ impl MeasurementAliasLookup {
     }
 }
 
-/// Port of `checker/instr_measure.py::_measurement_aliases`.
-pub fn _measurement_aliases(_program: &Program) {
-    todo!(
-        "checker/instr_measure.py::_measurement_aliases (omitted: tables: untyped, env: consteval.Env)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_measurement_aliases`.
-///
-/// TODO(integrator-2): wire `context::Context::measurement_aliases` to cache this on `Context`.
-pub fn _measurement_aliases_with(
+/// Port of checker/instr_measure.py::_measurement_aliases
+pub fn _measurement_aliases(
     program: &ProgramRef,
     tables: &ScopeLookup,
     env: &Env,
 ) -> MeasurementAliasLookup {
-    _build_measurement_aliases_with(program, tables, env)
+    context::of(program, None, Some(env.clone()))
+        .measurement_aliases()
+        .clone()
 }
 
-/// Port of `checker/instr_measure.py::_build_measurement_aliases`.
-pub fn _build_measurement_aliases(_program: &Program) {
-    todo!(
-        "checker/instr_measure.py::_build_measurement_aliases (omitted: tables: untyped, env: consteval.Env)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_build_measurement_aliases`.
-pub fn _build_measurement_aliases_with(
+/// Port of checker/instr_measure.py::_build_measurement_aliases
+pub fn _build_measurement_aliases(
     program: &ProgramRef,
     tables: &ScopeLookup,
     env: &Env,
@@ -1150,7 +925,7 @@ pub fn _build_measurement_aliases_with(
                 let mut dims = Vec::with_capacity(p.dim_exprs.len());
                 let mut ok = true;
                 for d in &p.dim_exprs {
-                    match int_value_local(Some(d.as_ref()), env) {
+                    match _int_value(Some(d.as_ref()), env) {
                         Some(n) if n >= 1 => dims.push(n),
                         _ => {
                             ok = false;
@@ -1176,7 +951,7 @@ pub fn _build_measurement_aliases_with(
             let mut indices = Vec::with_capacity(idx.args.len());
             let mut ok = true;
             for a in &idx.args {
-                if let Some(i) = int_value_local(a.as_deref(), env) {
+                if let Some(i) = _int_value(a.as_deref(), env) {
                     indices.push(i);
                 } else {
                     ok = false;
@@ -1228,7 +1003,7 @@ pub fn _build_measurement_aliases_with(
                 Expr::Name(_) => (Some(1_i64), true),
                 Expr::Index(idx) => {
                     let s = if idx.args.len() == 1 {
-                        int_value_local(idx.args[0].as_deref(), env)
+                        _int_value(idx.args[0].as_deref(), env)
                     } else {
                         None
                     };
@@ -1266,7 +1041,11 @@ pub fn _build_measurement_aliases_with(
 
     MeasurementAliasLookup {
         program: program.clone(),
-        tables: tables.clone(),
+        tables: program
+            .statements
+            .iter()
+            .map(|st| (stmt_id(st), tables.for_statement(st)))
+            .collect(),
         aliases,
         parameters,
         stmt_to_routine,
@@ -1274,15 +1053,8 @@ pub fn _build_measurement_aliases_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_alias_overrun`.
-pub fn _alias_overrun(_stmt: &Instruction, _count: i64, _profile: &Profile) -> bool {
-    todo!(
-        "checker/instr_measure.py::_alias_overrun (omitted: dest: untyped, alias: untyped, env: consteval.Env, signed_index: untyped)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_alias_overrun`.
-pub fn _alias_overrun_with(
+/// Port of checker/instr_measure.py::_alias_overrun
+pub fn _alias_overrun(
     _stmt: &Instruction,
     dest: &Expr,
     alias: &MeasurementAliasEntry,
@@ -1295,7 +1067,7 @@ pub fn _alias_overrun_with(
     let mut index = 0_i64;
     if let Expr::Index(idx) = dest {
         let mut k = if idx.args.len() == 1 {
-            match index_value_local(idx.args[0].as_deref(), Some(env)) {
+            match _index_value(idx.args[0].as_deref(), Some(env)) {
                 Some(v) => v,
                 None => return false,
             }
@@ -1315,25 +1087,15 @@ pub fn _alias_overrun_with(
     count < 0 || count > available
 }
 
-/// Port of `checker/instr_measure.py::check_reps`.
-pub fn check_reps(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::check_reps (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::check_reps`.
-pub fn check_reps_with(
-    program: &ProgramRef,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_measure.py::check_reps
+pub fn check_reps(program: &ProgramRef, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     let checked = _reps_checked_for(profile.name);
     if checked.is_empty() {
         return;
     }
     let ctx = context::of(program, None, Some(env.clone()));
     let tables = ctx.scope_tables(true, true);
-    let alias_storage = _measurement_aliases_with(program, &tables, env);
+    let alias_storage = _measurement_aliases(program, &tables, env);
 
     for stmt_ref in &program.statements {
         let Stmt::Instruction(stmt) = stmt_ref.as_ref() else {
@@ -1345,7 +1107,7 @@ pub fn check_reps_with(
         }
         let scope = tables.for_statement(stmt_ref);
         let arg1 = stmt.args[1].as_deref();
-        let mut reps = match const_value_local(arg1, env) {
+        let mut reps = match _const_value(arg1, env) {
             Some(ConstValue::Int(i)) => Some(i),
             Some(ConstValue::Float(f) | ConstValue::CFloat(f)) if f.is_finite() => {
                 pystr::py_int_from_f64(f)
@@ -1378,7 +1140,7 @@ pub fn check_reps_with(
             }
             if reps_val > 0 || (reps_val < 0 && _NEGATIVE_REPS_DEST.contains(&kw.as_str())) {
                 if let Some(dest) = stmt.args[0].as_deref() {
-                    messages.push(_dest_overrun_with(
+                    messages.push(_dest_overrun(
                         stmt,
                         stmt_ref,
                         dest,
@@ -1427,7 +1189,7 @@ pub fn check_reps_with(
         }
         if !_REPS_DEST_SIZE.contains(&kw.as_str()) {
             if let Some(alias) = alias_storage.lookup(stmt_ref, dest, false)
-                && _alias_overrun_with(stmt, dest, &alias, 0, profile, env, false)
+                && _alias_overrun(stmt, dest, &alias, 0, profile, env, false)
             {
                 diags.error_basic(
                     stmt.base.node.line,
@@ -1437,7 +1199,7 @@ pub fn check_reps_with(
             }
             continue;
         }
-        if let Some(message) = _dest_overrun_with(
+        if let Some(message) = _dest_overrun(
             stmt,
             stmt_ref,
             dest,
@@ -1458,9 +1220,9 @@ pub fn check_reps_with(
         }
     }
 
-    _check_bridge_burst_with(program, profile, diags, env);
-    _check_bridge_span_with(program, profile, diags, env);
-    _check_pulse_span_with(program, profile, diags, env);
+    _check_bridge_burst(program, profile, diags, env);
+    _check_bridge_span(program, profile, diags, env);
+    _check_pulse_span(program, profile, diags, env);
 }
 
 pub const _BRIDGE_SPAN: [(&str, (usize, usize, usize, i64, i64)); 5] = [
@@ -1471,13 +1233,8 @@ pub const _BRIDGE_SPAN: [(&str, (usize, usize, usize, i64, i64)); 5] = [
     ("BRFULL6W", (4, 5, 6, 2, 2)),
 ];
 
-/// Port of `checker/instr_measure.py::_check_bridge_span`.
-pub fn _check_bridge_span(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_bridge_span (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_bridge_span`.
-pub fn _check_bridge_span_with(
+/// Port of checker/instr_measure.py::_check_bridge_span
+pub fn _check_bridge_span(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -1499,10 +1256,10 @@ pub fn _check_bridge_span_with(
             continue;
         }
         let (Some(reps), Some(chan), Some(ex), Some(meas_raw)) = (
-            int_value_local(stmt.args[1].as_deref(), env),
-            int_value_local(stmt.args[cp].as_deref(), env),
-            int_value_local(stmt.args[xp].as_deref(), env),
-            int_value_local(stmt.args[mp].as_deref(), env),
+            _int_value(stmt.args[1].as_deref(), env),
+            _int_value(stmt.args[cp].as_deref(), env),
+            _int_value(stmt.args[xp].as_deref(), env),
+            _int_value(stmt.args[mp].as_deref(), env),
         ) else {
             continue;
         };
@@ -1539,7 +1296,7 @@ pub fn _check_bridge_span_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_insert_in_line_order`.
+/// Port of checker/instr_measure.py::_insert_in_line_order
 pub fn _insert_in_line_order(diags: &mut Diagnostics, stmt: &Instruction, texts: Vec<String>) {
     let at = diags
         .items
@@ -1562,7 +1319,7 @@ pub fn _insert_in_line_order(diags: &mut Diagnostics, stmt: &Instruction, texts:
     diags.items.splice(at..at, inserted);
 }
 
-/// Port of `checker/instr_measure.py::_pulse_index`.
+/// Port of checker/instr_measure.py::_pulse_index
 pub fn _pulse_index(code: i64) -> Option<(i64, i64)> {
     let idx = if (101..=116).contains(&code) {
         Some(code - 101)
@@ -1574,18 +1331,8 @@ pub fn _pulse_index(code: i64) -> Option<(i64, i64)> {
     Some((idx, if idx < 4 { 4 } else { 16 }))
 }
 
-/// Port of `checker/instr_measure.py::_check_pulse_span`.
-pub fn _check_pulse_span(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_pulse_span (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_pulse_span`.
-pub fn _check_pulse_span_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_measure.py::_check_pulse_span
+pub fn _check_pulse_span(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     if profile.name != "cr6" {
         return;
     }
@@ -1596,8 +1343,8 @@ pub fn _check_pulse_span_with(
         if pystr::upper(&stmt.keyword) != "PULSECOUNT" || stmt.args.len() < 3 {
             continue;
         }
-        let reps = int_value_local(stmt.args[1].as_deref(), env);
-        let chan = int_value_local(stmt.args[2].as_deref(), env);
+        let reps = _int_value(stmt.args[1].as_deref(), env);
+        let chan = _int_value(stmt.args[2].as_deref(), env);
         let port = chan.and_then(_pulse_index);
         let (Some(reps_val), Some(port_val)) = (reps, port) else {
             continue;
@@ -1608,15 +1355,8 @@ pub fn _check_pulse_span_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_dest_overrun`.
-pub fn _dest_overrun() -> Option<String> {
-    todo!(
-        "checker/instr_measure.py::_dest_overrun (omitted: stmt: untyped, dest: untyped, reps: untyped, profile: untyped, env: untyped, alias_storage: untyped, scope: untyped)"
-    )
-}
-
-/// Full implementation of `checker/instr_measure.py::_dest_overrun`.
-pub fn _dest_overrun_with(
+/// Port of checker/instr_measure.py::_dest_overrun
+pub fn _dest_overrun(
     stmt: &Instruction,
     stmt_ref: &StmtRef,
     dest: &Expr,
@@ -1627,9 +1367,9 @@ pub fn _dest_overrun_with(
     scope: &ScopeTables,
 ) -> Option<String> {
     let (dest_name, dest_upper) = expr_name_upper(dest)?;
-    let count = _measurement_output_count_with(stmt, reps, env);
+    let count = _measurement_output_count(stmt, reps, env);
     if let Some(alias) = alias_storage.lookup(stmt_ref, dest, false) {
-        return if _alias_overrun_with(stmt, dest, &alias, count, profile, env, false) {
+        return if _alias_overrun(stmt, dest, &alias, count, profile, env, false) {
             Some(format!("Variable {} out of bounds.", alias.2))
         } else {
             None
@@ -1639,7 +1379,7 @@ pub fn _dest_overrun_with(
         return None;
     }
     let shape = scope.dims.get(&dest_upper)?;
-    let offset = flat_offset_local(dest, shape, Some(env))?;
+    let offset = _flat_offset(dest, shape, Some(env))?;
     let total: i64 = shape.iter().product();
     if count < 0 || count > total - offset {
         Some(format!("Variable {dest_name} out of bounds."))
@@ -1648,13 +1388,8 @@ pub fn _dest_overrun_with(
     }
 }
 
-/// Port of `checker/instr_measure.py::_check_bridge_burst`.
-pub fn _check_bridge_burst(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_measure.py::_check_bridge_burst (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_measure.py::_check_bridge_burst`.
-pub fn _check_bridge_burst_with(
+/// Port of checker/instr_measure.py::_check_bridge_burst
+pub fn _check_bridge_burst(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -1672,9 +1407,9 @@ pub fn _check_bridge_burst_with(
             continue;
         }
         let (Some(reps), Some(channel), Some(meas)) = (
-            int_value_local(stmt.args[1].as_deref(), env),
-            int_value_local(stmt.args[4].as_deref(), env),
-            int_value_local(stmt.args[6].as_deref(), env),
+            _int_value(stmt.args[1].as_deref(), env),
+            _int_value(stmt.args[4].as_deref(), env),
+            _int_value(stmt.args[6].as_deref(), env),
         ) else {
             continue;
         };
@@ -1743,7 +1478,7 @@ pub const _BUILDER_FIXED: [(&str, &[(usize, i64)]); 5] = [
     ("RECTPOLAR", &[(0, 2), (1, 2)]),
 ];
 
-/// Port of `checker/instr_measure.py::_byte`.
+/// Port of checker/instr_measure.py::_byte
 pub fn _byte(value: i64) -> i64 {
     value & 0xFF
 }
@@ -1840,7 +1575,7 @@ mod tests {
             "Delay",
             vec![Some(num_i(-1)), Some(num_i(1)), Some(num_i(2))],
         );
-        _check_delay_with(&bad_opt, cfg, &env, &mut diags, false, false, &mut typer);
+        _check_delay(&bad_opt, cfg, &env, &mut diags, false, false, &mut typer);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Illegal option 255");
 
@@ -1850,7 +1585,7 @@ mod tests {
             "Delay",
             vec![Some(num_i(0)), Some(name_e("S")), Some(num_i(2))],
         );
-        _check_delay_with(
+        _check_delay(
             &str_interval,
             cfg,
             &env,
@@ -1870,7 +1605,7 @@ mod tests {
             "Delay",
             vec![Some(num_i(0)), Some(num_i(61)), Some(num_i(3))],
         );
-        _check_delay_with(&too_long, cfg, &env, &mut diags, false, false, &mut typer);
+        _check_delay(&too_long, cfg, &env, &mut diags, false, false, &mut typer);
         assert_eq!(diags.items[0].message, "Measurement Delay Exceeds 60 min.");
     }
 
@@ -1882,13 +1617,13 @@ mod tests {
         let mut diags = Diagnostics::new();
 
         let cs616 = instr_val(5, "CS616", vec![Some(name_e("X")), Some(num_i(0))]);
-        _check_cs616_reps_with(&cs616, measure, &env, &mut diags);
+        _check_cs616_reps(&cs616, measure, &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Invalid reps 0, must be > 0");
 
         diags.items.clear();
         let excite = instr_val(6, "ExciteV", vec![Some(num_i(201)), Some(num_i(2501))]);
-        _check_excite_magnitude_with(&excite, measure, &env, &mut diags);
+        _check_excite_magnitude(&excite, measure, &env, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Excitation exceeds 2500.000000.");
     }
@@ -1945,7 +1680,7 @@ mod tests {
             ),
         ]);
         let mut diags = Diagnostics::new();
-        check_reps_with(&p, cr6, &mut diags, &env);
+        check_reps(&p, cr6, &mut diags, &env);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert!(msgs.contains(&"Variable A out of bounds."));
         assert!(msgs.contains(&"Invalid PulseCount reps."));
@@ -1971,7 +1706,7 @@ mod tests {
             instr_stmt(3, "NextScan", vec![]),
         ]);
         let mut diags = Diagnostics::new();
-        check_cpi_time_with(&p, cr6, &mut diags, &env);
+        check_cpi_time(&p, cr6, &mut diags, &env);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
@@ -1993,7 +1728,7 @@ mod tests {
             instr_stmt(3, "NextScan", vec![]),
         ]);
         let mut diags = Diagnostics::new();
-        check_scan_delay_budget_with(&p, cr6, &mut diags, &env, false);
+        check_scan_delay_budget(&p, cr6, &mut diags, &env, false);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
@@ -2010,7 +1745,7 @@ mod tests {
             instr_stmt(2, "Therm107", vec![Some(name_e("T")), Some(str_e("fuzz"))]),
         ]);
         let mut diags = Diagnostics::new();
-        check_reps_with(&p, cr300, &mut diags, &env);
+        check_reps(&p, cr300, &mut diags, &env);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Invalid reps 0, must be > 0.");
     }

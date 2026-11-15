@@ -638,7 +638,7 @@ pub fn _check_with_context(
         expressions::check_const_family_args(ctx.flat(), profile, diags);
     });
     _run_pass("instr_measure::check_pass1_values", "pass1", || {
-        instr_measure::check_pass1_values(program, profile, diags);
+        instr_measure::check_pass1_values(program, profile, diags, env);
     });
     _run_pass("var_types::check_string_operands", "pass1", || {
         var_types::check_string_operands(program, diags);
@@ -723,7 +723,7 @@ pub fn _check_with_context(
         });
         if !profile.single_pass && errors_before_early == 0 {
             _run_pass("instr_measure::check_scan_delay_budget", "early", || {
-                instr_measure::check_scan_delay_budget(program, profile, diags, true);
+                instr_measure::check_scan_delay_budget(program, profile, diags, env, true);
             });
         }
         let early_errors: Vec<DiagRef> = diags
@@ -1146,7 +1146,7 @@ pub fn _check_with_context(
                 "ranges",
                 diags,
                 |aside| {
-                    instr_measure::check_const_ranges(profile, aside);
+                    instr_measure::check_const_ranges(&flat.statements, profile, aside, env);
                 },
             );
         }
@@ -1469,17 +1469,17 @@ pub fn _check_with_context(
         .any(|d| _blocks_tier_c(d, profile.single_pass))
     {
         _run_pass("instr_measure::check_reps", "tier_c", || {
-            instr_measure::check_reps(program, profile, diags);
+            instr_measure::check_reps(program, profile, diags, env);
         });
         _run_pass("instr_measure::check_dest_bounds", "tier_c", || {
-            instr_measure::check_dest_bounds(program, profile, diags);
+            instr_measure::check_dest_bounds(program, profile, diags, env);
         });
         _run_pass("var_types::check", "tier_c", || {
             var_types::check(program, diags);
         });
         if profile.single_pass {
             _run_pass("instr_measure::check_const_ranges", "tier_c", || {
-                instr_measure::check_const_ranges(profile, diags);
+                instr_measure::check_const_ranges(&ctx.flat().statements, profile, diags, env);
             });
         }
         _run_pass("terminals::check", "tier_c", || {
@@ -1507,13 +1507,13 @@ pub fn _check_with_context(
             instr_rules::check_samplefieldcal(ctx.flat(), profile, diags);
         });
         _run_pass("instr_measure::check", "tier_c_tail", || {
-            instr_measure::check(program, profile, diags);
+            instr_measure::check(program, profile, diags, env);
         });
         _run_pass(
             "instr_measure::check_scan_delay_budget",
             "tier_c_tail",
             || {
-                instr_measure::check_scan_delay_budget(program, profile, diags, false);
+                instr_measure::check_scan_delay_budget(program, profile, diags, env, false);
             },
         );
     }
@@ -1649,7 +1649,7 @@ pub fn _check_with_context(
             warnings::check_slow_scan_skips(program, profile, diags);
         });
         _run_pass("instr_measure::check_cpi_time", "post", || {
-            instr_measure::check_cpi_time(program, profile, diags);
+            instr_measure::check_cpi_time(program, profile, diags, env);
         });
         _run_pass("instr_data::check_duplicate_fields", "post", || {
             // TODO(wire): tables builder must provide duplicate-field bookkeeping.
