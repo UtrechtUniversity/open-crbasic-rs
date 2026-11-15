@@ -55,6 +55,8 @@ Verdict parity rose by 278 cases to 26,408 of 77,293, and `spi_open_order.json` 
 23rd baseline file.
 
 Operating notes (learned in wave 1):
+- Codex has its own 5-hour window. Run at most 2 Codex workers at a time (3 only for small
+  tasks) and start the next one when one finishes; never launch a wide wave (human, 2026-11-15).
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
   only below 50% used, a wave of 2 below 65%, a single task below 75%; otherwise hand off.
 - Do not use the Agent tool's `isolation: "worktree"`: it cuts from `main`, deletes the worktree
