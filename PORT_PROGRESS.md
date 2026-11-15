@@ -4,9 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (after the usage reset of 2026-11-15 13:50 UTC): first finish P0-a (branch
-`p0a-pyre-pystr`, worktree `.claude/worktrees/p0a`: if it has a commit, rebase onto `port`, run
-the check set, fast-forward `port`; if not, re-run the task). Then P1-a, P1-b, P1-d in parallel.
+Next wave: P1-a, P1-b, P1-d in parallel (Phase 0 is complete).
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -29,7 +27,7 @@ Operating notes (learned in wave 1):
 
 | Id | Python source (lines) | Rust files | Model | Status | Notes |
 |---|---|---|---|---|---|
-| P0-a | (helpers; Python `re`/`str`/number semantics) | `src/pyre.rs`, `src/pystr.rs` | S | running | branch `p0a-pyre-pystr` |
+| P0-a | (helpers; Python `re`/`str`/number semantics) | `src/pyre.rs`, `src/pystr.rs` | S | merged | regexes are `pyre::Regex` values in `LazyLock` statics, offsets in chars; ints are `i64` only |
 | P0-b | `syntax.py` (342), `diagnostics.py` (278), `provenance.py` (17) | `src/syntax.rs`, `src/diagnostics.rs` | S | merged | `diagnostics.rs` regex helpers carry `TODO(P1): switch to pyre` |
 | P0-c | `profiles.py` (266), `data/**` | `src/profiles.rs`, `data/**` | S | merged | |
 | P0-d | (harness) | `tools/pydump.py`, `tests/fixtures.rs`, `tests/fixture_baseline.txt`, `.github/workflows/ci.yml` | H | merged | 77,293 cases in 613 files; Python equals the reference on 71,524; lines/ast dumps come with P1 |
