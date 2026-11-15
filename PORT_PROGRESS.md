@@ -4,18 +4,26 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (rolling queue, at most 2 Codex workers at a time): running `cx-struct-7` and
-`cx-struct-8`. Queue after them: `instr_rules` parts 1, 2, 3, 5; then `check_pass2`
-(`structure.py` 2216-2702, left unported in part 4); then one wiring task per module: replace
-the `todo!()` skeleton stubs with the real signatures that delegate to the `*_with`
-implementations, fix the callers (`checker/mod.rs` first), and resolve what `handoffs/*.md`
-list. Wiring needs one `syntax.rs` change: `Declaration.vars` must be shortenable on a shared
-declaration (`structure.py` 1698, see `handoffs/struct-3.md`).
+Next wave (rolling queue, at most 2 Codex workers at a time): Codex is running `cx-rules-1` and
+`cx-rules-2` (`instr_rules` parts 1 and 2; worktrees `.claude/worktrees/cx-rules-N`, work
+uncommitted, `HANDOFF.md` in each). Merge them with the recipe below. Queue after them:
+1. `check_pass2` (`structure.py` 2216-2702, unported in `structure/part4.rs`) and
+   `_scan_placement_walk` (`structure.py` 781-849, `structure/part2.rs`): two porting tasks.
+2. Wiring, one task per module and one writer per file: replace the `todo!()` skeleton stubs
+   with the real signatures that delegate to the `*_with` implementations, fix the callers
+   (`checker/mod.rs` first), drop the private `_pN_*` copies, and resolve what `handoffs/*.md`
+   list. Needs one `syntax.rs` change: `Declaration.vars` must be shortenable on a shared
+   declaration (`structure.py` 1698, `handoffs/struct-3.md`). `RuleFn` in `instr_rules/mod.rs`
+   lacks `env` (`handoffs/rules-5.md`).
+3. Convergence on the fixture files (P5).
 
-Codex wave 1 (structure parts 1-6) is merged: bodies ported as `*_with` siblings, with
-`handoffs/struct-N.md` listing what each still needs. Open inside them: `check_pass2` (part 4),
-`_scan_placement_walk` (part 2), three result bridges in `check_pass1` (part 3). Full check set
-green; verdict parity 27,477 of 77,293, 27 files; 447 `todo!()`.
+Merged so far in this round: all nine `structure` parts and `instr_rules` parts 3, 4, 5, as
+`*_with` siblings with `handoffs/<task>.md`. Lint and 274 unit tests pass on `port`; the full
+fixture gate was last run before structure parts 7-8 (27,477 of 77,293); re-run it first.
+
+Merge recipe for a worker worktree: check only its one source file and `HANDOFF.md` changed,
+move `HANDOFF.md` to `handoffs/<task>.md`, commit, `git cherry-pick` onto `port`, run
+`cargo fmt --check`, clippy and `cargo test --lib`, remove the worktree and branch.
 
 2026-11-15 resume: verified `port` (check set green), cherry-picked the four finished branches
 `p4-measure-2`, `p4-measure-3`, `p4-rules-4`, `p4-struct-9`. Verdict parity 27,110 of 77,293,
