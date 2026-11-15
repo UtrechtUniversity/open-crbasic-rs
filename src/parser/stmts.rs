@@ -29,7 +29,7 @@ fn is_assign_op(text: &str) -> bool {
     text == "=" || COMPOUND_ASSIGNMENT_OPS.contains(&text)
 }
 
-impl Parser<'_> {
+impl Parser {
     /// Port of `parser.py::_Parser._parse_stmt`
     pub fn _parse_stmt(
         &mut self,

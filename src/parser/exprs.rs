@@ -22,7 +22,7 @@ fn number_value_from_token(val: &TokenValue) -> NumberValue {
     }
 }
 
-impl Parser<'_> {
+impl Parser {
     /// Port of `parser.py::_Parser._parse_expr`
     pub fn _parse_expr(
         &mut self,

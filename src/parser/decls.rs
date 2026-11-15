@@ -39,7 +39,7 @@ enum ConstBail {
     Err(ParseError),
 }
 
-impl Parser<'_> {
+impl Parser {
     /// Port of `parser.py::_Parser._parse_const`
     pub fn _parse_const(
         &mut self,
