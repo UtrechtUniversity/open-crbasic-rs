@@ -4,28 +4,27 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (state at 2026-11-16 00:25 CET): nothing is left to port, only to wire. Wiring is
+Next wave (state at 2026-11-16 00:35 CET): nothing is left to port, only to wire. Wiring is
 strictly one task at a time because it edits callers across files. Wired and verified on
 `port`: instr_rules (`2deee67`), structure (`d714d5b`), expressions (`e37d558`), instr_data
-(`797a6ba`), instr_measure (`bcf3724`); each left a `handoffs/wire-*.md`. The Codex window ran
-out at 00:19 CET (back at 03:08 CET) in the middle of the cr3xx wiring; a Sonnet agent
-continues it in the same worktree `.claude/worktrees/wire-cr3xx` (branch `wire-cr3xx`,
-uncommitted, `HANDOFF.md` says where it is). If it is found stopped: verify (check set, no
-baseline file lost), commit what compiles and passes, and re-launch for the rest. Then, in
-order: tables (expressions `_data_table_fields` and instr_data need the real table builder:
-a `BuildTablesHooks` adapter, GetRecord field counts, duplicate-field metadata), then the
-single files with stubs left (`grep -c 'todo!(' src/checker/*.rs src/*.rs`): intervals,
-symbols, structs, longconv, mode, ess and the rest.
+(`797a6ba`), instr_measure (`bcf3724`), cr3xx (`e950b2f`); each left a `handoffs/wire-*.md`.
+The Codex window ran out at 00:19 CET (back at 03:08 CET). Running: the last wiring task
+(tables, then intervals, storage, scan_time, warnings, var_types, symbols, structs, longconv,
+ess, `cr3xx/part2.rs`, then `mode.rs` and `compiler.rs`), one Sonnet agent, worktree
+`.claude/worktrees/wire-rest`, branch `wire-rest`, uncommitted; its `HANDOFF.md` says where it
+is. If it is found stopped: verify (check set, no baseline file lost), commit what compiles
+and passes, and re-launch for the rest (counts: `grep -c 'todo!(' -r src | grep -v ':0$'`).
 Wiring rules: for each `todo!()` skeleton stub that has a `*_with` sibling, delete the stub,
 rename the sibling to the Python name, and give every caller the real arguments (take them
 from the Python call site); drop the private `_pN_*` copies; resolve what `handoffs/*.md` list.
-Gate after each module: check set, no baseline file lost; record the parity number. Then
-convergence on the fixture files (P5; known first buckets: `r12_cr3xx_table_field_hidden` and
-`r10_cr3xx_block_quotes` lost cases in the expressions wiring) and close-out (P6; delete
+Gate: check set, no baseline file lost; record the parity number.
+After that, convergence on the 56 fixture files that still differ (P5): bucket by file and
+first differing line, one fixer per bucket, at most 2 Codex workers at a time on disjoint
+source files; then station and fuzz corpora and CLI bytes; then close-out (P6; delete
 `handoffs/`).
 
-After the instr_measure wiring, check set green on `port`: 282 unit tests, verdict parity
-69,819 of 77,293, 413 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
+After the cr3xx wiring, check set green on `port`: 281 unit tests, verdict parity 74,821 of
+77,293, 557 of 613 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
 
 Merged in this round: all nine `structure` parts and all five `instr_rules` parts, as `*_with`
 siblings with `handoffs/<task>.md`. Full check set green on `port` at `bb39c3b`: 278 unit
