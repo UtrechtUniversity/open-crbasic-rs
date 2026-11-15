@@ -1,0 +1,227 @@
+{
+ "channels": {
+  "current_chan_cr1000x": {
+   "ranges": [[401, 402], [-402, -401]],
+   "transform": "none",
+   "truncate": true,
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must be RG1 or RG2.",
+   "string_int_min": true
+  },
+  "diff_chan": {
+   "span": {"message": "Channel {v} exceeds number of valid channels."},
+   "overflow_add": 7,
+   "min": 0,
+   "max": 8,
+   "transform": "abs",
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must use 1..8."
+  },
+  "se_chan": {
+   "span": {"message": "Channel {v} exceeds number of valid channels."},
+   "huge_int_min": true,
+   "min": 1,
+   "max": 16,
+   "transform": "abs",
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must use 1..16.",
+   "string_int_min": true
+  },
+  "port_c1c8": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "string_int_min": true
+  },
+  "sdi_port_cr1000x": {
+   "ranges": [[101, 107]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "odd_only": true,
+   "message": "Invalid SDI-12 port, must be C1, C3, C5, or C7",
+   "string_int_min": true,
+   "odd_message": "Invalid SDI-12 port, must be C1, C3, C5, or C7"
+  },
+  "port_c1c8_bare": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port."
+  },
+  "i2c_port_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "odd_only": true,
+   "odd_message": "I2C port must be 1,3,5,7...",
+   "secondary_when_invalid": true
+  },
+  "spi_open_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "allowed": [101, 105],
+   "allowed_message": "SPI Port must be C1, U1, U5, or U9.",
+   "secondary_when_invalid": true,
+   "string_int_min": true
+  },
+  "spi_port_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "allowed": [101, 105],
+   "allowed_message": "SPI Port must be C1 or C5.",
+   "secondary_when_invalid": true
+  },
+  "timer_port_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "allowed": [101],
+   "allowed_message": "TimerInput starting channel must be C1.",
+   "secondary_when_invalid": true
+  },
+  "waitdigtrig_port_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "allowed": [101, 102, 103, 104, 105, 106, 107, 108],
+   "allowed_message": "WaitDigTrig must use edge triggering in Scan..NextScan.",
+   "secondary_when_invalid": true
+  },
+  "quadrature_port_cr1000x": {
+   "ranges": [[101, 108]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C8.",
+   "allowed": [101, 103, 105, 107],
+   "allowed_message": "Quadrature must use C1, C3, C5, or C7",
+   "string_int_min": true,
+   "secondary_when_invalid": true
+  },
+  "pulse_chan_cr1000x": {
+   "string_or_nan_int_min": true,
+   "span": {"message": "Invalid PulseCount reps."},
+   "ranges": [[101, 108], [301, 302]],
+   "transform": "none",
+   "truncate": true,
+   "skip_nonpositive": false,
+   "message": "Invalid PulseCount channel, must be P1, P2, or C1..C8."
+  }
+ },
+ "instructions": {
+  "TCDIFF": [
+   [4, "diff_chan", 2]
+  ],
+  "TCSE": [
+   [4, "se_chan", 2]
+  ],
+  "CURRENTSE": [
+   [4, "current_chan_cr1000x"]
+  ],
+  "VOLTSE": [
+   [4, "se_chan", 2]
+  ],
+  "VOLTDIFF": [
+   [4, "diff_chan", 2]
+  ],
+  "BRHALF": [
+   [4, "se_chan", 2]
+  ],
+  "BRHALF3W": [
+   [4, "se_chan", 2, 2]
+  ],
+  "BRFULL": [
+   [4, "diff_chan", 2]
+  ],
+  "BRHALF4W": [
+   [5, "diff_chan", 2, 2]
+  ],
+  "BRFULL6W": [
+   [5, "diff_chan", 2, 2]
+  ],
+  "THERM107": [
+   [3, "se_chan", 2]
+  ],
+  "THERM108": [
+   [3, "se_chan", 2]
+  ],
+  "THERM109": [
+   [3, "se_chan", 2]
+  ],
+  "PORTSET": [
+   [1, "port_c1c8"]
+  ],
+  "PORTGET": [
+   [2, "port_c1c8_bare"]
+  ],
+  "CS616": [
+   [4, "port_c1c8"]
+  ],
+  "SDI12RECORDER": [
+   [2, "sdi_port_cr1000x"]
+  ],
+  "I2COPEN": [
+   [1, "i2c_port_cr1000x"]
+  ],
+  "I2CREAD": [
+   [1, "i2c_port_cr1000x"]
+  ],
+  "I2CWRITE": [
+   [1, "i2c_port_cr1000x"]
+  ],
+  "MUXSELECT": [
+   [1, "port_c1c8"],
+   [2, "port_c1c8"]
+  ],
+  "PWM": [
+   [2, "port_c1c8"]
+  ],
+  "PORTPAIRCONFIG": [
+   [1, "port_c1c8"]
+  ],
+  "PULSEPORT": [
+   [1, "port_c1c8"]
+  ],
+  "SPIOPEN": [
+   [1, "spi_open_cr1000x"]
+  ],
+  "SPIREAD": [
+   [1, "spi_port_cr1000x"]
+  ],
+  "SPIWRITE": [
+   [1, "spi_port_cr1000x"]
+  ],
+  "TIMERINPUT": [
+   [2, "timer_port_cr1000x"]
+  ],
+  "WAITDIGTRIG": [
+   [1, "waitdigtrig_port_cr1000x"]
+  ],
+  "CWB100RSSI": [
+   [1, "sdi_port_cr1000x"]
+  ],
+  "CWB100DIAGNOSTICS": [
+   [1, "sdi_port_cr1000x"]
+  ],
+  "SDI12SENSORSETUP": [
+   [2, "sdi_port_cr1000x"]
+  ],
+  "AM25T": [
+   [8, "port_c1c8"],
+   [9, "port_c1c8"]
+  ],
+  "QUADRATURE": [
+   [2, "quadrature_port_cr1000x"]
+  ],
+  "PULSECOUNT": [
+   [3, "pulse_chan_cr1000x", 2]
+  ]
+ }
+}

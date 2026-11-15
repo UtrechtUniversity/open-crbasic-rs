@@ -1,0 +1,249 @@
+{
+  "1": {
+    "kind": "const_expr",
+    "desc": "Compile-time constant numeric expression: named constant fast-path or a full folded expression (literals, Consts, predefined symbols, arithmetic); a quoted numeric string is also accepted; rejects a live variable."
+  },
+  "2": {
+    "kind": "expr",
+    "desc": "General runtime expression or value; may be a variable, literal, or arithmetic expression; no compile-time type check."
+  },
+  "3": {
+    "kind": "for_header",
+    "desc": "FOR loop header: Var = start TO end [STEP step], parsed as one unit (4 words: variable, start, end, step)."
+  },
+  "4": {
+    "kind": "const_int_kw",
+    "desc": "Constant integer/keyword, tolerant of being absent at end of line (e.g. Do/Loop/Else's optional While/Until marker); when absent, all remaining codes for the instruction are silently defaulted."
+  },
+  "5": {
+    "kind": "const_expr_only",
+    "desc": "Compile-time constant only; always rejects a variable reference (paired with 38, the time-unit-scaled variant)."
+  },
+  "6": {
+    "kind": "identifier",
+    "desc": "A name token whose meaning is instruction-specific (Sub name, table name, or a Var=UnitString pair for Units); captured as raw text and interpreted/validated later, not compiled here."
+  },
+  "7": {
+    "kind": "bool_expr",
+    "desc": "General expression used as a condition (If/While/Select/Case); no compile-time type restriction."
+  },
+  "8": {
+    "kind": "variable_or_array",
+    "desc": "Destination variable or array (no index required); accepts a promotable expression but rejects a bare literal."
+  },
+  "9": {
+    "kind": "var_decl",
+    "desc": "Dim variable declaration: Name[(dims)] [As Type] [= init | {init,...}]."
+  },
+  "10": {
+    "kind": "var_decl",
+    "desc": "Public variable declaration; identical parser to code 9."
+  },
+  "11": {
+    "kind": "deferred_text",
+    "desc": "Raw expression text captured verbatim for later compilation (DataTable statistics function Source parameters); no type/constancy check at this layer."
+  },
+  "12": {
+    "kind": "sub_params",
+    "desc": "Sub parameter-list declaration; enforces OPTIONAL/required ordering and initializer rules."
+  },
+  "13": {
+    "kind": "expr_list",
+    "desc": "Comma-separated list of general expressions up to a closing ')' (Call's argument list)."
+  },
+  "14": {
+    "kind": "none",
+    "desc": "No argument (EndSub/EndFunction)."
+  },
+  "15": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction; real switch case exists in the decompiled parser but is unreachable from instructions.json."
+  },
+  "16": {
+    "kind": "end_exit_kw",
+    "desc": "End/Exit's optional target keyword (Prog/Sub/Function/...); absent is valid."
+  },
+  "17": {
+    "kind": "next_kw",
+    "desc": "NEXT's optional trailing keyword (Scan or SubScan); an unrecognised token is silently treated as absent."
+  },
+  "18": {
+    "kind": "raw_line_text",
+    "desc": "Rest-of-line text captured verbatim (MenuPick's menu label)."
+  },
+  "19": {
+    "kind": "const_int_kw",
+    "desc": "Constant integer/keyword (e.g. bridge RevEx flag); failure to resolve is silently ignored rather than reported."
+  },
+  "20": {
+    "kind": "datatype_kw",
+    "desc": "Data-type/range/units keyword, constant-only, validated against a per-instruction allowed set."
+  },
+  "21": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction."
+  },
+  "22": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction."
+  },
+  "23": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction (shares a no-op goto with used code 32)."
+  },
+  "24": {
+    "kind": "expr",
+    "desc": "General expression/value (shares a handler with 40, without 40's extra output-marking flag)."
+  },
+  "25": {
+    "kind": "expr",
+    "desc": "General runtime expression/value; second most common code; a non-constant argument here is one of the documented triggers for forcing Sequential mode (docs/modes.md)."
+  },
+  "26": {
+    "kind": "expr_or_name",
+    "desc": "General expression/reference, flagged variant of 25, used where the token may need to resolve against a different namespace (e.g. table/module name)."
+  },
+  "27": {
+    "kind": "variable_or_array",
+    "desc": "Variable/array reference, array-checked like 8/29; oracle testing showed it rejects a table name and accepts a plain variable."
+  },
+  "28": {
+    "kind": "expr",
+    "desc": "General expression/value (shares a handler with 2/27); accepts a variable syntactically even where the consuming instruction then imposes its own stricter constant-only rule."
+  },
+  "29": {
+    "kind": "variable_or_array",
+    "desc": "Destination variable/array, array-checked; stricter sibling of code 8."
+  },
+  "30": {
+    "kind": "expr_pair",
+    "desc": "Two words per argument: an internal word followed by the value (VoiceSpeak only); purpose of the extra word not fully determined."
+  },
+  "31": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction; real switch case exists (constant-only expression with a 'Parameter %s must be a constant.' check) but unreachable from instructions.json."
+  },
+  "32": {
+    "kind": "none",
+    "desc": "No-op marker: consumes no argument text (RainFlowSample's first parameter)."
+  },
+  "33": {
+    "kind": "variable_or_array",
+    "desc": "Variable/array reference, array-checked, with an extra 2-word allowance when a string/array-length flag is set."
+  },
+  "34": {
+    "kind": "expr_typed",
+    "desc": "Return's expression; accepted shape depends on the enclosing Function's declared return type."
+  },
+  "35": {
+    "kind": "sub_params",
+    "desc": "Function parameter-list declaration; identical parser to code 12."
+  },
+  "36": {
+    "kind": "none",
+    "desc": "No argument; EndSelect only."
+  },
+  "37": {
+    "kind": "expr_marker",
+    "desc": "ConstTable's optional table-name argument; presence is checked but the text itself is not stored (0 words) - only ever used as its optional form, 137."
+  },
+  "38": {
+    "kind": "const_expr_only",
+    "desc": "Paired, unit-scaled sibling of code 5 (rounds by a stored time-unit divisor after parsing)."
+  },
+  "39": {
+    "kind": "const_expr",
+    "desc": "Paired sibling of code 1 with an extra rounding step against a stored time-unit divisor (e.g. Scan's Units parameter)."
+  },
+  "40": {
+    "kind": "expr",
+    "desc": "General expression/value (shares a handler with 24); additionally sets an internal output/disable-reference flag."
+  },
+  "41": {
+    "kind": "variable_or_array",
+    "desc": "Variable/array reference (Move's Dest); shares flags with 27/28's handler family."
+  },
+  "42": {
+    "kind": "expr_special",
+    "desc": "Variant of the general expression handler with extra auto-temp-variable machinery specific to VibratingWire."
+  },
+  "43": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction."
+  },
+  "44": {
+    "kind": "unused",
+    "desc": "Not emitted by any CR6 instruction."
+  },
+  "45": {
+    "kind": "type_name",
+    "desc": "StructureType/ObjectType name declaration; registers a new named type context, rejects nesting."
+  },
+  "46": {
+    "kind": "none",
+    "desc": "Closes a structure/object type context (EndStructureType/EndObjectType)."
+  },
+  "47": {
+    "kind": "variable_or_array",
+    "desc": "Variable/array reference, array-checked (flags 0x200)."
+  },
+  "48": {
+    "kind": "variable_or_array",
+    "desc": "Variable/array reference, array-checked (flags 0x4000); only ever used as its optional form, 148."
+  },
+  "101": {
+    "kind": "const_expr",
+    "desc": "Optional Mask/Interval-style constant (e.g. WriteIO's, ExciteV's trailing constant); still rejects a variable once present.",
+    "optional_of": 1
+  },
+  "105": {
+    "kind": "const_expr_only",
+    "desc": "Optional constant-only value (e.g. Thermistor/VibratingWire trailing settling/multiplier constants).",
+    "optional_of": 5
+  },
+  "108": {
+    "kind": "variable_or_array",
+    "desc": "Optional constant/keyword (e.g. SlowSequence's, Calibrate's trailing option).",
+    "optional_of": 8
+  },
+  "120": {
+    "kind": "datatype_kw",
+    "desc": "Optional data-type/units keyword (VibratingWire).",
+    "optional_of": 20
+  },
+  "124": {
+    "kind": "expr",
+    "desc": "Optional general expression (AvgRun/TotalRun/StdDevRun's Count parameter).",
+    "optional_of": 24
+  },
+  "125": {
+    "kind": "expr",
+    "desc": "Optional general expression (AvgRun/TotalRun/StdDevRun's RunReset/TotalCalls/Call_ID parameters); confirmed to accept a variable, a literal, or omission.",
+    "optional_of": 25
+  },
+  "126": {
+    "kind": "expr_or_name",
+    "desc": "Optional expression/reference (SDI12SensorSetup, FieldClassify, MQTTPublishMeta).",
+    "optional_of": 26
+  },
+  "127": {
+    "kind": "variable_or_array",
+    "desc": "Optional expression/reference (GPS, ModBus family, GetDataRecord).",
+    "optional_of": 27
+  },
+  "129": {
+    "kind": "variable_or_array",
+    "desc": "Optional expression/reference (CDM_VW300Config trailing parameters).",
+    "optional_of": 29
+  },
+  "137": {
+    "kind": "expr_marker",
+    "desc": "Optional identifier (ConstTable's table name); presence-only, no text stored.",
+    "optional_of": 37
+  },
+  "148": {
+    "kind": "variable_or_array",
+    "desc": "Optional variable/array reference (MQTTPublishTable's trailing fields).",
+    "optional_of": 48
+  }
+}

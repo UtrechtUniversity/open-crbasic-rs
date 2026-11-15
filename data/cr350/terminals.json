@@ -1,0 +1,191 @@
+{
+ "channels": {
+  "diff_chan": {
+   "min": 1,
+   "max": 2,
+   "transform": "none",
+   "skip_nonpositive": true,
+   "message": "Channel {v} exceeds number of valid channels."
+  },
+  "se_chan": {
+   "min": 1,
+   "max": 4,
+   "transform": "none",
+   "skip_nonpositive": true,
+   "message": "Channel {v} exceeds number of valid channels."
+  },
+  "port_gap8_12": {
+   "string_int_min": true,
+   "ranges": [
+    [
+     1,
+     7
+    ],
+    [
+     9,
+     12
+    ]
+   ],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port specified {v}"
+  },
+  "sdi_port_1_2": {
+   "min": 1,
+   "max": 2,
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, must be 1 or 2"
+  },
+  "therm_chan": {
+   "min": 1,
+   "max": 4,
+   "transform": "none",
+   "skip_nonpositive": true,
+   "message": "Channel exceeds number of valid channels."
+  },
+  "currentse_chan": {
+   "min": 1,
+   "max": 2,
+   "transform": "none",
+   "skip_nonpositive": true,
+   "message": "Channel {v} exceeds number of valid channels."
+  },
+  "pulse_chan_span": {
+   "string_or_nan_int_min": true,
+   "ranges": [[1, 2], [3, 6], [7, 7], [8, 8]],
+   "transform": "none",
+   "truncate": true,
+   "skip_nonpositive": false,
+   "message": "Invalid PulseCount channel.",
+   "secondary_when_invalid": true,
+   "span": {"message": "Invalid PulseCount reps.", "invalid_start": 1}
+  }
+ },
+ "instructions": {
+  "TCDIFF": [
+   [
+    4,
+    "diff_chan",
+    2
+   ]
+  ],
+  "TCSE": [
+   [
+    4,
+    "se_chan",
+    2
+   ]
+  ],
+  "VOLTSE": [
+   [
+    4,
+    "se_chan",
+    2
+   ]
+  ],
+  "VOLTDIFF": [
+   [
+    4,
+    "diff_chan",
+    2
+   ]
+  ],
+  "PORTSET": [
+   [
+    1,
+    "port_gap8_12"
+   ]
+  ],
+  "PORTGET": [
+   [
+    2,
+    "port_gap8_12"
+   ]
+  ],
+  "SDI12RECORDER": [
+   [
+    2,
+    "sdi_port_1_2"
+   ]
+  ],
+  "BRHALF": [
+   [
+    4,
+    "se_chan",
+    2
+   ]
+  ],
+  "BRHALF3W": [
+   [
+    4,
+    "se_chan",
+    2,
+    2
+   ]
+  ],
+  "BRFULL": [
+   [
+    4,
+    "diff_chan",
+    2
+   ]
+  ],
+  "BRHALF4W": [
+   [
+    5,
+    "diff_chan",
+    2,
+    2
+   ]
+  ],
+  "BRFULL6W": [
+   [
+    5,
+    "diff_chan",
+    2,
+    2
+   ]
+  ],
+  "THERM107": [
+   [
+    3,
+    "therm_chan",
+    2
+   ]
+  ],
+  "THERM108": [
+   [
+    3,
+    "therm_chan",
+    2
+   ]
+  ],
+  "THERM109": [
+   [
+    3,
+    "therm_chan",
+    2
+   ]
+  ],
+  "CURRENTSE": [
+   [
+    4,
+    "se_chan",
+    2
+   ],
+   [
+    4,
+    "currentse_chan",
+    2
+   ]
+  ],
+  "PULSECOUNT": [
+   [
+    3,
+    "pulse_chan_span",
+    2
+   ]
+  ]
+ }
+}

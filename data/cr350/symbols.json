@@ -1,0 +1,572 @@
+[
+ {
+  "name": "While",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "Until",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "Select",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "Case",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "If",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "SUB",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "FUNCTION",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "PROG",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "TABLE",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "SCAN",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "SUBSCAN",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "DO",
+  "value": 8,
+  "fvalue": 8.0,
+  "extra": 0
+ },
+ {
+  "name": "FOR",
+  "value": 9,
+  "fvalue": 9.0,
+  "extra": 0
+ },
+ {
+  "name": "TRUE",
+  "value": -1,
+  "fvalue": -1.0,
+  "extra": 0
+ },
+ {
+  "name": "FALSE",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeT",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeE",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeK",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeJ",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeB",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeR",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeS",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "TypeN",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "usec",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "msec",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "sec",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "min",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "hr",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "day",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "MON",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "IEEE8",
+  "value": 25,
+  "fvalue": 25.0,
+  "extra": 0
+ },
+ {
+  "name": "DOUBLE",
+  "value": 25,
+  "fvalue": 25.0,
+  "extra": 0
+ },
+ {
+  "name": "IEEE4",
+  "value": 24,
+  "fvalue": 24.0,
+  "extra": 0
+ },
+ {
+  "name": "FLOAT",
+  "value": 24,
+  "fvalue": 24.0,
+  "extra": 0
+ },
+ {
+  "name": "LONG",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "BOOLEAN",
+  "value": 28,
+  "fvalue": 28.0,
+  "extra": 0
+ },
+ {
+  "name": "BOOL8",
+  "value": 17,
+  "fvalue": 17.0,
+  "extra": 0
+ },
+ {
+  "name": "UINT2",
+  "value": 21,
+  "fvalue": 21.0,
+  "extra": 0
+ },
+ {
+  "name": "UINT4",
+  "value": 22,
+  "fvalue": 22.0,
+  "extra": 0
+ },
+ {
+  "name": "UINT1",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "FP2",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "STRING",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "NSEC",
+  "value": 23,
+  "fvalue": 23.0,
+  "extra": 0
+ },
+ {
+  "name": "EVENT",
+  "value": -1,
+  "fvalue": -1.0,
+  "extra": 0
+ },
+ {
+  "name": "CR1000",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "CR800",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "CR3000",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "CR5000",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "CR9000X",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "CR6",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "GRANITE6",
+  "value": 60,
+  "fvalue": 60.0,
+  "extra": 0
+ },
+ {
+  "name": "CR300",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "CR1000X",
+  "value": 8,
+  "fvalue": 8.0,
+  "extra": 0
+ },
+ {
+  "name": "CR9",
+  "value": 9,
+  "fvalue": 9.0,
+  "extra": 0
+ },
+ {
+  "name": "GRANITE9",
+  "value": 9,
+  "fvalue": 9.0,
+  "extra": 0
+ },
+ {
+  "name": "GRANITE10",
+  "value": 10,
+  "fvalue": 10.0,
+  "extra": 0
+ },
+ {
+  "name": "CR350",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "CR_ASPEN",
+  "value": 12,
+  "fvalue": 12.0,
+  "extra": 0
+ },
+ {
+  "name": "LoggerType",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "mv2500",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 0
+ },
+ {
+  "name": "mv34",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "C1",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "C2",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "SE1",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "SE2",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "SE3",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "SE4",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "P_SW",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "P_LL",
+  "value": 8,
+  "fvalue": 8.0,
+  "extra": 0
+ },
+ {
+  "name": "SW12_1",
+  "value": 9,
+  "fvalue": 9.0,
+  "extra": 0
+ },
+ {
+  "name": "SW12_2",
+  "value": 10,
+  "fvalue": 10.0,
+  "extra": 0
+ },
+ {
+  "name": "P_VX_1",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "VX1",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "P_VX_2",
+  "value": 12,
+  "fvalue": 12.0,
+  "extra": 0
+ },
+ {
+  "name": "VX2",
+  "value": 12,
+  "fvalue": 12.0,
+  "extra": 0
+ },
+ {
+  "name": "ComUSB",
+  "value": 1,
+  "fvalue": 1.0,
+  "extra": 0
+ },
+ {
+  "name": "ComRS232",
+  "value": 2,
+  "fvalue": 2.0,
+  "extra": 0
+ },
+ {
+  "name": "ComRF",
+  "value": 3,
+  "fvalue": 3.0,
+  "extra": 0
+ },
+ {
+  "name": "Com1",
+  "value": 4,
+  "fvalue": 4.0,
+  "extra": 0
+ },
+ {
+  "name": "Com2",
+  "value": 5,
+  "fvalue": 5.0,
+  "extra": 0
+ },
+ {
+  "name": "Com3",
+  "value": 6,
+  "fvalue": 6.0,
+  "extra": 0
+ },
+ {
+  "name": "ComC1_Tx",
+  "value": 7,
+  "fvalue": 7.0,
+  "extra": 0
+ },
+ {
+  "name": "ComC1_Rx",
+  "value": 8,
+  "fvalue": 8.0,
+  "extra": 0
+ },
+ {
+  "name": "ComC2_Tx",
+  "value": 9,
+  "fvalue": 9.0,
+  "extra": 0
+ },
+ {
+  "name": "ComC2_Rx",
+  "value": 10,
+  "fvalue": 10.0,
+  "extra": 0
+ },
+ {
+  "name": "ComRS232_Tx",
+  "value": 11,
+  "fvalue": 11.0,
+  "extra": 0
+ },
+ {
+  "name": "ComRS232_Rx",
+  "value": 12,
+  "fvalue": 12.0,
+  "extra": 0
+ },
+ {
+  "name": "_50Hz",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "_50",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "_60Hz",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "_60",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "_Slow",
+  "value": 20,
+  "fvalue": 20.0,
+  "extra": 0
+ },
+ {
+  "name": "_Med",
+  "value": 160,
+  "fvalue": 160.0,
+  "extra": 0
+ },
+ {
+  "name": "_Fast",
+  "value": 2000,
+  "fvalue": 2000.0,
+  "extra": 0
+ },
+ {
+  "name": "OSVERSION",
+  "value": 0,
+  "fvalue": 0.0,
+  "extra": 6921128
+ }
+]

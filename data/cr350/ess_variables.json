@@ -1,0 +1,1087 @@
+[
+ {
+  "name": "essTypeofStation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essAtmosphericPressure",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essAvgWindDirection",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essAvgWindSpeed",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMaxWindGustSpeed",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMaxWindGustDir",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essRelativeHumidity",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipRate",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSnowfallAccumRate",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationOneHour",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationThreeHours",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationSixHours",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationTwelveHours",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitation24Hours",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essInstantaneousTerrestrialRadiation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essInstantaneousSolarRadiation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSolarRadiation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essTotalRadiation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essTotalSun",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essNtcipCategory",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essNtcipSiteDescription",
+  "type": "STRING",
+  "count": 1
+ },
+ {
+  "name": "essLatitude",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essLongitude",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essVehicleSpeed",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essVehicleBearing",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essOdometer",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essReferenceHeight",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPressureHeight",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essWindSensorHeight",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSpotWindDirection",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSpotWindSpeed",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essWindSituation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "windSensorTableNumSensors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "windSensorIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "windSensorHeight",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorLocation",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "windSensorAvgSpeed",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorAvgDirection",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorSpotSpeed",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorSpotDirection",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorGustSpeed",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorGustDirection",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "windSensorSituation",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essNumTemperatureSensors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essTemperatureSensorIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "essTemperatureSensorHeight",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essAirTemperature",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essWetbulbTemp",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essDewpointTemp",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMaxTemp",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMinTemp",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essWaterDepth",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essAdjacentSnowDepth",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essRoadwaySnowDepth",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essRoadwaySnowPackDepth",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipYesNo",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipSituation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essIceThickness",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationStartTime",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPrecipitationEndTime",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "precipitationSensorModelInformation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "waterLevelSensorTableNumSensors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "waterLevelSensorIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "waterLevelSensorReading",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essCloudSituation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essTotalRadiationPeriod",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essVisibility",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essVisibilitySituation",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "numEssPavementSensors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPavementSensorIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "essPavementSensorLocation",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "essPavementType",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPavementElevation",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPavementExposure",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPavementSensorType",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceStatus",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceTemperature",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPavementTemperature",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceWaterDepth",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceSalinity",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceConductivity",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceFreezePoint",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceBlackIceSignal",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPavementSensorError",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceIceOrWaterDepth",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSurfaceConductivityV2",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "pavementSensorModelInformation",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "pavementSensorTemperatureDepth",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "numEssSubSurfaceSensors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSubSurfaceSensorIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "essSubSurfaceSensorLocation",
+  "type": "STRING",
+  "count": 20
+ },
+ {
+  "name": "essSubSurfaceType",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "essSubSurfaceSensorDepth",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "essSubSurfaceTemperature",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "essSubSurfaceMoisture",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "essSubSurfaceSensorError",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "essPavementBlock",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essSubsurfaceData",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essPavementV3Block",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essMobileFriction",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMobileObservationGroundState",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essMobileObservationPavement",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "numEssTreatments",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPavementTreatmentIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "essPaveTreatProductType",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPaveTreatProductForm",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPercentProductMix",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essPaveTreatmentAmount",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPaveTreatmentWidth",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "pavementTreatmentBlock",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "ptsOperationalMode",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsCommandState",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsSprayerState",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsSignalDuration",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsSignalEventCount",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsLastSignalEvent",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsActiveEventCount",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsInactiveEventCount",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsLastActiveEvent",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsLastInactiveEvent",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsError",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsMonitoringDetectors",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsOperationalModeV3",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "ptsCommandStateV3",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essCO",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essCO2",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essNO",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essNO2",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSO2",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essO3",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essPM10",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essAirQualityData",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essSnapshotNumberOfCameras",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essSnapshotCameraIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "essSnapshotCameraDescription",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "essSnapshotCameraStoragePath",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "essSnapshotCameraCommand",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSnapshotCameraError",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "essSnapshotCameraFilename",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "essDoorStatus",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essBatteryStatus",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essLineVolts",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "essStationMetaDataBlock",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essWeatherBlock",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essMobileBlock",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essStationMetaDataV3Block",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "essWeatherV3Block",
+  "type": "STRING",
+  "count": 0
+ },
+ {
+  "name": "globalSetIDParameter",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "globalMaxModules",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "moduleNumber",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "moduleDeviceNode",
+  "type": "LONG_ARRAY16",
+  "count": 20
+ },
+ {
+  "name": "moduleMake",
+  "type": "STRING",
+  "count": 20
+ },
+ {
+  "name": "moduleModel",
+  "type": "STRING",
+  "count": 20
+ },
+ {
+  "name": "moduleVersion",
+  "type": "STRING",
+  "count": 20
+ },
+ {
+  "name": "moduleType",
+  "type": "LONG",
+  "count": 20
+ },
+ {
+  "name": "controller_baseStandards",
+  "type": "STRING",
+  "count": 1
+ },
+ {
+  "name": "dbCreateTransaction",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "dbVerifyStatus",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "dbVerifyError",
+  "type": "STRING",
+  "count": 1
+ },
+ {
+  "name": "globalTime",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "globalDaylightSaving",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "maxTimeBaseScheduleEntries",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "timeBaseScheduleNumber",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "timeBaseScheduleMonth",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "timeBaseScheduleDay",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "timeBaseScheduleDate",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "timeBaseScheduleDayPlan",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "maxDayPlans",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "maxDayPlanEvents",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "dayPlanNumber",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "dayPlanEventNumber",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "dayPlanHour",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "dayPlanMinute",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "dayPlanActionNumberOID",
+  "type": "LONG_ARRAY16",
+  "count": 10
+ },
+ {
+  "name": "dayPlanStatus",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "timeBaseScheduleTable_status",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "globalLocalTimeDifferential",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "controller_standardTimeZone",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "controller_localTime",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "maxEventLogConfigs",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "eventConfigID",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "eventConfigClass",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventConfigMode",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventConfigCompareValue",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventConfigCompareValue2",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventConfigCompareOID",
+  "type": "LONG_ARRAY16",
+  "count": 10
+ },
+ {
+  "name": "eventConfigLogOID",
+  "type": "LONG_ARRAY16",
+  "count": 10
+ },
+ {
+  "name": "eventConfigAction",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventConfigStatus",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "maxEventLogSize",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "eventLogClass",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventLogNumber",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "eventLogID",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventLogTime",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventLogValue",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "maxEventClasses",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "eventClassNumber",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "eventClassLimit",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventClassClearTime",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventClassDescription",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "eventClassNumRowsInLog",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "eventClassNumEvents",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "numEvents",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "communityNameAdmin",
+  "type": "STRING",
+  "count": 1
+ },
+ {
+  "name": "communityNamesMax",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "communityNameIndex",
+  "type": "LONG",
+  "count": 0
+ },
+ {
+  "name": "communityNameUser",
+  "type": "STRING",
+  "count": 10
+ },
+ {
+  "name": "communityNameAccessMask",
+  "type": "LONG",
+  "count": 10
+ },
+ {
+  "name": "AuxIOTable_numDigitalPorts",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "AuxIOTable_numAnalogPorts",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_portType",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_portNumber",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_description",
+  "type": "STRING",
+  "count": 1
+ },
+ {
+  "name": "auxIO_resolution",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_value",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_portDirection",
+  "type": "LONG",
+  "count": 1
+ },
+ {
+  "name": "auxIO_lastCommandedState",
+  "type": "LONG",
+  "count": 1
+ }
+]

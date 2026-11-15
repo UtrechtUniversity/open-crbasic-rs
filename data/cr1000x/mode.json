@@ -1,0 +1,111 @@
+{
+ "always_sequential": [
+  "SDMAO4",
+  "SDMAO4A",
+  "SDMCAN",
+  "SDMCD16AC",
+  "SDMCVO4",
+  "SDMIO16",
+  "TDR100",
+  "TDR200",
+  "WRITEIO"
+ ],
+ "task_instructions": [
+  "AM25T",
+  "BATTERY",
+  "BRFULL",
+  "BRFULL6W",
+  "BRHALF",
+  "BRHALF3W",
+  "BRHALF4W",
+  "CALIBRATE",
+  "CDM_BATTERY",
+  "CDM_BRFULL",
+  "CDM_BRFULL6W",
+  "CDM_BRHALF",
+  "CDM_BRHALF3W",
+  "CDM_BRHALF4W",
+  "CDM_CURRENTDIFF",
+  "CDM_EXCITEV",
+  "CDM_MUXSELECT",
+  "CDM_PANELTEMP",
+  "CDM_PERIODAVG",
+  "CDM_PULSEPORT",
+  "CDM_SW12",
+  "CDM_SW5",
+  "CDM_SWPOWER",
+  "CDM_TCDIFF",
+  "CDM_TCSE",
+  "CDM_THERM107",
+  "CDM_THERM108",
+  "CDM_THERM109",
+  "CDM_VOLTDIFF",
+  "CDM_VOLTSE",
+  "CS616",
+  "CS7500",
+  "CSAT3",
+  "DELAY",
+  "EC100",
+  "EXCITEV",
+  "LI7200",
+  "LI7700",
+  "MUXSELECT",
+  "PANELTEMP",
+  "PERIODAVG",
+  "PORTGET",
+  "PORTSET",
+  "PULSECOUNT",
+  "PULSEPORT",
+  "SDMINT8",
+  "SDMSW8A",
+  "SDMTRIGGER",
+  "SDMX50",
+  "SERIALINRECORD",
+  "SERIALOUTBLOCK",
+  "SETDAC",
+  "SW12",
+  "TCDIFF",
+  "TCSE",
+  "TGA",
+  "THERM107",
+  "THERM108",
+  "THERM109",
+  "VOLTDIFF",
+  "VOLTSE"
+ ],
+ "nonconstant_arg": {
+  "CDM_EXCITEI": [
+   3
+  ],
+  "CDM_EXCITEV": [
+   3
+  ],
+  "CDM_MUXSELECT": [
+   5
+  ],
+  "CDM_SW12": [
+   3
+  ],
+  "CDM_SW5": [
+   3
+  ],
+  "CDM_SWPOWER": [
+   2
+  ],
+  "EXCITEV": [
+   1
+  ],
+  "MUXSELECT": [
+   3
+  ],
+  "PORTSET": [
+   1
+  ]
+ },
+ "variable_arg": {
+  "CDM_SW12": 4,
+  "CDM_SW5": 4,
+  "CDM_SWPOWER": 3,
+  "SW12": 2
+ }
+}

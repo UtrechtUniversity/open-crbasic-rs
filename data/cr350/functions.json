@@ -1,0 +1,1262 @@
+[
+ {
+  "name": "NOT",
+  "code": 267,
+  "kind": 267,
+  "argspec": 0
+ },
+ {
+  "name": "MOD",
+  "code": 263,
+  "kind": 263,
+  "argspec": 0
+ },
+ {
+  "name": "OR",
+  "code": 264,
+  "kind": 264,
+  "argspec": 0
+ },
+ {
+  "name": "XOR",
+  "code": 265,
+  "kind": 265,
+  "argspec": 0
+ },
+ {
+  "name": "AND",
+  "code": 266,
+  "kind": 266,
+  "argspec": 0
+ },
+ {
+  "name": "IMP",
+  "code": 300,
+  "kind": 300,
+  "argspec": 0
+ },
+ {
+  "name": "EQV",
+  "code": 299,
+  "kind": 299,
+  "argspec": 0
+ },
+ {
+  "name": "IS",
+  "code": 301,
+  "kind": 301,
+  "argspec": 0
+ },
+ {
+  "name": "TO",
+  "code": 302,
+  "kind": 302,
+  "argspec": 0
+ },
+ {
+  "name": ">>",
+  "code": 315,
+  "kind": 315,
+  "argspec": 0
+ },
+ {
+  "name": "<<",
+  "code": 314,
+  "kind": 314,
+  "argspec": 0
+ },
+ {
+  "name": "SIN",
+  "code": 1,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "COS",
+  "code": 2,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "LOG",
+  "code": 8,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "LN",
+  "code": 8,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "SQR",
+  "code": 7,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "EXP",
+  "code": 3,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "ABS",
+  "code": 6,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "CSGN",
+  "code": 21,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "AVE",
+  "code": 5,
+  "kind": 295,
+  "argspec": 2,
+  "nargs": 2,
+  "argtypes": null
+ },
+ {
+  "name": "PWR",
+  "code": 9,
+  "kind": 295,
+  "argspec": 2,
+  "nargs": 2,
+  "argtypes": null
+ },
+ {
+  "name": "INT",
+  "code": 4,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "FRAC",
+  "code": 20,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "TIMER",
+  "code": 0,
+  "kind": 295,
+  "argspec": 3,
+  "nargs": 3,
+  "argtypes": null
+ },
+ {
+  "name": "SGN",
+  "code": 16,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "ATN",
+  "code": 15,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "TAN",
+  "code": 17,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "RANDOMIZE",
+  "code": 18,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "RND",
+  "code": 19,
+  "kind": 295,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": null
+ },
+ {
+  "name": "FIX",
+  "code": 22,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "ASIN",
+  "code": 23,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "ATN2",
+  "code": 24,
+  "kind": 295,
+  "argspec": 2,
+  "nargs": 2,
+  "argtypes": null
+ },
+ {
+  "name": "ACOS",
+  "code": 25,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "LOG10",
+  "code": 26,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "SINH",
+  "code": 27,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "TANH",
+  "code": 88,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "COSH",
+  "code": 29,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "IIF",
+  "code": 30,
+  "kind": 295,
+  "argspec": 963,
+  "nargs": 3,
+  "argtypes": [
+   0,
+   3,
+   3
+  ]
+ },
+ {
+  "name": "IFTIME",
+  "code": 33,
+  "kind": 295,
+  "argspec": 3,
+  "nargs": 3,
+  "argtypes": null
+ },
+ {
+  "name": "TIMEINTOINTERVAL",
+  "code": 33,
+  "kind": 295,
+  "argspec": 3,
+  "nargs": 3,
+  "argtypes": null
+ },
+ {
+  "name": "CHR$",
+  "code": 229,
+  "kind": 312,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "CHR",
+  "code": 229,
+  "kind": 312,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "INSTR",
+  "code": 34,
+  "kind": 309,
+  "argspec": 2404,
+  "nargs": 4,
+  "argtypes": [
+   2,
+   1,
+   1,
+   2
+  ]
+ },
+ {
+  "name": "MID",
+  "code": 230,
+  "kind": 312,
+  "argspec": 659,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "STRCOMP",
+  "code": 35,
+  "kind": 309,
+  "argspec": 82,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   1
+  ]
+ },
+ {
+  "name": "SERIALOPEN",
+  "code": 36,
+  "kind": 309,
+  "argspec": 43686,
+  "nargs": 6,
+  "argtypes": [
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "SERIALCLOSE",
+  "code": 37,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "SERIALFLUSH",
+  "code": 38,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "SERIALOUT",
+  "code": 39,
+  "kind": 309,
+  "argspec": 10597,
+  "nargs": 5,
+  "argtypes": [
+   2,
+   1,
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "UPPERCASE",
+  "code": 237,
+  "kind": 312,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "LOWERCASE",
+  "code": 238,
+  "kind": 312,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "FORMATFLOAT",
+  "code": 239,
+  "kind": 312,
+  "argspec": 66,
+  "nargs": 2,
+  "argtypes": [
+   0,
+   1
+  ]
+ },
+ {
+  "name": "TIMEUNTILTRANSMIT",
+  "code": 44,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "INTDV",
+  "code": 8,
+  "kind": 311,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "CHECKPORT",
+  "code": 45,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "SERIALINBLOCK",
+  "code": 46,
+  "kind": 309,
+  "argspec": 739,
+  "nargs": 3,
+  "argtypes": [
+   2,
+   3,
+   2
+  ]
+ },
+ {
+  "name": "LEN",
+  "code": 47,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "SERIALINCHK",
+  "code": 48,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "HEX",
+  "code": 243,
+  "kind": 312,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "HEXTODEC",
+  "code": 49,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "CHECKSUM",
+  "code": 50,
+  "kind": 309,
+  "argspec": 691,
+  "nargs": 3,
+  "argtypes": [
+   3,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "FILEWRITE",
+  "code": 51,
+  "kind": 309,
+  "argspec": 739,
+  "nargs": 3,
+  "argtypes": [
+   2,
+   3,
+   2
+  ]
+ },
+ {
+  "name": "FILEOPEN",
+  "code": 52,
+  "kind": 309,
+  "argspec": 595,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   1,
+   2
+  ]
+ },
+ {
+  "name": "FILECLOSE",
+  "code": 53,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "FILESIZE",
+  "code": 54,
+  "kind": 309,
+  "argspec": 49,
+  "nargs": 1,
+  "argtypes": [
+   3
+  ]
+ },
+ {
+  "name": "FILETIME",
+  "code": 55,
+  "kind": 309,
+  "argspec": 49,
+  "nargs": 1,
+  "argtypes": [
+   3
+  ]
+ },
+ {
+  "name": "FILERENAME",
+  "code": 56,
+  "kind": 309,
+  "argspec": 82,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   1
+  ]
+ },
+ {
+  "name": "FILECOPY",
+  "code": 57,
+  "kind": 309,
+  "argspec": 82,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   1
+  ]
+ },
+ {
+  "name": "FILEREAD",
+  "code": 58,
+  "kind": 309,
+  "argspec": 739,
+  "nargs": 3,
+  "argtypes": [
+   2,
+   3,
+   2
+  ]
+ },
+ {
+  "name": "FILEREADLINE",
+  "code": 59,
+  "kind": 309,
+  "argspec": 611,
+  "nargs": 3,
+  "argtypes": [
+   2,
+   1,
+   2
+  ]
+ },
+ {
+  "name": "ROUTE",
+  "code": 60,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "LOADFIELDCAL",
+  "code": 61,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "NEWFIELDCAL",
+  "code": 62,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "ASCII",
+  "code": 63,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "IPTRACE",
+  "code": 64,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "TCPOPEN",
+  "code": 65,
+  "kind": 309,
+  "argspec": 659,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "TCPCLOSE",
+  "code": 66,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "FTPCLIENT",
+  "code": 67,
+  "kind": 309,
+  "argspec": 38230,
+  "nargs": 6,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   2
+  ]
+ },
+ {
+  "name": "NETWORKTIMEPROTOCOL",
+  "code": 68,
+  "kind": 309,
+  "argspec": 659,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "EMAILSEND",
+  "code": 69,
+  "kind": 309,
+  "argspec": 21846,
+  "nargs": 6,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "EMAILRECV",
+  "code": 69,
+  "kind": 309,
+  "argspec": 21846,
+  "nargs": 6,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "PPPOPEN",
+  "code": 244,
+  "kind": 312,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "PPPCLOSE",
+  "code": 70,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "UDPDATAGRAM",
+  "code": 71,
+  "kind": 309,
+  "argspec": 39318,
+  "nargs": 6,
+  "argtypes": [
+   1,
+   2,
+   1,
+   2,
+   1,
+   2
+  ]
+ },
+ {
+  "name": "UDPOPEN",
+  "code": 72,
+  "kind": 309,
+  "argspec": 659,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "COMPORTISACTIVE",
+  "code": 73,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "PINGIP",
+  "code": 74,
+  "kind": 309,
+  "argspec": 659,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "HTTPGET",
+  "code": 75,
+  "kind": 309,
+  "argspec": 339,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "HTTPPOST",
+  "code": 76,
+  "kind": 309,
+  "argspec": 5461,
+  "nargs": 5,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "XMLPARSE",
+  "code": 77,
+  "kind": 309,
+  "argspec": 21846,
+  "nargs": 6,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "SIGNATURE",
+  "code": 78,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "LEFT",
+  "code": 245,
+  "kind": 312,
+  "argspec": 146,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   2
+  ]
+ },
+ {
+  "name": "RIGHT",
+  "code": 246,
+  "kind": 312,
+  "argspec": 146,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   2
+  ]
+ },
+ {
+  "name": "TRIM",
+  "code": 247,
+  "kind": 312,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "LTRIM",
+  "code": 248,
+  "kind": 312,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "RTRIM",
+  "code": 249,
+  "kind": 312,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "REPLACE",
+  "code": 250,
+  "kind": 312,
+  "argspec": 339,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "FLOOR",
+  "code": 4,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "CEILING",
+  "code": 31,
+  "kind": 295,
+  "argspec": 1,
+  "nargs": 1,
+  "argtypes": null
+ },
+ {
+  "name": "ROUND",
+  "code": 32,
+  "kind": 295,
+  "argspec": 130,
+  "nargs": 2,
+  "argtypes": [
+   0,
+   2
+  ]
+ },
+ {
+  "name": "FILELIST",
+  "code": 79,
+  "kind": 309,
+  "argspec": 82,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   1
+  ]
+ },
+ {
+  "name": "FINDSPA",
+  "code": 280,
+  "kind": 309,
+  "argspec": 3828,
+  "nargs": 4,
+  "argtypes": [
+   3,
+   3,
+   2,
+   3
+  ]
+ },
+ {
+  "name": "SECSSINCE1990",
+  "code": 80,
+  "kind": 309,
+  "argspec": 146,
+  "nargs": 2,
+  "argtypes": [
+   1,
+   2
+  ]
+ },
+ {
+  "name": "CLOCKCHANGE",
+  "code": 81,
+  "kind": 295,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": null
+ },
+ {
+  "name": "FILEENCRYPT",
+  "code": 82,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "DAYLIGHTSAVING",
+  "code": 83,
+  "kind": 309,
+  "argspec": 699048,
+  "nargs": 8,
+  "argtypes": [
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "DAYLIGHTSAVINGUS",
+  "code": 84,
+  "kind": 309,
+  "argspec": 33,
+  "nargs": 1,
+  "argtypes": [
+   2
+  ]
+ },
+ {
+  "name": "FORMATLONG",
+  "code": 251,
+  "kind": 312,
+  "argspec": 98,
+  "nargs": 2,
+  "argtypes": [
+   2,
+   1
+  ]
+ },
+ {
+  "name": "FORMATLONGLONG",
+  "code": 252,
+  "kind": 312,
+  "argspec": 49,
+  "nargs": 1,
+  "argtypes": [
+   3
+  ]
+ },
+ {
+  "name": "DATE",
+  "code": 253,
+  "kind": 312,
+  "argspec": 162,
+  "nargs": 2,
+  "argtypes": [
+   2,
+   2
+  ]
+ },
+ {
+  "name": "ARRAYINDEX",
+  "code": 85,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ },
+ {
+  "name": "ARRAYLENGTH",
+  "code": 86,
+  "kind": 309,
+  "argspec": 49,
+  "nargs": 1,
+  "argtypes": [
+   3
+  ]
+ },
+ {
+  "name": "ENCRYPTION",
+  "code": 87,
+  "kind": 309,
+  "argspec": 177911,
+  "nargs": 7,
+  "argtypes": [
+   3,
+   3,
+   2,
+   1,
+   3,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "HTTPPUT",
+  "code": 89,
+  "kind": 309,
+  "argspec": 5461,
+  "nargs": 5,
+  "argtypes": [
+   1,
+   1,
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "SPRINTF",
+  "code": 90,
+  "kind": 309,
+  "argspec": 405,
+  "nargs": 5,
+  "argtypes": [
+   1,
+   2,
+   1,
+   0,
+   0
+  ]
+ },
+ {
+  "name": "IPINFO",
+  "code": 254,
+  "kind": 312,
+  "argspec": 162,
+  "nargs": 2,
+  "argtypes": [
+   2,
+   2
+  ]
+ },
+ {
+  "name": "TIMEISBETWEEN",
+  "code": 91,
+  "kind": 309,
+  "argspec": 2724,
+  "nargs": 4,
+  "argtypes": [
+   2,
+   2,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "LINENUM",
+  "code": 92,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "CTYPE",
+  "code": 93,
+  "kind": 312,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "EMAILRELAY",
+  "code": 94,
+  "kind": 309,
+  "argspec": 1360,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "TYPEOF",
+  "code": 95,
+  "kind": 309,
+  "argspec": 49,
+  "nargs": 1,
+  "argtypes": [
+   3
+  ]
+ },
+ {
+  "name": "ABSLONG",
+  "code": 96,
+  "kind": 309,
+  "argspec": 0,
+  "nargs": 0,
+  "argtypes": []
+ },
+ {
+  "name": "SMSRECV",
+  "code": 97,
+  "kind": 309,
+  "argspec": 339,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   1,
+   1
+  ]
+ },
+ {
+  "name": "SDI12WATCH",
+  "code": 98,
+  "kind": 309,
+  "argspec": 1716,
+  "nargs": 4,
+  "argtypes": [
+   3,
+   2,
+   2,
+   1
+  ]
+ },
+ {
+  "name": "MQTTPUBLISH",
+  "code": 99,
+  "kind": 309,
+  "argspec": 2772,
+  "nargs": 4,
+  "argtypes": [
+   1,
+   3,
+   2,
+   2
+  ]
+ },
+ {
+  "name": "MQTTSUBSCRIBE",
+  "code": 100,
+  "kind": 309,
+  "argspec": 915,
+  "nargs": 3,
+  "argtypes": [
+   1,
+   2,
+   3
+  ]
+ },
+ {
+  "name": "MQTTUNSUBSCRIBE",
+  "code": 101,
+  "kind": 309,
+  "argspec": 17,
+  "nargs": 1,
+  "argtypes": [
+   1
+  ]
+ }
+]

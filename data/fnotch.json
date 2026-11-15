@@ -1,0 +1,34 @@
+{
+ "min_hz": 1.430525,
+ "message": "Invalid fnotch, minimum allowed is 2 Hz.",
+ "instructions": {
+  "PANELTEMP": 2,
+  "VOLTSE": 7,
+  "VOLTDIFF": 7,
+  "CURRENTSE": 7,
+  "TCSE": 9,
+  "TCDIFF": 9,
+  "THERM107": 6,
+  "THERM108": 6,
+  "THERM109": 6,
+  "BRHALF": 10,
+  "BRHALF3W": 10,
+  "BRFULL": 11,
+  "BRHALF4W": 12,
+  "BRFULL6W": 12,
+  "AM25T": 13,
+  "PANELTEMP2": 4,
+  "THERMISTOR": 8,
+  "RESISTANCE": 11,
+  "RESISTANCE2W": 8,
+  "RESISTANCE3W": 8
+ },
+ "twice": [
+  "THERM107",
+  "THERM108",
+  "THERM109",
+  "BRHALF",
+  "BRHALF3W",
+  "BRFULL"
+ ]
+}

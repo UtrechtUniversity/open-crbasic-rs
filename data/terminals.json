@@ -1,0 +1,205 @@
+{
+ "channels": {
+  "u_terminal": {
+   "ranges": [[201, 212]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must use U1..U12."
+  },
+  "u_terminal_se": {
+   "ranges": [[201, 212]],
+   "span": {"message": "Channel {v} exceeds number of valid channels.", "shift": -200, "start_upper": false},
+   "transform": "abs",
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must use U1..U12."
+  },
+  "u_terminal_diff": {
+   "ranges": [[201, 212]],
+   "span": {"message": "Channel {v} exceeds number of valid channels.", "shift": -200, "start_upper": false, "step": 2},
+   "transform": "abs",
+   "skip_nonpositive": false,
+   "message": "Invalid channel {v}, must use U1..U12.",
+   "odd_only": true,
+   "odd_message": "Invalid start channel for Differential Measurement. Must be U1, U3, U5 ..."
+  },
+  "excite_channel": {
+   "ranges": [[201, 212]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid Excitation channel (must be U1-U12)."
+  },
+  "port_c1c4_u1u12": {
+   "ranges": [[101, 116], [201, 212]],
+   "port_wrap": true,
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C4 or U1..U12.",
+   "string_int_min": true
+  },
+  "quadrature_port": {
+   "ranges": [[101, 116], [201, 212]],
+   "port_wrap": true,
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C4 or U1..U12.",
+   "string_int_min": true,
+   "odd_only": true,
+   "odd_message": "Quadrature must use C1,C3, or U1,U3..U11"
+  },
+  "sdi_port": {
+   "ranges": [[101, 103], [201, 211]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "odd_only": true,
+   "message": "Invalid SDI-12 port, must be C1,C3 or U1,U3...U11",
+   "string_int_min": true,
+   "odd_message": "Invalid SDI-12 port, must be C1,C3 or U1,U3...U11"
+  },
+  "i2c_port": {
+   "ranges": [[101, 116], [201, 212]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C4 or U1..U12.",
+   "odd_only": true,
+   "odd_message": "I2C port must be 1,3,5,7..."
+  },
+  "spi_port": {
+   "ranges": [[101, 116], [201, 212]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C4 or U1..U12.",
+   "allowed": [101, 105, 109, 113, 201, 205, 209],
+   "allowed_message": "SPI Port must be C1, U1, U5, or U9.",
+   "string_int_min": true
+  },
+  "timer_port": {
+   "ranges": [[101, 116], [201, 212]],
+   "transform": "none",
+   "skip_nonpositive": false,
+   "message": "Invalid port {v}, use C1..C4 or U1..U12.",
+   "allowed": [101, 105, 201],
+   "allowed_message": "TimerInput starting channel must be C1 or U1."
+  }
+ },
+ "instructions": {
+  "TCDIFF": [
+   [4, "u_terminal_diff", 2]
+  ],
+  "TCSE": [
+   [4, "u_terminal_se", 2]
+  ],
+  "VOLTSE": [
+   [4, "u_terminal_se", 2]
+  ],
+  "VOLTDIFF": [
+   [4, "u_terminal_diff", 2]
+  ],
+  "BRHALF": [
+   [4, "u_terminal_se", 2]
+  ],
+  "BRHALF3W": [
+   [4, "u_terminal_se", 2, 2]
+  ],
+  "BRFULL": [
+   [4, "u_terminal_diff", 2]
+  ],
+  "BRHALF4W": [
+   [5, "u_terminal_diff", 2, 2]
+  ],
+  "BRFULL6W": [
+   [5, "u_terminal_diff", 2, 2]
+  ],
+  "THERM107": [
+   [3, "u_terminal_se", 2]
+  ],
+  "THERM108": [
+   [3, "u_terminal_se", 2]
+  ],
+  "THERM109": [
+   [3, "u_terminal_se", 2]
+  ],
+  "ACPOWER": [
+   [4, "u_terminal"],
+   [7, "u_terminal"]
+  ],
+  "CS616": [
+   [3, "u_terminal"],
+   [4, "port_c1c4_u1u12"]
+  ],
+  "EXCITEV": [
+   [1, "u_terminal"],
+   [1, "excite_channel"]
+  ],
+  "EXCITEI": [
+   [1, "u_terminal"],
+   [1, "excite_channel"]
+  ],
+  "PORTSET": [
+   [1, "port_c1c4_u1u12"]
+  ],
+  "PORTGET": [
+   [2, "port_c1c4_u1u12"]
+  ],
+  "SDI12RECORDER": [
+   [2, "sdi_port"]
+  ],
+  "AM25T": [
+   [5, "u_terminal_diff"],
+   [8, "port_c1c4_u1u12"],
+   [9, "port_c1c4_u1u12"],
+   [10, "u_terminal"]
+  ],
+  "I2COPEN": [
+   [1, "i2c_port"]
+  ],
+  "I2CREAD": [
+   [1, "i2c_port"]
+  ],
+  "I2CWRITE": [
+   [1, "i2c_port"]
+  ],
+  "MUXSELECT": [
+   [1, "port_c1c4_u1u12"],
+   [2, "port_c1c4_u1u12"]
+  ],
+  "PWM": [
+   [2, "port_c1c4_u1u12"]
+  ],
+  "PORTPAIRCONFIG": [
+   [1, "port_c1c4_u1u12"]
+  ],
+  "PULSEPORT": [
+   [1, "port_c1c4_u1u12"]
+  ],
+  "PULSECOUNT": [
+   [3, "port_c1c4_u1u12"]
+  ],
+  "QUADRATURE": [
+   [2, "quadrature_port"]
+  ],
+  "SPIOPEN": [
+   [1, "spi_port"]
+  ],
+  "SPIREAD": [
+   [1, "spi_port"]
+  ],
+  "SPIWRITE": [
+   [1, "spi_port"]
+  ],
+  "TIMERINPUT": [
+   [2, "timer_port"]
+  ],
+  "WAITDIGTRIG": [
+   [1, "port_c1c4_u1u12"]
+  ],
+  "CWB100RSSI": [
+   [1, "sdi_port"]
+  ],
+  "CWB100DIAGNOSTICS": [
+   [1, "sdi_port"]
+  ],
+  "SDI12SENSORSETUP": [
+   [2, "sdi_port"]
+  ]
+ }
+}

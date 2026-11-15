@@ -1,0 +1,684 @@
+{
+  "_comment": "Status table of a minimal CR6 program (Public X As Float; BeginProg/Scan(1,Sec,0,0)/EndProg), no DataTable, no SlowSequence, no SubScan, no card/CPI use. Extracted from CR6Comp.exe CR6.14.2.0 TDF (-z) output via tools/tdf_probe.py. Field keys match src/opencrbasic/tdf.py's TdfField (begin=begin_index, dim=dimension). See docs/tdf-rules.md for which fields/dims change with program features (SlowSequence, table/const-table count, etc.).",
+  "table": "Status",
+  "time_type": 14,
+  "time_into": [
+    0,
+    0
+  ],
+  "interval": [
+    0,
+    0
+  ],
+  "fields": [
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "OSVersion",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 76,
+      "subdims": [
+        76
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "OSDate",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 12,
+      "subdims": [
+        12
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "OSSignature",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "SerialNumber",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 8,
+      "subdims": [
+        8
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "RevBoard",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 12,
+      "subdims": [
+        12
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": false,
+      "name": "StationName",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 64,
+      "subdims": [
+        64
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "RecipeStatus",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 64,
+      "subdims": [
+        64
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "ProgName",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 64,
+      "subdims": [
+        64
+      ]
+    },
+    {
+      "type": 14,
+      "read_only": true,
+      "name": "StartTime",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "RunSignature",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "ProgSignature",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "WatchdogErrors",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "PanelTemp",
+      "aliases": [],
+      "processing": "",
+      "units": "DegC",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "Battery",
+      "aliases": [],
+      "processing": "",
+      "units": "Volts",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "LithiumBattery",
+      "aliases": [],
+      "processing": "",
+      "units": "Volts",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "PowerSource",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 8,
+      "subdims": [
+        8
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "ChargeInput",
+      "aliases": [],
+      "processing": "",
+      "units": "Volts",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "ChargeState",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 20,
+      "subdims": [
+        20
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "Low12VCount",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "CompileResults",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 256,
+      "subdims": [
+        256
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "StartUpCode",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "ProgErrors",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "VarOutOfBound",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "SkippedScan",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "SkippedSystemScan",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "ErrorCalib",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "MemorySize",
+      "aliases": [],
+      "processing": "",
+      "units": "bytes",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "MemoryFree",
+      "aliases": [],
+      "processing": "",
+      "units": "bytes",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "CommsMemFree",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 84,
+      "subdims": [
+        84
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "FullMemReset",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "CardStatus",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 80,
+      "subdims": [
+        80
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "MeasureOps",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "MeasureTime",
+      "aliases": [],
+      "processing": "",
+      "units": "usec",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "ProcessTime",
+      "aliases": [],
+      "processing": "",
+      "units": "usec",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "MaxProcTime",
+      "aliases": [],
+      "processing": "",
+      "units": "usec",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "BuffDepth",
+      "aliases": [],
+      "processing": "",
+      "units": "scans",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "MaxBuffDepth",
+      "aliases": [],
+      "processing": "",
+      "units": "scans",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 14,
+      "read_only": true,
+      "name": "LastSystemScan",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "SystemProcTime",
+      "aliases": [],
+      "processing": "",
+      "units": "usec",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 6,
+      "read_only": false,
+      "name": "MaxSystemProcTime",
+      "aliases": [],
+      "processing": "",
+      "units": "usec",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 28,
+      "read_only": false,
+      "name": "PortStatus",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 4,
+      "subdims": [
+        4
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "PortConfig",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 48,
+      "subdims": [
+        4,
+        12
+      ]
+    },
+    {
+      "type": 28,
+      "read_only": false,
+      "name": "SW12Volts",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 2,
+      "subdims": [
+        2
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": true,
+      "name": "PakBusRoutes",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 256,
+      "subdims": [
+        256
+      ]
+    },
+    {
+      "type": 11,
+      "read_only": false,
+      "name": "Messages",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 256,
+      "subdims": [
+        256
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "CalVolts",
+      "aliases": [],
+      "processing": "",
+      "units": "mVolts",
+      "description": "",
+      "begin": 1,
+      "dim": 3,
+      "subdims": [
+        3
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "CalRefSlope",
+      "aliases": [],
+      "processing": "",
+      "units": "mVolts/DegC",
+      "description": "",
+      "begin": 1,
+      "dim": 3,
+      "subdims": [
+        3
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "CalRefOffset",
+      "aliases": [],
+      "processing": "",
+      "units": "mVolts",
+      "description": "",
+      "begin": 1,
+      "dim": 3,
+      "subdims": [
+        3
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "CalGain",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 3,
+      "subdims": [
+        3
+      ]
+    },
+    {
+      "type": 6,
+      "read_only": true,
+      "name": "CalOffset",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 3,
+      "subdims": [
+        3
+      ]
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "IxResistor",
+      "aliases": [],
+      "processing": "",
+      "units": "Ohms",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    },
+    {
+      "type": 9,
+      "read_only": true,
+      "name": "CalCurrent",
+      "aliases": [],
+      "processing": "",
+      "units": "",
+      "description": "",
+      "begin": 1,
+      "dim": 1,
+      "subdims": []
+    }
+  ]
+}
