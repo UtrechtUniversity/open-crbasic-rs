@@ -4,11 +4,18 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: Codex workers (gpt-6.1-sol, medium) are porting `structure.py` parts 1-6 in the
-worktrees `.claude/worktrees/cx-struct-N` (branches `cx-struct-N`, work left uncommitted, each
-with a `HANDOFF.md`). Then: structure parts 7-8 and `instr_rules` parts 1, 2, 3, 5 the same way;
-then one wiring task per module (replace the `todo!()` skeleton stubs with the real signatures
-that delegate to the `*_with` implementations, and fix the callers in `checker/mod.rs`).
+Next wave (rolling queue, at most 2 Codex workers at a time): running `cx-struct-7` and
+`cx-struct-8`. Queue after them: `instr_rules` parts 1, 2, 3, 5; then `check_pass2`
+(`structure.py` 2216-2702, left unported in part 4); then one wiring task per module: replace
+the `todo!()` skeleton stubs with the real signatures that delegate to the `*_with`
+implementations, fix the callers (`checker/mod.rs` first), and resolve what `handoffs/*.md`
+list. Wiring needs one `syntax.rs` change: `Declaration.vars` must be shortenable on a shared
+declaration (`structure.py` 1698, see `handoffs/struct-3.md`).
+
+Codex wave 1 (structure parts 1-6) is merged: bodies ported as `*_with` siblings, with
+`handoffs/struct-N.md` listing what each still needs. Open inside them: `check_pass2` (part 4),
+`_scan_placement_walk` (part 2), three result bridges in `check_pass1` (part 3). Full check set
+green; verdict parity 27,477 of 77,293, 27 files; 447 `todo!()`.
 
 2026-11-15 resume: verified `port` (check set green), cherry-picked the four finished branches
 `p4-measure-2`, `p4-measure-3`, `p4-rules-4`, `p4-struct-9`. Verdict parity 27,110 of 77,293,
