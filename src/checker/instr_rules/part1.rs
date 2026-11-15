@@ -41,12 +41,7 @@ thread_local! {
 }
 
 /// Port of checker/instr_rules.py::rule
-pub fn rule(phase: &str, single_pass: Option<bool>) {
-    todo!("checker/instr_rules.py::rule")
-}
-
-/// Port of checker/instr_rules.py::rule
-pub fn rule_with<'a>(
+pub fn rule<'a>(
     phase: &'a str,
     keywords: &'a [&'a str],
     single_pass: Option<bool>,
@@ -74,12 +69,7 @@ pub fn rule_with<'a>(
 }
 
 /// Port of checker/instr_rules.py::run_rules
-pub fn run_rules(phase: &str, program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::run_rules (omitted: env: consteval.Env)")
-}
-
-/// Port of checker/instr_rules.py::run_rules
-pub fn run_rules_with(
+pub fn run_rules(
     phase: &str,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -100,15 +90,7 @@ pub fn run_rules_with(
                 .single_pass
                 .is_none_or(|gate| gate == profile.single_pass)
             {
-                match kw.as_str() {
-                    "SDI12RECORDER" => {
-                        super::check_sdi12_nan_fill_with(stmt, program, profile, diags, env);
-                    }
-                    "PORTBRIDGE" => {
-                        super::check_portbridge_array_with(stmt, program, profile, diags, env);
-                    }
-                    _ => (entry.func)(stmt, program, profile, diags),
-                }
+                (entry.func)(stmt, program, profile, diags, env);
             }
         }
         if let Some(entries) = registered.as_ref().and_then(|r| r.get(&kw)) {
@@ -299,15 +281,6 @@ pub fn _past_last_param(text: &str, count: i64) -> Option<String> {
 
 /// Port of checker/instr_rules.py::_check_unterminated_string_param
 pub fn _check_unterminated_string_param(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::_check_unterminated_string_param")
-}
-
-/// Port of checker/instr_rules.py::_check_unterminated_string_param
-pub fn _check_unterminated_string_param_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -408,12 +381,7 @@ pub fn _required_count(params: Vec<i64>) -> i64 {
 }
 
 /// Port of checker/instr_rules.py::misplaced_returns
-pub fn misplaced_returns(program: &Program) {
-    let _ = misplaced_returns_with(program);
-}
-
-/// Port of checker/instr_rules.py::misplaced_returns
-pub fn misplaced_returns_with(program: &Program) -> OrderedMap<usize, bool> {
+pub fn misplaced_returns(program: &Program) -> OrderedMap<usize, bool> {
     let mut found = OrderedMap::new();
     let mut routine = None;
     for st in &context::_with_inline(program).statements {
@@ -438,8 +406,8 @@ pub fn misplaced_returns_with(program: &Program) -> OrderedMap<usize, bool> {
 
 /// Port of checker/instr_rules.py::check_return_placement
 pub fn check_return_placement(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let misplaced = misplaced_returns_with(program);
-    for st in _return_statements_with(program) {
+    let misplaced = misplaced_returns(program);
+    for st in _return_statements(program) {
         let Some(in_sub) = misplaced.get(&stmt_id(&st)) else {
             continue;
         };
@@ -469,12 +437,7 @@ pub fn check_return_placement(program: &Program, profile: &Profile, diags: &mut 
 }
 
 /// Port of checker/instr_rules.py::_return_statements
-pub fn _return_statements(program: &Program) {
-    let _ = _return_statements_with(program);
-}
-
-/// Port of checker/instr_rules.py::_return_statements
-pub fn _return_statements_with(program: &Program) -> Vec<StmtRef> {
+pub fn _return_statements(program: &Program) -> Vec<StmtRef> {
     let mut result = Vec::new();
     for stmt in &program.statements {
         let mut candidates = vec![stmt];
@@ -492,13 +455,8 @@ pub fn _return_statements_with(program: &Program) -> Vec<StmtRef> {
 }
 
 /// Port of checker/instr_rules.py::check
-pub fn check(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check")
-}
-
-/// Port of checker/instr_rules.py::check
-pub fn check_with(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
-    let outside = misplaced_returns_with(program);
+pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
+    let outside = misplaced_returns(program);
     let ctx = context::of(program, Some(profile), None);
     let known = ctx.known_names();
     let kinds = expressions::_type_code_kinds();
@@ -542,10 +500,10 @@ pub fn check_with(program: &ProgramRef, profile: &'static Profile, diags: &mut D
             }) {
                 continue;
             }
-            _report_constant_destinations_with(stmt, record, &params, program, profile, diags);
+            _report_constant_destinations(stmt, record, &params, program, profile, diags);
         }
         if ["cr6", "cr1000x"].contains(&profile.name)
-            && _earlier_error_in_stmt_with(
+            && _earlier_error_in_stmt(
                 program,
                 st,
                 diags,
@@ -572,7 +530,7 @@ pub fn check_with(program: &ProgramRef, profile: &'static Profile, diags: &mut D
             st.file(),
         );
     }
-    _check_unterminated_string_param_with(program, profile, diags);
+    _check_unterminated_string_param(program, profile, diags);
 }
 
 /// Port of checker/instr_rules.py::given_count
@@ -598,12 +556,7 @@ pub fn given_count_of(args: Vec<String>) -> i64 {
 }
 
 /// Port of checker/instr_rules.py::shortfall_message
-pub fn shortfall_message(given: i64) -> Option<String> {
-    todo!("checker/instr_rules.py::shortfall_message (omitted: record: dict)")
-}
-
-/// Port of checker/instr_rules.py::shortfall_message
-pub fn shortfall_message_with(record: &crate::profiles::Instruction, given: i64) -> Option<String> {
+pub fn shortfall_message(record: &crate::profiles::Instruction, given: i64) -> Option<String> {
     let params = _real_params(record.params.clone());
     if given >= _required_count(params.clone()) {
         return None;
@@ -626,17 +579,6 @@ pub fn shortfall_message_with(record: &crate::profiles::Instruction, given: i64)
 
 /// Port of checker/instr_rules.py::_report_constant_destinations
 pub fn _report_constant_destinations(
-    stmt: &Instruction,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    todo!(
-        "checker/instr_rules.py::_report_constant_destinations (omitted: record: dict, params: list, program: untyped)"
-    )
-}
-
-/// Port of checker/instr_rules.py::_report_constant_destinations
-pub fn _report_constant_destinations_with(
     stmt: &Instruction,
     record: &crate::profiles::Instruction,
     params: &[i64],
@@ -794,7 +736,7 @@ pub fn plain_expression_params(params: Vec<i64>) -> bool {
 
 /// Port of checker/instr_rules.py::check_too_many
 pub fn check_too_many(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let outside = misplaced_returns_with(program);
+    let outside = misplaced_returns(program);
     for st in &program.statements {
         let Stmt::Instruction(stmt) = st.as_ref() else {
             continue;
@@ -826,7 +768,7 @@ pub fn check_too_many(program: &Program, profile: &Profile, diags: &mut Diagnost
             continue;
         }
         if !profile.single_pass
-            && _earlier_error_in_stmt_with(
+            && _earlier_error_in_stmt(
                 program,
                 st,
                 diags,
@@ -844,14 +786,7 @@ pub fn check_too_many(program: &Program, profile: &Profile, diags: &mut Diagnost
 }
 
 /// Port of checker/instr_rules.py::_earlier_error_in_stmt
-pub fn _earlier_error_in_stmt(program: &Program, diags: &mut Diagnostics) -> bool {
-    todo!(
-        "checker/instr_rules.py::_earlier_error_in_stmt (omitted: stmt: untyped, prefixes: tuple)"
-    )
-}
-
-/// Port of checker/instr_rules.py::_earlier_error_in_stmt
-pub fn _earlier_error_in_stmt_with(
+pub fn _earlier_error_in_stmt(
     program: &Program,
     stmt: &StmtRef,
     diags: &Diagnostics,
@@ -966,12 +901,7 @@ pub static _SNMP_OID_LITERAL: LazyLock<pyre::Regex> = LazyLock::new(|| {
 pub const _SNMP_FLOOR: [i64; 8] = [1, 3, 6, 1, 2, 1, 1, 7];
 
 /// Port of checker/instr_rules.py::_snmp_components
-pub fn _snmp_components(text: &str) {
-    let _ = _snmp_components_with(text);
-}
-
-/// Port of checker/instr_rules.py::_snmp_components
-pub fn _snmp_components_with(text: &str) -> Option<Vec<Option<i64>>> {
+pub fn _snmp_components(text: &str) -> Option<Vec<Option<i64>>> {
     let mut parts = Vec::new();
     for p in text.split('.') {
         if pystr::len(p) > 5 {
@@ -1020,7 +950,7 @@ mod tests {
             assert_eq!(json!(plain_expression_params(params)), row[4]);
         }
         for row in data["snmp"].as_array().unwrap() {
-            let got = _snmp_components_with(row[0].as_str().unwrap()).map(|parts| {
+            let got = _snmp_components(row[0].as_str().unwrap()).map(|parts| {
                 parts
                     .into_iter()
                     .map(|v| v.map_or_else(|| json!(""), |v| json!(v)))
@@ -1034,7 +964,7 @@ mod tests {
                 .instructions()
                 .get(&pystr::upper(row[1].as_str().unwrap()))
                 .unwrap();
-            let got: Vec<_> = (0..6).map(|n| shortfall_message_with(record, n)).collect();
+            let got: Vec<_> = (0..6).map(|n| shortfall_message(record, n)).collect();
             assert_eq!(json!(got), row[2]);
         }
     }
@@ -1050,7 +980,7 @@ mod tests {
             for which in 0..4 {
                 let mut diags = Diagnostics::new();
                 match which {
-                    0 => check_with(&program, profile, &mut diags),
+                    0 => check(&program, profile, &mut diags),
                     1 => check_return_placement(&program, profile, &mut diags),
                     2 => check_too_many(&program, profile, &mut diags),
                     _ => check_essinitialize_too_many(&program, profile, &mut diags),
@@ -1103,9 +1033,9 @@ mod tests {
             );
         }
         let phase = "rules1_observed_dispatch";
-        rule_with(phase, &["battery"], None)(a);
-        rule_with(phase, &["BATTERY"], Some(true))(b);
-        rule_with(phase, &["Battery"], Some(false))(a);
+        rule(phase, &["battery"], None)(a);
+        rule(phase, &["BATTERY"], Some(true))(b);
+        rule(phase, &["Battery"], Some(false))(a);
         for (name, expected) in [
             (
                 "cr6",
@@ -1134,7 +1064,7 @@ mod tests {
                 Some(profile),
             );
             let mut diags = Diagnostics::new();
-            run_rules_with(phase, &program, profile, &mut diags, &Env::new(profile));
+            run_rules(phase, &program, profile, &mut diags, &Env::new(profile));
             assert_eq!(
                 json!(
                     diags
@@ -1177,7 +1107,7 @@ mod tests {
                     .statements
                     .iter()
                     .map(|s| {
-                        _earlier_error_in_stmt_with(
+                        _earlier_error_in_stmt(
                             &program,
                             s,
                             &diags,

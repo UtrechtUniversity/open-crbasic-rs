@@ -11,6 +11,10 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
+use super::part1::{
+    _SNMP_FLOOR, _SNMP_OID_DEST, _SNMP_OID_LITERAL, _SNMP_SPACED_OID, _SNMP_TAIL, _SNMP_TYPES,
+    _snmp_components,
+};
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
 use crate::syntax::{
@@ -18,34 +22,6 @@ use crate::syntax::{
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
 };
 
-// These part1-owned constants are not yet exported by the generated sibling.
-static _SNMP_SPACED_OID: LazyLock<pyre::Regex> = LazyLock::new(|| {
-    pyre::Regex::new(
-        r"^\s*SNMPVARIABLE\s*\(\s*[^,]+\s*,\s*(\d[\d.]*\.[\d.]*)[ \t]+[\d.]+(?=[ \t,)])",
-        pyre::I,
-    )
-});
-static _SNMP_OID_DEST: LazyLock<pyre::Regex> =
-    LazyLock::new(|| pyre::Regex::new(r"^\s*SNMPVARIABLE\s*\(\s*(\d+(?:\.\d+)*)\s*,", pyre::I));
-static _SNMP_TAIL: LazyLock<pyre::Regex> = LazyLock::new(|| {
-    pyre::Regex::new(
-        r"^\s*SNMPVARIABLE\s*\(\s*[^,]+,\s*\d+(?:\.\d+)*\s*,",
-        pyre::I,
-    )
-});
-const _SNMP_TYPES: [&str; 7] = [
-    "INTEGER",
-    "COUNTER",
-    "STRING",
-    "TIMETICKS",
-    "OPAQUE",
-    "GAUGE",
-    "FLOAT",
-];
-static _SNMP_OID_LITERAL: LazyLock<pyre::Regex> = LazyLock::new(|| {
-    pyre::Regex::new(r"^\s*SNMPVARIABLE\s*\(\s*[^,]+,\s*([\d.]+)\s*[,)]", pyre::I)
-});
-const _SNMP_FLOOR: [i64; 8] = [1, 3, 6, 1, 2, 1, 1, 7];
 static SNMP_DECIMAL: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"\d+\.\d+", 0));
 static SNMP_DOTTED: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"\d+(?:\.\d+)+", 0));
 static SNMP_DIGITS: LazyLock<pyre::Regex> =
@@ -59,13 +35,8 @@ static SNMP_TYPE_RE: LazyLock<pyre::Regex> = LazyLock::new(|| {
     )
 });
 
-/// Port of `checker/instr_rules.py::check_snmp_oid`.
-pub fn check_snmp_oid(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    check_snmp_oid_with(program, profile, diags, None);
-}
-
-/// Port of `checker/instr_rules.py::check_snmp_oid`.
-pub fn check_snmp_oid_with(
+/// Port of checker/instr_rules.py::check_snmp_oid
+pub fn check_snmp_oid(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -86,7 +57,7 @@ pub fn check_snmp_oid_with(
             Stmt::Unparsed(u) => {
                 let comps = _SNMP_OID_LITERAL
                     .match_(&u.base.text)
-                    .and_then(|m| snmp_components_result(m.group(1).unwrap_or("")));
+                    .and_then(|m| _snmp_components(m.group(1).unwrap_or("")));
                 let Some(comps) = comps.filter(|c| c.len() >= 3) else {
                     continue;
                 };
@@ -106,7 +77,7 @@ pub fn check_snmp_oid_with(
                             both = true;
                             key = Some(vec![value.and_then(pystr::py_int_from_f64)]);
                         } else if SNMP_DECIMAL.fullmatch(&n.text).is_some() {
-                            key = snmp_components_result(&n.text);
+                            key = _snmp_components(&n.text);
                         } else {
                             continue;
                         }
@@ -208,25 +179,15 @@ pub fn check_snmp_oid_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_modemcallback_baud`.
-pub fn check_modemcallback_baud(
-    _stmt: &Instruction,
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::check_modemcallback_baud (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_modemcallback_baud`.
+/// Port of checker/instr_rules.py::check_modemcallback_baud
 #[allow(
     clippy::single_match_else,
     reason = "Preserve Python literal-versus-folded branch"
 )]
-pub fn check_modemcallback_baud_with(
+pub fn check_modemcallback_baud(
     stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
     env: &Env,
 ) {
@@ -295,7 +256,7 @@ pub fn check_snmpvariable_too_many(program: &Program, profile: &Profile, diags: 
         }
         let text = &stmt.base.text;
         if let Some(m) = _SNMP_SPACED_OID.match_(text) {
-            if let Some(components) = snmp_components_result(m.group(1).unwrap_or(""))
+            if let Some(components) = _snmp_components(m.group(1).unwrap_or(""))
                 && components
                     .iter()
                     .map(|c| c.unwrap_or(0))
@@ -407,13 +368,8 @@ pub fn check_snmpvariable_too_many(program: &Program, profile: &Profile, diags: 
 
 const _SCAN_VALUE_CHECK_LOGGERS: [&str; 2] = ["cr6", "cr1000x"];
 
-/// Port of `checker/instr_rules.py::_is_negative_or_invalid`.
-pub fn _is_negative_or_invalid() -> bool {
-    todo!("checker/instr_rules.py::_is_negative_or_invalid (omitted: value: object)")
-}
-
-/// Port of `checker/instr_rules.py::_is_negative_or_invalid`.
-pub fn _is_negative_or_invalid_with(value: &ConstValue) -> bool {
+/// Port of checker/instr_rules.py::_is_negative_or_invalid
+pub fn _is_negative_or_invalid(value: &ConstValue) -> bool {
     if matches!(value, ConstValue::Str(_)) {
         return true;
     }
@@ -423,18 +379,8 @@ pub fn _is_negative_or_invalid_with(value: &ConstValue) -> bool {
     false
 }
 
-/// Port of `checker/instr_rules.py::check_scan_params`.
-pub fn check_scan_params(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_scan_params (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_scan_params`.
-pub fn check_scan_params_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+/// Port of checker/instr_rules.py::check_scan_params
+pub fn check_scan_params(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     if !_SCAN_VALUE_CHECK_LOGGERS.contains(&profile.name) {
         return;
     }
@@ -461,7 +407,7 @@ pub fn check_scan_params_with(
             let Ok(value) = consteval::value_of(Some(arg), env) else {
                 continue;
             };
-            if _is_negative_or_invalid_with(&value) {
+            if _is_negative_or_invalid(&value) {
                 diags.error_basic(
                     stmt.base.node.line,
                     &format!("Scan {label} parameter must be a non-negative integer"),
@@ -469,7 +415,7 @@ pub fn check_scan_params_with(
                 );
             }
             if idx == 0 {
-                split = _scan_min_interval_with(stmt, diags, env);
+                split = _scan_min_interval(stmt, diags, env);
                 if let Some((sec, us)) = split
                     && sec > 86400
                     && !(sec == 0 && us < 1000)
@@ -516,7 +462,7 @@ pub fn _check_slow_scan_interval(stmt: &Instruction, split: (i64, i64), diags: &
     }
 }
 
-static _US_PER_UNIT: LazyLock<OrderedMap<i64, i64>> = LazyLock::new(|| {
+pub(super) static _US_PER_UNIT: LazyLock<OrderedMap<i64, i64>> = LazyLock::new(|| {
     let mut m = OrderedMap::new();
     for (k, v) in [
         (0, 1),
@@ -531,18 +477,13 @@ static _US_PER_UNIT: LazyLock<OrderedMap<i64, i64>> = LazyLock::new(|| {
     m
 });
 
-/// Port of `checker/instr_rules.py::_scan_min_interval`.
-pub fn _scan_min_interval(_stmt: &Instruction, _diags: &mut Diagnostics) -> Option<(i64, i64)> {
-    todo!("checker/instr_rules.py::_scan_min_interval (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_scan_min_interval`.
-pub fn _scan_min_interval_with(
+/// Port of checker/instr_rules.py::_scan_min_interval
+pub fn _scan_min_interval(
     stmt: &Instruction,
     diags: &mut Diagnostics,
     env: &Env,
 ) -> Option<(i64, i64)> {
-    let split = scan_split_with(stmt, env)?;
+    let split = scan_split(stmt, env)?;
     let (sec, us) = split;
     if sec == 0 && us < 1000 {
         diags.error_basic(
@@ -565,13 +506,8 @@ pub fn _crem(a: i64, b: i64) -> i64 {
     a - b * _cdiv(a, b)
 }
 
-/// Port of `checker/instr_rules.py::scan_split`.
-pub fn scan_split(_stmt: &Instruction) -> Option<(i64, i64)> {
-    todo!("checker/instr_rules.py::scan_split (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::scan_split`.
-pub fn scan_split_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
+/// Port of checker/instr_rules.py::scan_split
+pub fn scan_split(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     let a = stmt.args.first()?.as_deref()?;
     let b = stmt.args.get(1)?.as_deref()?;
     if !(consteval::is_constant(Some(a), env) && consteval::is_constant(Some(b), env)) {
@@ -580,9 +516,7 @@ pub fn scan_split_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     let value = consteval::value_of(Some(a), env).ok()?;
     let unit = consteval::value_of(Some(b), env).ok()?;
     let mut n = consteval::to_long(&value);
-    if n == -2_147_483_648
-        && ["cr300", "cr350"].contains(&env.profile.name)
-        && _f32_is_2_31_with(&value)
+    if n == -2_147_483_648 && ["cr300", "cr350"].contains(&env.profile.name) && _f32_is_2_31(&value)
     {
         n = 2_147_483_647;
     }
@@ -621,18 +555,13 @@ pub fn scan_split_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     ))
 }
 
-/// Port of `checker/instr_rules.py::_f32_is_2_31`.
-pub fn _f32_is_2_31() -> bool {
-    todo!("checker/instr_rules.py::_f32_is_2_31 (omitted: value: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_f32_is_2_31`.
+/// Port of checker/instr_rules.py::_f32_is_2_31
 #[allow(
     clippy::cast_possible_truncation,
     reason = "Python struct.pack f narrows to IEEE float32"
 )]
 #[allow(clippy::float_cmp, reason = "Python exact float32 boundary comparison")]
-pub fn _f32_is_2_31_with(value: &ConstValue) -> bool {
+pub fn _f32_is_2_31(value: &ConstValue) -> bool {
     numeric(value).is_some_and(|v| f64::from(v as f32) == 2_147_483_648.0)
 }
 
@@ -646,13 +575,8 @@ pub fn _cdiv(a: i64, b: i64) -> i64 {
     }
 }
 
-/// Port of `checker/instr_rules.py::check_scan_max_interval`.
-pub fn check_scan_max_interval(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_scan_max_interval (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_scan_max_interval`.
-pub fn check_scan_max_interval_with(
+/// Port of checker/instr_rules.py::check_scan_max_interval
+pub fn check_scan_max_interval(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -673,7 +597,7 @@ pub fn check_scan_max_interval_with(
         if kw != "SCAN" {
             continue;
         }
-        let Some(split) = scan_split_with(stmt, env) else {
+        let Some(split) = scan_split(stmt, env) else {
             continue;
         };
         let (sec, us) = split;
@@ -696,13 +620,8 @@ pub fn check_scan_max_interval_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_scan_raw`.
-pub fn _scan_raw(_stmt: &Instruction) -> Option<(i64, i64)> {
-    todo!("checker/instr_rules.py::_scan_raw (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_scan_raw`.
-pub fn _scan_raw_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
+/// Port of checker/instr_rules.py::_scan_raw
+pub fn _scan_raw(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     let a = stmt.args.first()?.as_deref()?;
     let b = stmt.args.get(1)?.as_deref()?;
     if !(consteval::is_constant(Some(a), env) && consteval::is_constant(Some(b), env)) {
@@ -721,13 +640,8 @@ pub fn _scan_raw_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     Some((n, u))
 }
 
-/// Port of `checker/instr_rules.py::_units_key`.
-pub fn _units_key(_units_arg: &Expr, _truncate: bool) {
-    todo!("checker/instr_rules.py::_units_key (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_units_key`.
-pub fn _units_key_with(
+/// Port of checker/instr_rules.py::_units_key
+pub fn _units_key(
     units_arg: &Expr,
     env: &Env,
     truncate: bool,
@@ -738,17 +652,8 @@ pub fn _units_key_with(
     consteval::value_of(Some(units_arg), env).map(Some)
 }
 
-/// Port of `checker/instr_rules.py::_interval_us`.
+/// Port of checker/instr_rules.py::_interval_us
 pub fn _interval_us(
-    _interval_arg: Option<&Expr>,
-    _units_arg: Option<&Expr>,
-    _truncate_units: bool,
-) -> Option<f64> {
-    todo!("checker/instr_rules.py::_interval_us (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_interval_us`.
-pub fn _interval_us_with(
     interval_arg: Option<&Expr>,
     units_arg: Option<&Expr>,
     env: &Env,
@@ -759,7 +664,7 @@ pub fn _interval_us_with(
         return None;
     }
     let value = consteval::value_of(Some(a), env).ok()?;
-    let unit = _units_key_with(b, env, truncate_units).ok()??;
+    let unit = _units_key(b, env, truncate_units).ok()??;
     let factor = _US_PER_UNIT.get(&unit_key(&unit)?)?;
     if !consteval::is_finite_number(&value) {
         return None;
@@ -771,37 +676,23 @@ pub fn _interval_us_with(
     Some(value * int_float(*factor))
 }
 
-/// Port of `checker/instr_rules.py::_divisible_interval_us`.
+/// Port of checker/instr_rules.py::_divisible_interval_us
 pub fn _divisible_interval_us(
-    _interval_arg: Option<&Expr>,
-    _units_arg: Option<&Expr>,
-    _truncate_units: bool,
-) -> Option<f64> {
-    todo!("checker/instr_rules.py::_divisible_interval_us (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_divisible_interval_us`.
-pub fn _divisible_interval_us_with(
     interval_arg: Option<&Expr>,
     units_arg: Option<&Expr>,
     env: &Env,
     truncate_units: bool,
 ) -> Option<f64> {
-    _interval_us_with(interval_arg, units_arg, env, truncate_units)?;
+    _interval_us(interval_arg, units_arg, env, truncate_units)?;
     let units_arg = units_arg?;
     let value = consteval::value_of(interval_arg, env).ok()?;
     let value = numeric(&value)?;
-    let unit = _units_key_with(units_arg, env, truncate_units).ok()??;
+    let unit = _units_key(units_arg, env, truncate_units).ok()??;
     Some(value.trunc() * int_float(*_US_PER_UNIT.get(&unit_key(&unit)?)?))
 }
 
-/// Port of `checker/instr_rules.py::check_data_interval`.
-pub fn check_data_interval(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_data_interval (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_data_interval`.
-pub fn check_data_interval_with(
+/// Port of checker/instr_rules.py::check_data_interval
+pub fn check_data_interval(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -850,7 +741,7 @@ pub fn check_data_interval_with(
                 let Ok(value) = consteval::value_of(arg, env) else {
                     continue;
                 };
-                if _is_negative_or_invalid_with(&value) {
+                if _is_negative_or_invalid(&value) {
                     diags.error(
                         stmt.base.node.line,
                         "DataInterval TintoInt and Interval parameters must be non-negative",
@@ -864,7 +755,7 @@ pub fn check_data_interval_with(
                 }
             }
         }
-        if let Some(us) = _divisible_interval_us_with(interval, units, env, true) {
+        if let Some(us) = _divisible_interval_us(interval, units, env, true) {
             declared_interval_us.insert(table.clone(), us);
         }
     }
@@ -875,8 +766,8 @@ pub fn check_data_interval_with(
         };
         let kw = pystr::upper(&stmt.keyword);
         if kw == "SCAN" {
-            scan_interval_us = if _scan_raw_with(stmt, env).is_some() {
-                _divisible_interval_us_with(
+            scan_interval_us = if _scan_raw(stmt, env).is_some() {
+                _divisible_interval_us(
                     stmt.args.first().and_then(Option::as_deref),
                     stmt.args.get(1).and_then(Option::as_deref),
                     env,
@@ -885,7 +776,7 @@ pub fn check_data_interval_with(
             } else {
                 None
             };
-            if scan_split_with(stmt, env) == Some((0, 0)) {
+            if scan_split(stmt, env) == Some((0, 0)) {
                 scan_interval_us = None;
             }
             continue;
@@ -979,21 +870,12 @@ pub fn _stringish(expr: Option<&Expr>, str_consts: &BTreeSet<String>) -> bool {
     }
 }
 
-/// Port of `checker/instr_rules.py::_string_typed`.
-pub fn _string_typed(
-    _expr: Option<&Expr>,
-    _str_consts: &BTreeSet<String>,
-    _profile: &Profile,
-) -> Option<bool> {
-    todo!("checker/instr_rules.py::_string_typed (omitted: typer: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_string_typed`.
+/// Port of checker/instr_rules.py::_string_typed
 #[allow(
     clippy::match_same_arms,
     reason = "Preserve Python expression-kind branch order"
 )]
-pub fn _string_typed_with(
+pub fn _string_typed(
     expr: Option<&Expr>,
     typer: &Typer,
     str_consts: &BTreeSet<String>,
@@ -1019,8 +901,8 @@ pub fn _string_typed_with(
                 && let Some(Expr::Index(ix)) = expr
                 && ix.args.len() == 3
             {
-                let a = _string_typed_with(ix.args[1].as_deref(), typer, str_consts, profile);
-                let b = _string_typed_with(ix.args[2].as_deref(), typer, str_consts, profile);
+                let a = _string_typed(ix.args[1].as_deref(), typer, str_consts, profile);
+                let b = _string_typed(ix.args[2].as_deref(), typer, str_consts, profile);
                 return if a == b { a } else { None };
             }
             if let Some(record) = record
@@ -1041,8 +923,8 @@ pub fn _string_typed_with(
             if !["+", "&"].contains(&b.op.as_str()) {
                 return Some(false);
             }
-            let a = _string_typed_with(b.left.as_deref(), typer, str_consts, profile);
-            let c = _string_typed_with(b.right.as_deref(), typer, str_consts, profile);
+            let a = _string_typed(b.left.as_deref(), typer, str_consts, profile);
+            let c = _string_typed(b.right.as_deref(), typer, str_consts, profile);
             if a == Some(true) || c == Some(true) {
                 Some(true)
             } else if a.is_none() || c.is_none() {
@@ -1055,18 +937,8 @@ pub fn _string_typed_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_iif_types`.
-pub fn check_iif_types(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let profile = crate::profiles::get(profile.name).expect("known profile");
-    check_iif_types_with(&Rc::new(program.clone()), profile, diags);
-}
-
-/// Port of `checker/instr_rules.py::check_iif_types`.
-pub fn check_iif_types_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-) {
+/// Port of checker/instr_rules.py::check_iif_types
+pub fn check_iif_types(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     use crate::checker::expressions::{
         part1::{_undefined_names_with, KnownView},
         part2::_stmt_exprs_with,
@@ -1111,7 +983,7 @@ pub fn check_iif_types_with(
                     .args
                     .iter()
                     .skip(1)
-                    .map(|a| _string_typed_with(a.as_deref(), &typer, str_consts, profile))
+                    .map(|a| _string_typed(a.as_deref(), &typer, str_consts, profile))
                     .collect();
                 if let Stmt::Assignment(a) = stmt.as_ref()
                     && ix.args.len() == 3
@@ -1171,13 +1043,6 @@ fn unit_key(v: &ConstValue) -> Option<i64> {
     (int_float(i) == n).then_some(i)
 }
 
-// The sibling's generated unit-returning signature cannot expose Python's tuple.
-// Replace this adapter with part1::_snmp_components_with once its owner supplies it.
-fn snmp_components_result(text: &str) -> Option<Vec<Option<i64>>> {
-    super::part1::_snmp_components(text);
-    todo!("part1::_snmp_components needs Option<Vec<Option<i64>>> return value")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,8 +1066,8 @@ mod tests {
             let mut diags = Diagnostics::new();
             match mode {
                 "scan" => {
-                    check_scan_params_with(&program, profile, &mut diags, &env);
-                    check_scan_max_interval_with(&program, profile, &mut diags, &env);
+                    check_scan_params(&program, profile, &mut diags, &env);
+                    check_scan_max_interval(&program, profile, &mut diags, &env);
                     let scan = program
                         .statements
                         .iter()
@@ -1212,7 +1077,7 @@ mod tests {
                         })
                         .unwrap();
                     assert_eq!(
-                        serde_json::to_value(scan_split_with(scan, &env)).unwrap(),
+                        serde_json::to_value(scan_split(scan, &env)).unwrap(),
                         row[3],
                         "split {} {source}",
                         profile.name
@@ -1222,11 +1087,11 @@ mod tests {
                     let Stmt::Instruction(stmt) = program.statements[0].as_ref() else {
                         panic!("instruction")
                     };
-                    check_modemcallback_baud_with(stmt, &program, profile, &mut diags, &env);
+                    check_modemcallback_baud(stmt, &program, profile, &mut diags, &env);
                 }
-                "iif" => check_iif_types_with(&program, profile, &mut diags),
-                "data" => check_data_interval_with(&program, profile, &mut diags, &env),
-                "snmp" => check_snmp_oid_with(&program, profile, &mut diags, Some(&env)),
+                "iif" => check_iif_types(&program, profile, &mut diags),
+                "data" => check_data_interval(&program, profile, &mut diags, &env),
+                "snmp" => check_snmp_oid(&program, profile, &mut diags, Some(&env)),
                 _ => panic!("unknown mode"),
             }
             let actual: Vec<_> = diags

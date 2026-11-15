@@ -195,11 +195,10 @@ pub fn _scan_counts_for_table_placement_with(stmt: &Stmt, env: Option<&Env>) -> 
     {
         return false;
     }
-    if env.is_some()
+    if let Some(env) = env
         && let Stmt::Instruction(inst) = stmt
     {
-        // TODO: scan_split's existing signature omits env; wire its full variant when ported.
-        return instr_rules::scan_split(inst) != Some((0, 0));
+        return instr_rules::scan_split(inst, env) != Some((0, 0));
     }
     true
 }

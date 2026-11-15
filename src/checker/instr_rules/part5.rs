@@ -8,8 +8,10 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::sync::LazyLock;
 
+use crate::checker::instr_rules::part2::{_US_PER_UNIT, _interval_us, _scan_raw};
 use crate::checker::instr_rules::part4::{
-    _delay_option_with, _dnp_long_with, DnpConv, cdm_unsupported_module_with,
+    _CDM_PORT_MODULES, _cdm_null_module, _delay_option, _dnp_long, _is_cdm_named_type, DnpConv,
+    cdm_unsupported_module,
 };
 use crate::checker::{context, longconv};
 use crate::consteval::{self, Env};
@@ -26,17 +28,8 @@ fn arg_at(args: &[Option<ExprRef>], i: usize) -> Option<&Expr> {
     args.get(i).and_then(|a| a.as_deref())
 }
 
-/// Port of `checker/instr_rules.py::check_fieldcal_variable_args`.
+/// Port of checker/instr_rules.py::check_fieldcal_variable_args
 pub fn check_fieldcal_variable_args(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::check_fieldcal_variable_args (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_fieldcal_variable_args`.
-pub fn check_fieldcal_variable_args_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -59,7 +52,7 @@ pub fn check_fieldcal_variable_args_with(
     };
     let number = |arg: Option<&Expr>| {
         if env.is_some() {
-            _dnp_long_with(arg, &conv, false)
+            _dnp_long(arg, &conv, false)
         } else {
             None
         }
@@ -107,7 +100,7 @@ pub fn check_fieldcal_variable_args_with(
         }
         // a MeasVar or Reps error (CR300/CR350 then print no Mult/Offset line)
         let mut earlier = false;
-        let meas = args.len() > 1 && _fieldcal_string_subscript_with(arg_at(args, 1));
+        let meas = args.len() > 1 && _fieldcal_string_subscript(arg_at(args, 1));
         if meas {
             earlier = true;
             diags.error_basic(
@@ -135,7 +128,7 @@ pub fn check_fieldcal_variable_args_with(
         ] {
             if options.contains(&option)
                 && index < args.len()
-                && _fieldcal_bad_variable_with(arg_at(args, index))
+                && _fieldcal_bad_variable(arg_at(args, index))
                 && !(earlier && profile.single_pass)
             {
                 diags.error_basic(
@@ -148,7 +141,7 @@ pub fn check_fieldcal_variable_args_with(
                 earlier = true;
             }
         }
-        if args.len() > 5 && _fieldcal_string_subscript_with(arg_at(args, 5)) {
+        if args.len() > 5 && _fieldcal_string_subscript(arg_at(args, 5)) {
             diags.error_basic(
                 line,
                 "FieldCal Mode must be a declared public variable that can be resolved during compilation.",
@@ -179,7 +172,7 @@ pub fn check_fieldcal_variable_args_with(
                 _ => false,
             };
             let bad = outside
-                || _fieldcal_bad_variable_with(known)
+                || _fieldcal_bad_variable(known)
                 || matches!(known, Some(Expr::Unary(_)))
                 || match known {
                     Some(Expr::Name(n)) => {
@@ -245,13 +238,8 @@ pub fn check_fieldcal_variable_args_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_fieldcal_string_subscript`.
-pub fn _fieldcal_string_subscript() -> bool {
-    todo!("checker/instr_rules.py::_fieldcal_string_subscript (omitted: arg: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_fieldcal_string_subscript`.
-pub fn _fieldcal_string_subscript_with(arg: Option<&Expr>) -> bool {
+/// Port of checker/instr_rules.py::_fieldcal_string_subscript
+pub fn _fieldcal_string_subscript(arg: Option<&Expr>) -> bool {
     match arg {
         Some(Expr::Index(ix)) => ix
             .args
@@ -264,9 +252,10 @@ pub fn _fieldcal_string_subscript_with(arg: Option<&Expr>) -> bool {
 /// Port of `checker/instr_rules.py::check_matrix_destination`.
 pub fn check_matrix_destination(
     stmt: &Instruction,
-    _program: &Program,
-    profile: &Profile,
+    _program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
+    _env: &Env,
 ) {
     if !profile.single_pass || stmt.args.len() < 4 {
         return;
@@ -285,13 +274,8 @@ pub fn check_matrix_destination(
     }
 }
 
-/// Port of `checker/instr_rules.py::_fieldcal_bad_variable`.
-pub fn _fieldcal_bad_variable() -> bool {
-    todo!("checker/instr_rules.py::_fieldcal_bad_variable (omitted: arg: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_fieldcal_bad_variable`.
-pub fn _fieldcal_bad_variable_with(arg: Option<&Expr>) -> bool {
+/// Port of checker/instr_rules.py::_fieldcal_bad_variable
+pub fn _fieldcal_bad_variable(arg: Option<&Expr>) -> bool {
     match arg {
         Some(Expr::String(_) | Expr::Binary(_)) => true,
         Some(Expr::Index(ix)) => ix
@@ -335,13 +319,8 @@ pub fn check_samplefieldcal(program: &Program, profile: &Profile, diags: &mut Di
     }
 }
 
-/// Port of `checker/instr_rules.py::_cdm_type_value`.
-pub fn _cdm_type_value() -> Option<i64> {
-    todo!("checker/instr_rules.py::_cdm_type_value (omitted: kind: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_cdm_type_value`.
-pub fn _cdm_type_value_with(kind: &ConstValue) -> Option<i64> {
+/// Port of checker/instr_rules.py::_cdm_type_value
+pub fn _cdm_type_value(kind: &ConstValue) -> Option<i64> {
     match kind {
         ConstValue::BigInt(_) => None,
         ConstValue::Str(_) => Some(0),
@@ -356,64 +335,29 @@ pub fn _cdm_type_value_with(kind: &ConstValue) -> Option<i64> {
     }
 }
 
-// part4.rs keeps its copies of these tables private; same content (instr_rules.py 3011-3040).
-fn _p5_cdm_named_type(kind: i64) -> bool {
-    (100..106).contains(&kind)
-        || (200..=202).contains(&kind)
-        || (220..232).contains(&kind)
-        || matches!(kind, 260 | 261)
-}
-
-fn _p5_cdm_null_module(kw: &str) -> &'static [&'static str] {
-    const ANALOG: &str = "Analog measurement";
-    match kw {
-        "CDM_VOLTSE" | "CDM_VOLTDIFF" | "CDM_TCSE" | "CDM_PANELTEMP" | "CDM_BRFULL6W"
-        | "CDM_BRHALF3W" | "CDM_THERM107" | "CDM_RESISTANCE" => &[ANALOG],
-        "CDM_BATTERY" => &["CDM_Battery"],
-        "CDM_DELAY" => &["CDM_Delay"],
-        "CDM_PULSEPORT" => &["CDM_PulsePort"],
-        "CDM_TCCOMP" => &["CDM_TCComp"],
-        "CDM_ACPOWER" => &["CDM_ACPower"],
-        "CDM_PERIODAVG" => &["CDM_PeriodAvg"],
-        "CDM_EXCITEV" | "CDM_EXCITEI" => &["CDM_Excite"],
-        "CDM_MUXSELECT" => &["CDM_MuxSel"],
-        "CDM_SW12" | "CDM_SW5" => &["SW"],
-        "CDM_SWPOWER" => &["CDM_SWPower", "SW"],
-        "CDM_CURRENTDIFF" => &["CDM_CurrentDiff", ANALOG],
-        _ => &[],
-    }
-}
-
-const _P5_CDM_PORT_MODULES: &[i64] = &[220, 221, 222, 223];
-
-/// Port of `checker/instr_rules.py::cdm_null_module`.
-pub fn cdm_null_module(_stmt: &Instruction) -> bool {
-    todo!("checker/instr_rules.py::cdm_null_module (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::cdm_null_module`.
-pub fn cdm_null_module_with(stmt: &Instruction, env: &Env) -> bool {
+/// Port of checker/instr_rules.py::cdm_null_module
+pub fn cdm_null_module(stmt: &Instruction, env: &Env) -> bool {
     let kw = pystr::upper(&stmt.keyword);
-    if _p5_cdm_null_module(&kw).is_empty() || stmt.args.is_empty() {
+    if _cdm_null_module(&kw).is_none() || stmt.args.is_empty() {
         return false;
     }
     let Ok(value) = consteval::value_of(stmt.args[0].as_deref(), env) else {
         return false;
     };
-    let Some(kind) = _cdm_type_value_with(&value) else {
+    let Some(kind) = _cdm_type_value(&value) else {
         return false;
     };
     (0..=65536).contains(&kind)
-        && !_p5_cdm_named_type(kind)
+        && !_is_cdm_named_type(kind)
         && (kw != "CDM_DELAY"
-            || match _delay_option_with(stmt, env) {
+            || match _delay_option(stmt, env) {
                 Some(ConstValue::Int(0)) => true,
                 Some(ConstValue::Float(f) | ConstValue::CFloat(f)) => f == 0.0,
                 _ => false,
             })
 }
 
-fn _p5_cdm_bridge_option_args(kw: &str) -> Option<(usize, usize)> {
+fn _cdm_bridge_option_args(kw: &str) -> Option<(usize, usize)> {
     match kw {
         "CDM_BRHALF3W" => Some((10, 8)),
         "CDM_BRFULL6W" => Some((12, 9)),
@@ -421,15 +365,8 @@ fn _p5_cdm_bridge_option_args(kw: &str) -> Option<(usize, usize)> {
     }
 }
 
-/// Port of `checker/instr_rules.py::_check_cdm_bridge_options`.
-pub fn _check_cdm_bridge_options(_profile: &Profile) {
-    todo!(
-        "checker/instr_rules.py::_check_cdm_bridge_options (omitted: stmt: untyped, positions: untyped, diags: untyped, env: untyped, names: untyped, literals: untyped)"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_check_cdm_bridge_options`.
-pub fn _check_cdm_bridge_options_with(
+/// Port of checker/instr_rules.py::_check_cdm_bridge_options
+pub fn _check_cdm_bridge_options(
     stmt: &Instruction,
     positions: (usize, usize),
     profile: &Profile,
@@ -481,15 +418,8 @@ pub fn _check_cdm_bridge_options_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_check_cdm_mux_options`.
-pub fn _check_cdm_mux_options(_profile: &Profile) {
-    todo!(
-        "checker/instr_rules.py::_check_cdm_mux_options (omitted: stmt: untyped, module: untyped, diags: untyped, env: untyped, names: untyped, literals: untyped)"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_check_cdm_mux_options`.
-pub fn _check_cdm_mux_options_with(
+/// Port of checker/instr_rules.py::_check_cdm_mux_options
+pub fn _check_cdm_mux_options(
     stmt: &Instruction,
     module: i64,
     profile: &Profile,
@@ -534,13 +464,8 @@ pub fn _check_cdm_mux_options_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_cdm_address_types`.
-pub fn check_cdm_address_types(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_cdm_address_types (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_cdm_address_types`.
-pub fn check_cdm_address_types_with(
+/// Port of checker/instr_rules.py::check_cdm_address_types
+pub fn check_cdm_address_types(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -616,8 +541,8 @@ pub fn check_cdm_address_types_with(
             ConstValue::BigInt(s) => Some(s.parse::<f64>().unwrap_or(f64::INFINITY)),
         };
         let Some(numeric) = numeric else {
-            if cdm_null_module_with(stmt, env) {
-                for name in _p5_cdm_null_module(&kw) {
+            if cdm_null_module(stmt, env) {
+                for name in _cdm_null_module(&kw).unwrap_or(&[]) {
                     diags.error_basic(
                         line,
                         &format!("{name} instruction not supported by module NULL."),
@@ -646,16 +571,16 @@ pub fn check_cdm_address_types_with(
                 &format!("Address {address} already used with a different type CDM."),
                 file,
             );
-        } else if cdm_null_module_with(stmt, env) {
-            for name in _p5_cdm_null_module(&kw) {
+        } else if cdm_null_module(stmt, env) {
+            for name in _cdm_null_module(&kw).unwrap_or(&[]) {
                 diags.error_basic(
                     line,
                     &format!("{name} instruction not supported by module NULL."),
                     file,
                 );
             }
-        } else if let Some(module) = cdm_unsupported_module_with(stmt, env) {
-            for name in _p5_cdm_null_module(&kw) {
+        } else if let Some(module) = cdm_unsupported_module(stmt, env) {
+            for name in _cdm_null_module(&kw).unwrap_or(&[]) {
                 diags.error_basic(
                     line,
                     &format!("{name} instruction not supported by module {module}."),
@@ -663,8 +588,8 @@ pub fn check_cdm_address_types_with(
                 );
             }
         } else if let Some(kind) = kind_int
-            && _P5_CDM_PORT_MODULES.contains(&kind)
-            && (_p5_cdm_bridge_option_args(&kw).is_some() || kw == "CDM_MUXSELECT")
+            && _CDM_PORT_MODULES.contains(&kind)
+            && (_cdm_bridge_option_args(&kw).is_some() || kw == "CDM_MUXSELECT")
         {
             if conversion.is_none() {
                 conversion = Some((
@@ -674,11 +599,9 @@ pub fn check_cdm_address_types_with(
             }
             let (names, literals) = conversion.as_ref().expect("set above");
             if kw == "CDM_MUXSELECT" {
-                _check_cdm_mux_options_with(stmt, kind, profile, diags, env, names, literals);
-            } else if let Some(positions) = _p5_cdm_bridge_option_args(&kw) {
-                _check_cdm_bridge_options_with(
-                    stmt, positions, profile, diags, env, names, literals,
-                );
+                _check_cdm_mux_options(stmt, kind, profile, diags, env, names, literals);
+            } else if let Some(positions) = _cdm_bridge_option_args(&kw) {
+                _check_cdm_bridge_options(stmt, positions, profile, diags, env, names, literals);
             }
         }
     }
@@ -688,66 +611,8 @@ const _EPI_FILTERS: &[&str] = &["CDM_BRIDGEFILT", "CDM_FFTFILT"];
 const _EPI_RATES_MS: &[i64] = &[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
 const _FFT_SAMPLE_PERIODS: &[i64] = &[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
-// instr_rules.py `_US_PER_UNIT`
-fn _p5_us_per_unit(unit: i64) -> Option<i64> {
-    match unit {
-        0 => Some(1),
-        1 => Some(1_000),
-        2 => Some(1_000_000),
-        3 => Some(60_000_000),
-        4 => Some(3_600_000_000),
-        5 => Some(86_400_000_000),
-        _ => None,
-    }
-}
-
-/// A unit constant as a `_US_PER_UNIT` key (`2.0` hashes like `2`).
-fn _p5_unit_key(unit: &ConstValue) -> Option<i64> {
-    match unit {
-        ConstValue::Int(i) => Some(*i),
-        ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() && f.fract() == 0.0 => {
-            pystr::py_int_from_f64(*f)
-        }
-        _ => None,
-    }
-}
-
-// ponytail: local copy of part2.rs `_scan_raw` (env variant missing there); swap for
-// `_scan_raw_with` once part2 provides it.
-fn _p5_scan_raw(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
-    let args = &stmt.args;
-    if args.len() < 2
-        || args[0].is_none()
-        || args[1].is_none()
-        || !(consteval::is_constant(args[0].as_deref(), env)
-            && consteval::is_constant(args[1].as_deref(), env))
-    {
-        return None;
-    }
-    let value = consteval::value_of(args[0].as_deref(), env).ok()?;
-    let unit = consteval::value_of(args[1].as_deref(), env).ok()?;
-    if !consteval::is_finite_number(&value) {
-        return None;
-    }
-    let unit = _p5_unit_key(&unit).filter(|u| _p5_us_per_unit(*u).is_some())?;
-    let int_value = match &value {
-        ConstValue::Int(i) => *i,
-        ConstValue::Float(f) | ConstValue::CFloat(f) => pystr::py_int_from_f64(*f)?,
-        ConstValue::BigInt(_) | ConstValue::Str(_) => return None,
-    };
-    if !(0..=2_147_483_647).contains(&int_value) {
-        return None;
-    }
-    Some((int_value, unit))
-}
-
-/// Port of `checker/instr_rules.py::check_epi_scan_buffers`.
-pub fn check_epi_scan_buffers(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_epi_scan_buffers (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_epi_scan_buffers`.
-pub fn check_epi_scan_buffers_with(
+/// Port of checker/instr_rules.py::check_epi_scan_buffers
+pub fn check_epi_scan_buffers(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -806,13 +671,13 @@ pub fn check_epi_scan_buffers_with(
             us = None;
             minimum = None;
             subscan = 0;
-            let raw = if slow { None } else { _p5_scan_raw(st, env) };
+            let raw = if slow { None } else { _scan_raw(st, env) };
             if let Some((value, unit)) = raw {
-                let total = value.saturating_mul(_p5_us_per_unit(unit).unwrap_or(1));
+                let total = value.saturating_mul(_US_PER_UNIT.get(&unit).copied().unwrap_or(1));
                 if total >= 1000 {
                     us = Some(total);
                     let buffers = if st.args.len() > 2 {
-                        _const_int_with(st.args[2].as_deref(), env)
+                        _const_int(st.args[2].as_deref(), env)
                     } else {
                         None
                     };
@@ -856,19 +721,14 @@ pub fn check_epi_scan_buffers_with(
                 }
             }
             if subscan == 0 && kw == "CDM_FFTFILT" {
-                _check_cdm_fft_with(st, us, profile, env, names, diags);
+                _check_cdm_fft(st, us, profile, env, names, diags);
             }
         }
     }
 }
 
-/// Port of `checker/instr_rules.py::_check_cdm_fft`.
-pub fn _check_cdm_fft(_st: &Instruction, _us: i64, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::_check_cdm_fft (omitted: env: untyped, names: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_check_cdm_fft`.
-pub fn _check_cdm_fft_with(
+/// Port of checker/instr_rules.py::_check_cdm_fft
+pub fn _check_cdm_fft(
     st: &Instruction,
     us: i64,
     profile: &Profile,
@@ -942,13 +802,8 @@ pub fn _check_cdm_fft_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_const_int`.
-pub fn _const_int() -> Option<i64> {
-    todo!("checker/instr_rules.py::_const_int (omitted: arg: untyped, env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_const_int`.
-pub fn _const_int_with(arg: Option<&Expr>, env: &Env) -> Option<i64> {
+/// Port of checker/instr_rules.py::_const_int
+pub fn _const_int(arg: Option<&Expr>, env: &Env) -> Option<i64> {
     arg?;
     if !consteval::is_constant(arg, env) {
         return None;
@@ -961,54 +816,8 @@ pub fn _const_int_with(arg: Option<&Expr>, env: &Env) -> Option<i64> {
     }
 }
 
-/// An interval in microseconds, int or float as Python's arithmetic keeps it.
-enum _P5Us {
-    Int(i128),
-    Float(f64),
-}
-
-// ponytail: local copy of part2.rs `_interval_us` (truncate_units=False; env variant missing
-// there); swap for `_interval_us_with` once part2 provides it.
-fn _p5_interval_us(
-    interval_arg: Option<&Expr>,
-    units_arg: Option<&Expr>,
-    env: &Env,
-) -> Option<_P5Us> {
-    interval_arg?;
-    units_arg?;
-    if !(consteval::is_constant(interval_arg, env) && consteval::is_constant(units_arg, env)) {
-        return None;
-    }
-    let value = consteval::value_of(interval_arg, env).ok()?;
-    let unit = consteval::value_of(units_arg, env).ok()?;
-    let per_unit = _p5_unit_key(&unit).and_then(_p5_us_per_unit)?;
-    if !consteval::is_finite_number(&value) {
-        return None;
-    }
-    match value {
-        ConstValue::Int(i) => (i >= 0).then(|| _P5Us::Int(i128::from(i) * i128::from(per_unit))),
-        ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            #[allow(clippy::cast_precision_loss)]
-            let us = f * per_unit as f64;
-            (f >= 0.0).then_some(_P5Us::Float(us))
-        }
-        // ponytail: BigInt beyond i128 reads as unusable (Python would still find it too large)
-        ConstValue::BigInt(s) => s
-            .parse::<i128>()
-            .ok()
-            .and_then(|v| v.checked_mul(i128::from(per_unit)))
-            .map(_P5Us::Int),
-        ConstValue::Str(_) => None,
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_avw200_scan_time`.
-pub fn check_avw200_scan_time(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_avw200_scan_time (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_avw200_scan_time`.
-pub fn check_avw200_scan_time_with(
+/// Port of checker/instr_rules.py::check_avw200_scan_time
+pub fn check_avw200_scan_time(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1085,27 +894,21 @@ pub fn check_avw200_scan_time_with(
         return;
     }
     let (scan_stmt, calls) = holders[0];
-    let Some(interval_us) =
-        _p5_interval_us(arg_at(&scan_stmt.args, 0), arg_at(&scan_stmt.args, 1), env)
-    else {
+    let Some(interval_us) = _interval_us(
+        arg_at(&scan_stmt.args, 0),
+        arg_at(&scan_stmt.args, 1),
+        env,
+        false,
+    ) else {
         return;
     };
-    let interval: i64 = match interval_us {
-        _P5Us::Int(us) => {
-            if us % 1_000_000 != 0 || us <= 0 {
-                return;
-            }
-            i64::try_from(us / 1_000_000).unwrap_or(i64::MAX)
-        }
-        _P5Us::Float(us) => {
-            if pystr::pymod_f64(us, 1_000_000.0).is_none_or(|m| m != 0.0) || us <= 0.0 {
-                return;
-            }
-            match pystr::floordiv_f64(us, 1_000_000.0).and_then(pystr::py_int_from_f64) {
-                Some(i) => i,
-                None => return,
-            }
-        }
+    if pystr::pymod_f64(interval_us, 1_000_000.0).is_none_or(|m| m != 0.0) || interval_us <= 0.0 {
+        return;
+    }
+    let Some(interval) =
+        pystr::floordiv_f64(interval_us, 1_000_000.0).and_then(pystr::py_int_from_f64)
+    else {
+        return;
     };
     let mut total: i64 = 0;
     for st in calls {
@@ -1160,17 +963,8 @@ pub fn check_avw200_scan_time_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_mqtt_publish_payload`.
+/// Port of checker/instr_rules.py::check_mqtt_publish_payload
 pub fn check_mqtt_publish_payload(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::check_mqtt_publish_payload")
-}
-
-/// Port of `checker/instr_rules.py::check_mqtt_publish_payload`.
-pub fn check_mqtt_publish_payload_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1204,7 +998,7 @@ pub fn check_mqtt_publish_payload_with(
             }
         }
         if matches!(payload, Some(Expr::Number(_) | Expr::Name(_)))
-            || _numeric_expression_with(payload, &types)
+            || _numeric_expression(payload, &types)
         {
             diags.error_basic(
                 stmt.base.node.line,
@@ -1215,38 +1009,26 @@ pub fn check_mqtt_publish_payload_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_numeric_expression`.
-pub fn _numeric_expression(_expr: Option<&Expr>) -> bool {
-    todo!("checker/instr_rules.py::_numeric_expression (omitted: types: dict)")
-}
-
-/// Port of `checker/instr_rules.py::_numeric_expression`.
-pub fn _numeric_expression_with(expr: Option<&Expr>, types: &OrderedMap<String, String>) -> bool {
+/// Port of checker/instr_rules.py::_numeric_expression
+pub fn _numeric_expression(expr: Option<&Expr>, types: &OrderedMap<String, String>) -> bool {
     match expr {
         Some(Expr::Number(_)) => true,
         Some(Expr::Name(n)) => !matches!(
             types.get(&pystr::upper(&n.name)).map(String::as_str),
             None | Some("STRING")
         ),
-        Some(Expr::Unary(u)) => {
-            u.op == "-" && _numeric_expression_with(u.operand.as_deref(), types)
-        }
+        Some(Expr::Unary(u)) => u.op == "-" && _numeric_expression(u.operand.as_deref(), types),
         Some(Expr::Binary(b)) => {
             matches!(b.op.as_str(), "+" | "-" | "*" | "/" | "^")
-                && _numeric_expression_with(b.left.as_deref(), types)
-                && _numeric_expression_with(b.right.as_deref(), types)
+                && _numeric_expression(b.left.as_deref(), types)
+                && _numeric_expression(b.right.as_deref(), types)
         }
         _ => false,
     }
 }
 
-/// Port of `checker/instr_rules.py::_constant_name_text`.
-pub fn _constant_name_text(_arg: Option<&Expr>, _depth: i64) -> Option<String> {
-    todo!("checker/instr_rules.py::_constant_name_text (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::_constant_name_text`.
-pub fn _constant_name_text_with(arg: Option<&Expr>, env: &Env, depth: i64) -> Option<String> {
+/// Port of checker/instr_rules.py::_constant_name_text
+pub fn _constant_name_text(arg: Option<&Expr>, env: &Env, depth: i64) -> Option<String> {
     let arg = arg?;
     if depth > 16 {
         return None;
@@ -1258,29 +1040,16 @@ pub fn _constant_name_text_with(arg: Option<&Expr>, env: &Env, depth: i64) -> Op
             _ => None,
         },
         Expr::Binary(b) if b.op == "+" => {
-            let left = _constant_name_text_with(b.left.as_deref(), env, depth + 1);
-            let right = _constant_name_text_with(b.right.as_deref(), env, depth + 1);
+            let left = _constant_name_text(b.left.as_deref(), env, depth + 1);
+            let right = _constant_name_text(b.right.as_deref(), env, depth + 1);
             Some(left? + &right?)
         }
         _ => None,
     }
 }
 
-/// Port of `checker/instr_rules.py::_check_port_index`.
+/// Port of checker/instr_rules.py::_check_port_index
 pub fn _check_port_index(
-    _stmt: &Instruction,
-    _key: &str,
-    _index: Option<&str>,
-    _profile: &Profile,
-    _found: &mut Diagnostics,
-) {
-    todo!(
-        "checker/instr_rules.py::_check_port_index (omitted: cfg: dict | None, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_check_port_index`.
-pub fn _check_port_index_with(
     stmt: &Instruction,
     key: &str,
     index: Option<&str>,
@@ -1340,18 +1109,8 @@ pub fn _check_port_index_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_settings_fields`.
+/// Port of checker/instr_rules.py::check_settings_fields
 pub fn check_settings_fields(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-    _found: Option<&mut Diagnostics>,
-) {
-    todo!("checker/instr_rules.py::check_settings_fields (omitted: env: consteval.Env | None)")
-}
-
-/// Port of `checker/instr_rules.py::check_settings_fields`.
-pub fn check_settings_fields_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1420,7 +1179,7 @@ pub fn check_settings_fields_with(
         {
             continue;
         }
-        let Some(name) = _constant_name_text_with(stmt.args[0].as_deref(), env, 0) else {
+        let Some(name) = _constant_name_text(stmt.args[0].as_deref(), env, 0) else {
             // a number, variable or other non-string-constant name
             // (docs/checker.md#settings-name-must-be-constant-round-36)
             if stmt.args[0].is_some() {
@@ -1457,7 +1216,7 @@ pub fn check_settings_fields_with(
             &name
         });
         if (if kw == "SETSTATUS" { &both } else { &settings }).contains(&key) {
-            _check_port_index_with(
+            _check_port_index(
                 stmt,
                 &key,
                 index.as_deref(),
@@ -1517,7 +1276,7 @@ EndProg
 ";
         let profile = profiles::get("cr1000x").unwrap();
         let got = run(src, profile, |p, e, d| {
-            check_fieldcal_variable_args_with(p, profile, d, Some(e));
+            check_fieldcal_variable_args(p, profile, d, Some(e));
         });
         let off =
             "FieldCal Offset must be a declared variable that can be resolved during compilation.";
@@ -1553,7 +1312,7 @@ EndProg
 ";
         let profile = profiles::get("cr1000x").unwrap();
         let got = run(src, profile, |p, _, d| {
-            check_settings_fields_with(p, profile, d, None, None);
+            check_settings_fields(p, profile, d, None, None);
         });
         let want = [
             (4, "Bogus is not a Settings Field Name."),
@@ -1572,7 +1331,7 @@ EndProg
 ";
         let profile = profiles::get("cr300").unwrap();
         let got = run(src, profile, |p, _, d| {
-            check_mqtt_publish_payload_with(p, profile, d);
+            check_mqtt_publish_payload(p, profile, d);
         });
         let lines: Vec<i64> = got.iter().map(|g| g.0).collect();
         assert_eq!(lines, [3, 5, 6]);
@@ -1592,7 +1351,7 @@ EndProg
 ";
         let profile = profiles::get("cr6").unwrap();
         let got = run(src, profile, |p, e, d| {
-            check_epi_scan_buffers_with(p, profile, d, e);
+            check_epi_scan_buffers(p, profile, d, e);
         });
         let m = "Insufficient Scan buffers to read EPI data, minimum is 100.".to_string();
         assert_eq!(got, [(4, m.clone()), (7, m)]);
@@ -1608,7 +1367,7 @@ BeginProg
 EndProg
 ";
         let got = run(src, profile, |p, e, d| {
-            check_cdm_address_types_with(p, profile, d, e);
+            check_cdm_address_types(p, profile, d, e);
         });
         let want = [
             (6, "CPI Address must be 1..120."),

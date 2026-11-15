@@ -1287,9 +1287,8 @@ pub fn _scan_step(_stmt: &Instruction) -> Option<(i64, i64)> {
 }
 
 /// Port of `checker/intervals.py::_scan_step`.
-pub fn _scan_step_with(stmt: &Instruction, _env: &Env) -> Option<(i64, i64)> {
-    // TODO(P4): pass `_env` once `instr_rules::scan_split` accepts `env`.
-    super::instr_rules::scan_split(stmt)
+pub fn _scan_step_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
+    super::instr_rules::scan_split(stmt, env)
 }
 
 /// Port of `checker/intervals.py::_wrap32`.

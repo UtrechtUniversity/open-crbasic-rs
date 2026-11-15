@@ -242,9 +242,9 @@ pub fn check_early_with(program: &Program, profile: &Profile, diags: &mut Diagno
     _check_uint1_dims_with(program, profile, diags, env);
     _check_reachability_with(program, profile, diags, env);
     _check_fnotch_with(program, profile, diags, env);
-    instr_rules::check_scan_params(program, profile, diags);
-    instr_rules::check_scan_max_interval(program, profile, diags);
-    instr_rules::check_data_interval(program, profile, diags);
+    instr_rules::check_scan_params(program, profile, diags, env);
+    instr_rules::check_scan_max_interval(program, profile, diags, env);
+    instr_rules::check_data_interval(program, profile, diags, env);
 }
 
 /// Port of `checker/warnings.py::_kw`.
@@ -562,7 +562,7 @@ pub fn check_background_calibration_with(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
-    _env: &Env,
+    env: &Env,
 ) {
     let data = profile.background_calibration();
     if data.is_empty() {
@@ -597,7 +597,7 @@ pub fn check_background_calibration_with(
             continue;
         };
         main_scan_index += 1;
-        let interval_ms = _scan_interval_ms(inst);
+        let interval_ms = _scan_interval_ms(inst, env);
         let sid = stmt_id(stmt);
         if busy.contains(&sid)
             || (!timed.contains(&sid) && interval_ms.is_some_and(|ms| ms < threshold_ms))
@@ -682,7 +682,7 @@ pub fn check_slow_scan_skips_with(
         } else if kw == "SCAN"
             && let Stmt::Instruction(inst) = stmt.as_ref()
         {
-            let interval = _scan_interval_ms(inst);
+            let interval = _scan_interval_ms(inst, env);
             if seq == 0 {
                 mains.push(interval);
             } else {
@@ -778,8 +778,8 @@ pub fn check_slow_scan_skips_with(
 }
 
 /// Port of `checker/warnings.py::_scan_interval_ms`.
-pub fn _scan_interval_ms(stmt: &Instruction) -> Option<f64> {
-    let split = instr_rules::scan_split(stmt)?;
+pub fn _scan_interval_ms(stmt: &Instruction, env: &Env) -> Option<f64> {
+    let split = instr_rules::scan_split(stmt, env)?;
     let sign: i64 = if split.1 >= 0 { 1 } else { -1 };
     let abs_us = split.1.wrapping_abs();
     let units = split

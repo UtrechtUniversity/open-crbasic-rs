@@ -510,7 +510,7 @@ pub fn _instruction_arg_findings_with(
         return vec![];
     }
     let mut out = vec![];
-    let short = instr_rules::shortfall_message(col(args.len()));
+    let short = instr_rules::shortfall_message(record, col(args.len()));
     let params = instr_rules::_real_params(record.params.clone());
     for (i, (v, arg_toks, arg_text)) in syntax.iter().enumerate() {
         if arg_toks.is_empty() || i == 0 && toks[0].upper == "CALLTABLE" {

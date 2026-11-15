@@ -646,7 +646,7 @@ pub fn _check_with_context(
         intervals::check(program, diags);
     });
     _run_pass("instr_rules::check_const_int_args", "pass1", || {
-        instr_rules::check_const_int_args(program, profile, diags);
+        instr_rules::check_const_int_args(program, profile, diags, env);
     });
     _run_pass("expressions::check_function_call_counts", "pass1", || {
         expressions::check_function_call_counts(program, diags);
@@ -682,16 +682,16 @@ pub fn _check_with_context(
         instr_rules::check_snmpvariable_too_many(program, profile, diags);
     });
     _run_pass("instr_rules::check_snmp_oid", "pass1", || {
-        instr_rules::check_snmp_oid(program, profile, diags);
+        instr_rules::check_snmp_oid(program, profile, diags, Some(env));
     });
     _run_pass("instr_rules::run_rules(pass1)", "pass1", || {
-        instr_rules::run_rules("pass1", ctx.flat(), profile, diags);
+        instr_rules::run_rules("pass1", ctx.flat(), profile, diags, env);
     });
     _run_pass("instr_rules::check_emailrecv_destination", "pass1", || {
         instr_rules::check_emailrecv_destination(program, profile, diags);
     });
     _run_pass("instr_rules::check_tcpopen_connections", "pass1", || {
-        instr_rules::check_tcpopen_connections(program, profile, diags);
+        instr_rules::check_tcpopen_connections(program, profile, diags, env);
     });
     _run_pass("instr_rules::check_tcpopen_handle_type", "pass1", || {
         instr_rules::check_tcpopen_handle_type(program, profile, diags);
@@ -938,7 +938,7 @@ pub fn _check_with_context(
             "instr_rules::run_rules(tier_b_generic)",
             "tier_b_generic",
             || {
-                instr_rules::run_rules("tier_b_generic", &flat, profile, diags);
+                instr_rules::run_rules("tier_b_generic", &flat, profile, diags, env);
             },
         );
         _run_aside(
@@ -946,7 +946,7 @@ pub fn _check_with_context(
             "leading",
             diags,
             |aside| {
-                instr_rules::run_rules("leading", &flat, profile, aside);
+                instr_rules::run_rules("leading", &flat, profile, aside, env);
             },
         );
         if !profile.single_pass {
@@ -993,7 +993,7 @@ pub fn _check_with_context(
                 },
             );
             _run_aside("instr_rules::run_rules(bounds)", "bounds", diags, |aside| {
-                instr_rules::run_rules("bounds", &flat, profile, aside);
+                instr_rules::run_rules("bounds", &flat, profile, aside, env);
             });
             _run_aside(
                 "instr_data::check_output_datatype",
@@ -1016,7 +1016,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_option_values(&flat, profile, aside);
+                    instr_rules::check_option_values(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1024,7 +1024,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_serialinrecord(&flat, profile, aside);
+                    instr_rules::check_serialinrecord(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1072,7 +1072,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_fieldcal_variable_args(&flat, profile, aside);
+                    instr_rules::check_fieldcal_variable_args(&flat, profile, aside, Some(env));
                 },
             );
             _run_aside(
@@ -1088,18 +1088,18 @@ pub fn _check_with_context(
                 "claims",
                 diags,
                 |aside| {
-                    instr_rules::check_terminal_conflicts(&flat, profile, aside);
+                    instr_rules::check_terminal_conflicts(&flat, profile, aside, env);
                 },
             );
             _run_aside("instr_rules::check_dnp_update", "leading", diags, |aside| {
-                instr_rules::check_dnp_update(&flat, profile, aside);
+                instr_rules::check_dnp_update(&flat, profile, aside, Some(env));
             });
             _run_aside(
                 "instr_rules::check_cdm_address_types",
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_cdm_address_types(&flat, profile, aside);
+                    instr_rules::check_cdm_address_types(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1107,7 +1107,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_avw200_scan_time(&flat, profile, aside);
+                    instr_rules::check_avw200_scan_time(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1115,13 +1115,13 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_epi_scan_buffers(&flat, profile, aside);
+                    instr_rules::check_epi_scan_buffers(&flat, profile, aside, env);
                 },
             );
         }
 
         _run_pass("instr_rules::run_rules(tier_b)", "tier_b", || {
-            instr_rules::run_rules("tier_b", program, profile, diags);
+            instr_rules::run_rules("tier_b", program, profile, diags, env);
         });
         if !profile.single_pass {
             _run_aside(
@@ -1147,7 +1147,13 @@ pub fn _check_with_context(
                 diags,
                 |aside| {
                     let mut tmp = Diagnostics::new();
-                    instr_rules::check_settings_fields(&flat, profile, &mut tmp, Some(aside));
+                    instr_rules::check_settings_fields(
+                        &flat,
+                        profile,
+                        &mut tmp,
+                        Some(aside),
+                        Some(env),
+                    );
                 },
             );
         }
@@ -1235,7 +1241,13 @@ pub fn _check_with_context(
             diags,
             |aside| {
                 let mut tmp = Diagnostics::new();
-                instr_rules::check_settings_fields(ctx.flat(), profile, &mut tmp, Some(aside));
+                instr_rules::check_settings_fields(
+                    ctx.flat(),
+                    profile,
+                    &mut tmp,
+                    Some(aside),
+                    Some(env),
+                );
             },
         );
         _run_aside(
@@ -1243,7 +1255,7 @@ pub fn _check_with_context(
             "bounds",
             diags,
             |aside| {
-                instr_rules::check_option_values(ctx.flat(), profile, aside);
+                instr_rules::check_option_values(ctx.flat(), profile, aside, env);
             },
         );
     }
@@ -1310,11 +1322,11 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_rules::check_fieldcal_variable_args(program, profile, aside);
+                    instr_rules::check_fieldcal_variable_args(program, profile, aside, Some(env));
                 },
             );
             _run_aside("instr_rules::run_rules(bounds)", "bounds", diags, |aside| {
-                instr_rules::run_rules("bounds", program, profile, aside);
+                instr_rules::run_rules("bounds", program, profile, aside, env);
             });
             _run_aside(
                 "instr_data::check_eventcount_tables",
@@ -1330,10 +1342,10 @@ pub fn _check_with_context(
         });
         if profile.single_pass {
             _run_pass("instr_rules::check_dnp_update", "late", || {
-                instr_rules::check_dnp_update(ctx.flat(), profile, diags);
+                instr_rules::check_dnp_update(ctx.flat(), profile, diags, Some(env));
             });
             _run_pass("instr_rules::run_rules(late)", "late", || {
-                instr_rules::run_rules("late", ctx.flat(), profile, diags);
+                instr_rules::run_rules("late", ctx.flat(), profile, diags, env);
             });
         }
     }

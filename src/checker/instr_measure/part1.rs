@@ -394,8 +394,8 @@ pub fn check_const_ranges_with(
         };
         let kw = pystr::upper(&stmt.keyword);
         if kw.starts_with("CDM_")
-            && (instr_rules::part5::cdm_null_module(stmt)
-                || instr_rules::part4::cdm_unsupported_module(stmt).is_some())
+            && (instr_rules::part5::cdm_null_module(stmt, env)
+                || instr_rules::part4::cdm_unsupported_module(stmt, env).is_some())
         {
             continue;
         }

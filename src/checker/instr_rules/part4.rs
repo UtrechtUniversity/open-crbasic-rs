@@ -16,51 +16,11 @@ use crate::syntax::{
 };
 use crate::{pyre, pystr};
 
+use super::part2::_f32_is_2_31;
+use super::part3::{_SERIALIN_DEST_MESSAGE, _serialin_bad_destination};
+use super::part5::_cdm_type_value;
+
 const _EMAIL_FUNCTIONS: &[&str] = &["EMAILRECV", "EMAILSEND"];
-const _P4_SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
-
-fn _p4_serialin_bad_destination(arg: &Expr, types: &OrderedMap<String, String>) -> Option<bool> {
-    match arg {
-        Expr::Name(n) => {
-            let kind = types.get(&pystr::upper(&n.name))?;
-            if kind == "FUNCTION" {
-                return None;
-            }
-            Some(kind != "STRING")
-        }
-        Expr::Index(ix) => {
-            let kind = types.get(&pystr::upper(&ix.name))?;
-            Some(kind != "STRING")
-        }
-        Expr::Number(_) | Expr::String(_) | Expr::Binary(_) | Expr::Unary(_) => Some(true),
-        _ => None,
-    }
-}
-
-fn _p4_f32_is_2_31(value: f64) -> bool {
-    if !value.is_finite() {
-        return false;
-    }
-    #[allow(clippy::cast_possible_truncation)]
-    let f = value as f32;
-    f.is_finite() && f.to_bits() == 2_147_483_648.0_f32.to_bits()
-}
-
-fn _p4_cdm_type_value(kind: &ConstValue) -> Option<i64> {
-    match kind {
-        ConstValue::BigInt(_) => None,
-        ConstValue::Str(_) => Some(0),
-        ConstValue::Int(i) => (i.abs() < (1_i64 << 31)).then_some(*i),
-        ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            if f.is_finite() && f.abs() < 2_147_483_648.0 {
-                pystr::py_int_from_f64(*f)
-            } else {
-                None
-            }
-        }
-    }
-}
-
 fn _p4_index_value(arg: Option<&Expr>, env: Option<&Env>) -> Option<i64> {
     let arg = arg?;
     if let Expr::Number(n) = arg
@@ -124,17 +84,8 @@ fn _p4_known_view(known: &expressions::KnownNames) -> expressions::KnownView<'_>
     }
 }
 
-/// Port of `checker/instr_rules.py::check_emailrecv_destination`.
-pub fn check_emailrecv_destination(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let Ok(static_profile) = profiles::get(profile.name) else {
-        return;
-    };
-    let program_ref = Rc::new(program.clone());
-    check_emailrecv_destination_with(&program_ref, static_profile, diags);
-}
-
-/// Port of `checker/instr_rules.py::check_emailrecv_destination`.
-pub fn check_emailrecv_destination_with(
+/// Port of checker/instr_rules.py::check_emailrecv_destination
+pub fn check_emailrecv_destination(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -148,7 +99,7 @@ pub fn check_emailrecv_destination_with(
     let known_view = _p4_known_view(known);
 
     let bad = |a: &Expr| -> bool {
-        if _p4_serialin_bad_destination(a, &types).unwrap_or(false) {
+        if _serialin_bad_destination(a, &types).unwrap_or(false) {
             return true;
         }
         if profile.single_pass {
@@ -236,24 +187,15 @@ pub fn check_emailrecv_destination_with(
             Rc::new(Diagnostic::basic(
                 "error",
                 stmt.line(),
-                _P4_SERIALIN_DEST_MESSAGE,
+                _SERIALIN_DEST_MESSAGE,
                 stmt.file(),
             )),
         );
     }
 }
 
-/// Port of `checker/instr_rules.py::check_tcpopen_handle_type`.
-pub fn check_tcpopen_handle_type(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let Ok(static_profile) = profiles::get(profile.name) else {
-        return;
-    };
-    let program_ref = Rc::new(program.clone());
-    check_tcpopen_handle_type_with(&program_ref, static_profile, diags);
-}
-
-/// Port of `checker/instr_rules.py::check_tcpopen_handle_type`.
-pub fn check_tcpopen_handle_type_with(
+/// Port of checker/instr_rules.py::check_tcpopen_handle_type
+pub fn check_tcpopen_handle_type(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -316,13 +258,8 @@ pub fn check_tcpopen_handle_type_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_tcpopen_connections`.
-pub fn check_tcpopen_connections(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_tcpopen_connections (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_tcpopen_connections`.
-pub fn check_tcpopen_connections_with(
+/// Port of checker/instr_rules.py::check_tcpopen_connections
+pub fn check_tcpopen_connections(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -520,18 +457,8 @@ pub fn check_pulsecount_channels(program: &Program, profile: &Profile, diags: &m
     }
 }
 
-/// Port of `checker/instr_rules.py::check_sdi12_nan_fill`.
+/// Port of checker/instr_rules.py::check_sdi12_nan_fill
 pub fn check_sdi12_nan_fill(
-    _st: &Instruction,
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::check_sdi12_nan_fill (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_sdi12_nan_fill`.
-pub fn check_sdi12_nan_fill_with(
     st: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -650,13 +577,8 @@ fn _terminal_role(kw: &str) -> Option<(usize, &'static str, &'static str)> {
     }
 }
 
-/// Port of `checker/instr_rules.py::check_terminal_conflicts`.
-pub fn check_terminal_conflicts(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_terminal_conflicts (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_terminal_conflicts`.
-pub fn check_terminal_conflicts_with(
+/// Port of checker/instr_rules.py::check_terminal_conflicts
+pub fn check_terminal_conflicts(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -966,13 +888,8 @@ pub struct DnpConv<'a> {
     pub literals: &'a BTreeSet<String>,
 }
 
-/// Port of `checker/instr_rules.py::_dnp_long`.
-pub fn _dnp_long(_arg: Option<&Expr>, _wrap16: bool) -> Option<i64> {
-    todo!("checker/instr_rules.py::_dnp_long (omitted: conv: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_dnp_long`.
-pub fn _dnp_long_with(arg: Option<&Expr>, conv: &DnpConv<'_>, wrap16: bool) -> Option<i64> {
+/// Port of checker/instr_rules.py::_dnp_long
+pub fn _dnp_long(arg: Option<&Expr>, conv: &DnpConv<'_>, wrap16: bool) -> Option<i64> {
     let env = conv.env?;
     let arg = arg?;
     let number =
@@ -984,13 +901,8 @@ pub fn _dnp_long_with(arg: Option<&Expr>, conv: &DnpConv<'_>, wrap16: bool) -> O
     }
 }
 
-/// Port of `checker/instr_rules.py::_dnp_source`.
-pub fn _dnp_source(_stmt: &Instruction) {
-    todo!("checker/instr_rules.py::_dnp_source (omitted: conv: untyped, dims: dict)")
-}
-
-/// Port of `checker/instr_rules.py::_dnp_source`.
-pub fn _dnp_source_with(
+/// Port of checker/instr_rules.py::_dnp_source
+pub fn _dnp_source(
     stmt: &Instruction,
     conv: &DnpConv<'_>,
     dims: &OrderedMap<String, Vec<i64>>,
@@ -1090,15 +1002,8 @@ const _DNP_FLAG_BINARY_OPS: &[&str] = &[
 ];
 const _DNP_FLAG_TYPE: &str = "Flag paramter must be of type LONG";
 
-/// Port of `checker/instr_rules.py::_dnp_long_flag`.
-pub fn _dnp_long_flag(_profile: &Profile) -> Option<bool> {
-    todo!(
-        "checker/instr_rules.py::_dnp_long_flag (omitted: arg: untyped, typer: untyped, env: untyped, routine_names: untyped)"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_dnp_long_flag`.
-pub fn _dnp_long_flag_with(
+/// Port of checker/instr_rules.py::_dnp_long_flag
+pub fn _dnp_long_flag(
     arg: Option<&Expr>,
     typer: &var_types::Typer,
     env: &Env,
@@ -1130,7 +1035,7 @@ pub fn _dnp_long_flag_with(
                         return Some(false);
                     }
                     if f < -2_147_483_648.0_f64 {
-                        return Some(_p4_f32_is_2_31(-f));
+                        return Some(_f32_is_2_31(&ConstValue::Float(-f)));
                     }
                     let mag = f.abs();
                     let Some(mag_int) = pystr::py_int_from_f64(mag) else {
@@ -1145,7 +1050,7 @@ pub fn _dnp_long_flag_with(
                     if i < longconv::INT_MIN {
                         #[allow(clippy::cast_precision_loss)]
                         let neg = -(i as f64);
-                        return Some(_p4_f32_is_2_31(neg));
+                        return Some(_f32_is_2_31(&ConstValue::Float(neg)));
                     }
                     let sign = if i < 0 { -1 } else { 1 };
                     let converted = intervals::_decimal_with(i.unsigned_abs(), sign, profile, true);
@@ -1159,7 +1064,7 @@ pub fn _dnp_long_flag_with(
                         return Some(false);
                     }
                     if f < -2_147_483_648.0_f64 {
-                        return Some(_p4_f32_is_2_31(-f));
+                        return Some(_f32_is_2_31(&ConstValue::Float(-f)));
                     }
                     return Some(false);
                 }
@@ -1171,15 +1076,15 @@ pub fn _dnp_long_flag_with(
         }
     }
     if let Expr::Unary(u) = arg {
-        return _dnp_long_flag_with(u.operand.as_deref(), typer, env, profile, routine_names);
+        return _dnp_long_flag(u.operand.as_deref(), typer, env, profile, routine_names);
     }
     if let Expr::Binary(b) = arg {
         if matches!(b.op.as_str(), "/" | "^") {
             return Some(false);
         }
         if _DNP_FLAG_BINARY_OPS.contains(&b.op.as_str()) {
-            let left = _dnp_long_flag_with(b.left.as_deref(), typer, env, profile, routine_names);
-            let right = _dnp_long_flag_with(b.right.as_deref(), typer, env, profile, routine_names);
+            let left = _dnp_long_flag(b.left.as_deref(), typer, env, profile, routine_names);
+            let right = _dnp_long_flag(b.right.as_deref(), typer, env, profile, routine_names);
             return if left == Some(false) || right == Some(false) {
                 Some(false)
             } else if left.is_none() || right.is_none() {
@@ -1230,13 +1135,8 @@ pub struct DnpStmtInfo {
     pub fails_late: bool,
 }
 
-/// Port of `checker/instr_rules.py::_dnp_statement`.
-pub fn _dnp_statement(_stmt: &Instruction, _kind: Option<&str>, _long_flag: Option<bool>) {
-    todo!("checker/instr_rules.py::_dnp_statement (omitted: conv: untyped, dims: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_dnp_statement`.
-pub fn _dnp_statement_with(
+/// Port of checker/instr_rules.py::_dnp_statement
+pub fn _dnp_statement(
     stmt: &Instruction,
     conv: &DnpConv<'_>,
     dims: &OrderedMap<String, Vec<i64>>,
@@ -1244,7 +1144,7 @@ pub fn _dnp_statement_with(
     long_flag: Option<bool>,
 ) -> DnpStmtInfo {
     let group = if stmt.args.len() >= 3 {
-        _dnp_long_with(stmt.args[2].as_deref(), conv, true)
+        _dnp_long(stmt.args[2].as_deref(), conv, true)
     } else {
         None
     };
@@ -1259,7 +1159,7 @@ pub fn _dnp_statement_with(
     };
     let full = stmt.args.len() == 8;
     let (source_messages, left) = if conv.env.is_some() {
-        _dnp_source_with(stmt, conv, dims)
+        _dnp_source(stmt, conv, dims)
     } else {
         (Vec::new(), None)
     };
@@ -1275,7 +1175,7 @@ pub fn _dnp_statement_with(
     let before = Vec::new();
     let mut after = Vec::new();
     let swath = if full {
-        _dnp_long_with(stmt.args[1].as_deref(), conv, false)
+        _dnp_long(stmt.args[1].as_deref(), conv, false)
     } else {
         None
     };
@@ -1296,7 +1196,7 @@ pub fn _dnp_statement_with(
         };
     }
     let variation = if full {
-        _dnp_long_with(stmt.args[3].as_deref(), conv, true)
+        _dnp_long(stmt.args[3].as_deref(), conv, true)
     } else {
         None
     };
@@ -1345,7 +1245,7 @@ pub fn _dnp_statement_with(
             fails_late: false,
         };
     }
-    if let Some(klass) = _dnp_long_with(stmt.args[4].as_deref(), conv, false) {
+    if let Some(klass) = _dnp_long(stmt.args[4].as_deref(), conv, false) {
         if (1..=3).contains(&klass) && !spec.is_event {
             after.push("Static Data Class: must be 0".to_string());
             return DnpStmtInfo {
@@ -1363,7 +1263,7 @@ pub fn _dnp_statement_with(
     if long_flag == Some(false) {
         after.push(_DNP_FLAG_TYPE.to_string());
     }
-    if let Some(events) = _dnp_long_with(stmt.args[7].as_deref(), conv, false) {
+    if let Some(events) = _dnp_long(stmt.args[7].as_deref(), conv, false) {
         if spec.is_event && events == 0 {
             after.push("Event size must be non-zero to hold events".to_string());
         } else if !spec.is_event && events != 0 {
@@ -1379,13 +1279,8 @@ pub fn _dnp_statement_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_dnp_update`.
-pub fn check_dnp_update(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_dnp_update (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::check_dnp_update`.
-pub fn check_dnp_update_with(
+/// Port of checker/instr_rules.py::check_dnp_update
+pub fn check_dnp_update(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1443,12 +1338,12 @@ pub fn check_dnp_update_with(
                     && expressions::_undefined_names_with(flag, &_p4_known_view(k)).is_empty()
                     && let Some(ref t) = typer
                 {
-                    long_flag = _dnp_long_flag_with(flag, t, env_ref, profile, &routine_names);
+                    long_flag = _dnp_long_flag(flag, t, env_ref, profile, &routine_names);
                 }
             }
             info.insert(
                 syntax::rc_id(st),
-                _dnp_statement_with(instr, &conv, dims_ref, kind, long_flag),
+                _dnp_statement(instr, &conv, dims_ref, kind, long_flag),
             );
         }
     }
@@ -1515,18 +1410,8 @@ pub fn check_dnp_update_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_portbridge_array`.
+/// Port of checker/instr_rules.py::check_portbridge_array
 pub fn check_portbridge_array(
-    _stmt: &Instruction,
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_rules.py::check_portbridge_array (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_rules.py::check_portbridge_array`.
-pub fn check_portbridge_array_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1595,7 +1480,7 @@ const _CDM_ADDRESS_INSTRUCTIONS: &[&str] = &[
     "CDM_PERIODAVG",
 ];
 
-fn _is_cdm_named_type(kind: i64) -> bool {
+pub(super) fn _is_cdm_named_type(kind: i64) -> bool {
     (100..106).contains(&kind)
         || (200..=202).contains(&kind)
         || (220..232).contains(&kind)
@@ -1604,7 +1489,7 @@ fn _is_cdm_named_type(kind: i64) -> bool {
 
 const _CDM_ANALOG: &str = "Analog measurement";
 
-fn _cdm_null_module(kw: &str) -> Option<&'static [&'static str]> {
+pub(super) fn _cdm_null_module(kw: &str) -> Option<&'static [&'static str]> {
     match kw {
         "CDM_VOLTSE" | "CDM_VOLTDIFF" | "CDM_TCSE" | "CDM_PANELTEMP" | "CDM_BRFULL6W"
         | "CDM_BRHALF3W" | "CDM_THERM107" | "CDM_RESISTANCE" => Some(&[_CDM_ANALOG]),
@@ -1649,15 +1534,10 @@ fn _cdm_module_name(kind: i64) -> Option<&'static str> {
 }
 
 const _CDM_PORT_INSTRUCTIONS: &[&str] = &["CDM_SW12", "CDM_SW5", "CDM_PULSEPORT", "CDM_MUXSELECT"];
-const _CDM_PORT_MODULES: &[i64] = &[220, 221, 222, 223];
+pub(super) const _CDM_PORT_MODULES: &[i64] = &[220, 221, 222, 223];
 
-/// Port of `checker/instr_rules.py::cdm_unsupported_module`.
-pub fn cdm_unsupported_module(_stmt: &Instruction) -> Option<String> {
-    todo!("checker/instr_rules.py::cdm_unsupported_module (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::cdm_unsupported_module`.
-pub fn cdm_unsupported_module_with(stmt: &Instruction, env: &Env) -> Option<String> {
+/// Port of checker/instr_rules.py::cdm_unsupported_module
+pub fn cdm_unsupported_module(stmt: &Instruction, env: &Env) -> Option<String> {
     let kw = pystr::upper(&stmt.keyword);
     if stmt.args.is_empty()
         || (!_CDM_PORT_INSTRUCTIONS.contains(&kw.as_str()) && kw != "CDM_PANELTEMP")
@@ -1665,7 +1545,7 @@ pub fn cdm_unsupported_module_with(stmt: &Instruction, env: &Env) -> Option<Stri
         return None;
     }
     let val = consteval::value_of(stmt.args[0].as_deref(), env).ok()?;
-    let kind = _p4_cdm_type_value(&val)?;
+    let kind = _cdm_type_value(&val)?;
     let supported = if kw == "CDM_PANELTEMP" {
         (220..232).contains(&kind)
     } else {
@@ -1678,13 +1558,8 @@ pub fn cdm_unsupported_module_with(stmt: &Instruction, env: &Env) -> Option<Stri
     }
 }
 
-/// Port of `checker/instr_rules.py::_delay_option`.
-pub fn _delay_option(_stmt: &Instruction) {
-    todo!("checker/instr_rules.py::_delay_option (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_rules.py::_delay_option`.
-pub fn _delay_option_with(stmt: &Instruction, env: &Env) -> Option<ConstValue> {
+/// Port of checker/instr_rules.py::_delay_option
+pub fn _delay_option(stmt: &Instruction, env: &Env) -> Option<ConstValue> {
     if stmt.args.len() <= 2 {
         return None;
     }
@@ -1718,7 +1593,7 @@ EndProg
         let mut diags = Diagnostics::new();
         check_emailrecv_destination(&prog, profile, &mut diags);
         assert_eq!(diags.items.len(), 1);
-        assert_eq!(diags.items[0].message, _P4_SERIALIN_DEST_MESSAGE);
+        assert_eq!(diags.items[0].message, _SERIALIN_DEST_MESSAGE);
     }
 
     #[test]
@@ -1736,7 +1611,7 @@ EndProg
         let prog = parse_prog(src, profile);
         let env = env_for(&prog, profile);
         let mut diags = Diagnostics::new();
-        check_tcpopen_handle_type_with(&prog, profile, &mut diags);
+        check_tcpopen_handle_type(&prog, profile, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
@@ -1744,7 +1619,7 @@ EndProg
         );
 
         let mut diags2 = Diagnostics::new();
-        check_tcpopen_connections_with(&prog, profile, &mut diags2, &env);
+        check_tcpopen_connections(&prog, profile, &mut diags2, &env);
         assert_eq!(diags2.items.len(), 1);
         assert_eq!(
             diags2.items[0].message,
@@ -1795,7 +1670,7 @@ EndProg
         let Stmt::Instruction(instr) = prog.statements[3].as_ref() else {
             panic!("expected SDI12Recorder instruction");
         };
-        check_sdi12_nan_fill_with(instr, &prog, profile, &mut diags, &env);
+        check_sdi12_nan_fill(instr, &prog, profile, &mut diags, &env);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
@@ -1818,7 +1693,7 @@ EndProg
         let prog = parse_prog(src, profile);
         let env = env_for(&prog, profile);
         let mut diags = Diagnostics::new();
-        check_terminal_conflicts_with(&prog, profile, &mut diags, &env);
+        check_terminal_conflicts(&prog, profile, &mut diags, &env);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
@@ -1845,7 +1720,7 @@ EndProg
         let env = env_for(&prog, profile);
 
         let mut dnp_diags = Diagnostics::new();
-        check_dnp_update_with(&prog, profile, &mut dnp_diags, Some(&env));
+        check_dnp_update(&prog, profile, &mut dnp_diags, Some(&env));
         assert!(
             dnp_diags
                 .items
@@ -1863,7 +1738,7 @@ EndProg
         let Stmt::Instruction(pb_instr) = prog.statements[5].as_ref() else {
             panic!("expected PortBridge");
         };
-        check_portbridge_array_with(pb_instr, &prog, profile, &mut pb_diags, &env);
+        check_portbridge_array(pb_instr, &prog, profile, &mut pb_diags, &env);
         assert_eq!(pb_diags.items.len(), 1);
         assert_eq!(
             pb_diags.items[0].message,
@@ -1874,7 +1749,7 @@ EndProg
             panic!("expected CDM_SW12");
         };
         assert_eq!(
-            cdm_unsupported_module_with(cdm_instr, &env),
+            cdm_unsupported_module(cdm_instr, &env),
             Some("EC100".to_string())
         );
 
@@ -1882,7 +1757,7 @@ EndProg
             panic!("expected CDM_Delay");
         };
         assert!(matches!(
-            _delay_option_with(delay_instr, &env),
+            _delay_option(delay_instr, &env),
             Some(ConstValue::Int(0))
         ));
     }

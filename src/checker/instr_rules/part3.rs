@@ -17,8 +17,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::LazyLock;
 
-use super::part1::{_next_simple_token, _real_params, _required_count, given_count};
-use super::part2::{_cdiv, _crem, _has_call, _stringish};
+use super::part1::{
+    _earlier_error_in_stmt, _next_simple_token, _real_params, _required_count, given_count,
+    shortfall_message,
+};
+use super::part2::{_PRECISION_VARIABLE_POSITIONS, _cdiv, _crem, _has_call, _stringish};
 use crate::checker::expressions::{self, KnownView};
 use crate::checker::{context, longconv, var_types};
 use crate::consteval::{self, Env};
@@ -80,47 +83,10 @@ fn _p3_float32(value: f64) -> f64 {
     f64::from(value as f32)
 }
 
-/// Placeholder for `instr_rules.py::shortfall_message(record, given)` (part1 stub lacks `record`).
-fn _p3_shortfall_message(record: &profiles::Instruction, given: i64) -> Option<String> {
-    todo!("instr_rules/part1 shortfall_message_with(record: &profiles::Instruction, given: i64)")
-}
-
-/// Placeholder for `instr_rules.py::_earlier_error_in_stmt(program, stmt, diags, prefixes)`.
-fn _p3_earlier_error_in_stmt(
-    program: &Program,
-    stmt: &StmtRef,
-    diags: &Diagnostics,
-    prefixes: &[&str],
-) -> bool {
-    todo!(
-        "instr_rules/part1 _earlier_error_in_stmt_with(program: &Program, stmt: &StmtRef, diags: &Diagnostics, prefixes: &[&str])"
-    )
-}
-
-/// `instr_rules.py::_PRECISION_VARIABLE_POSITIONS` (a part2 constant, not yet ported).
-fn _p3_precision_positions(kw: &str) -> Option<&'static [usize]> {
-    match kw {
-        "ADDPRECISE" | "MOVEPRECISE" => Some(&[0]),
-        _ => None,
-    }
-}
-
 // ---------------------------------------------------------------------------------------------
 
-/// Port of `checker/instr_rules.py::check_precision_variable`.
+/// Port of checker/instr_rules.py::check_precision_variable
 pub fn check_precision_variable(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_precision_variable_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_precision_variable` (full parameter list).
-pub fn check_precision_variable_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -128,7 +94,7 @@ pub fn check_precision_variable_with(
     env: &Env,
 ) {
     let kw = pystr::upper(&stmt.keyword);
-    let Some(positions) = _p3_precision_positions(&kw) else {
+    let Some(positions) = _PRECISION_VARIABLE_POSITIONS.get(&kw.as_str()) else {
         return;
     };
     if !profile.instructions().contains(&kw) {
@@ -146,6 +112,7 @@ pub fn check_precision_variable_with(
         return;
     }
     for &i in positions {
+        let i = usize::try_from(i).unwrap_or(usize::MAX);
         if i >= stmt.args.len() || stmt.args[i].is_none() {
             continue;
         }
@@ -169,20 +136,8 @@ pub fn check_precision_variable_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_vibrating_wire_diagnostics`.
+/// Port of checker/instr_rules.py::check_vibrating_wire_diagnostics
 pub fn check_vibrating_wire_diagnostics(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_vibrating_wire_diagnostics_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_vibrating_wire_diagnostics` (full parameter list).
-pub fn check_vibrating_wire_diagnostics_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -236,20 +191,8 @@ pub const _SDM_ADDRESS_ARG: &[(&str, usize)] = &[
     ("TDR200", 1),
 ];
 
-/// Port of `checker/instr_rules.py::check_sdm_address`.
+/// Port of checker/instr_rules.py::check_sdm_address
 pub fn check_sdm_address(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_sdm_address_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_sdm_address` (full parameter list).
-pub fn check_sdm_address_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -331,20 +274,8 @@ pub fn _operator_tree(expr: Option<&Expr>) -> bool {
     }
 }
 
-/// Port of `checker/instr_rules.py::check_avgrun_options`.
+/// Port of checker/instr_rules.py::check_avgrun_options
 pub fn check_avgrun_options(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_avgrun_options_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_avgrun_options` (full parameter list).
-pub fn check_avgrun_options_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -464,15 +395,8 @@ pub fn check_avgrun_options_with(
 
 const _CDM_SETTLING_ARG: &[(&str, usize)] = &[("CDM_TCSE", 9), ("CDM_VOLTSE", 7)];
 
-/// Port of `checker/instr_rules.py::check_option_values`.
-pub fn check_option_values(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_option_values_with(&prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_option_values` (full parameter list).
-pub fn check_option_values_with(
+/// Port of checker/instr_rules.py::check_option_values
+pub fn check_option_values(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -641,7 +565,7 @@ pub fn check_option_values_with(
                 } else if let Some(v) = v
                     && v.rem_euclid(256) == 0
                 {
-                    for _ in 0.._cdm_delay_overlong_with(args, env, profile, names, literals) {
+                    for _ in 0.._cdm_delay_overlong(args, env, profile, names, literals) {
                         _p3_err(diags, base, "Measurement Delay Exceeds 60 min.");
                     }
                 }
@@ -655,9 +579,8 @@ pub fn check_option_values_with(
                 } else if let Some(v) = v
                     && args.len() == 4
                 {
-                    let shapes =
-                        matrix_shapes.get_or_insert_with(|| _matrix_shapes_with(program, env));
-                    for message in _matrix_dimension_errors_with(v & 0x7FFF_FFFF, args, shapes) {
+                    let shapes = matrix_shapes.get_or_insert_with(|| _matrix_shapes(program, env));
+                    for message in _matrix_dimension_errors(v & 0x7FFF_FFFF, args, shapes) {
                         _p3_err(diags, base, &message);
                     }
                 }
@@ -689,15 +612,8 @@ pub fn check_option_values_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::_cdm_delay_overlong`.
-pub fn _cdm_delay_overlong(_profile: &Profile) -> i64 {
-    todo!(
-        "checker/instr_rules.py::_cdm_delay_overlong (omitted: args: list, env: consteval.Env, names: untyped, literals: untyped); use _cdm_delay_overlong_with"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_cdm_delay_overlong` (full parameter list).
-pub fn _cdm_delay_overlong_with(
+/// Port of checker/instr_rules.py::_cdm_delay_overlong
+pub fn _cdm_delay_overlong(
     args: &[Option<ExprRef>],
     env: &Env,
     profile: &Profile,
@@ -767,15 +683,8 @@ pub const _ILLEGAL_MATRIX: (i64, i64) = (-1, -1);
 /// `instr_rules.py::_UNDEFINED_MATRIX`.
 pub const _UNDEFINED_MATRIX: (i64, i64) = (-842_150_451, -842_150_451);
 
-/// Port of `checker/instr_rules.py::_matrix_shapes`.
-pub fn _matrix_shapes(_program: &Program) -> OrderedMap<String, (i64, i64)> {
-    todo!(
-        "checker/instr_rules.py::_matrix_shapes (omitted: env: consteval.Env); use _matrix_shapes_with"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_matrix_shapes` (full parameter list).
-pub fn _matrix_shapes_with(program: &ProgramRef, env: &Env) -> OrderedMap<String, (i64, i64)> {
+/// Port of checker/instr_rules.py::_matrix_shapes
+pub fn _matrix_shapes(program: &ProgramRef, env: &Env) -> OrderedMap<String, (i64, i64)> {
     let ctx = context::of(program, None, Some(env.clone()));
     let dims = ctx.declared_all_dims();
     let types = ctx.variable_types(false);
@@ -812,15 +721,8 @@ pub fn _matrix_shapes_with(program: &ProgramRef, env: &Env) -> OrderedMap<String
     out
 }
 
-/// Port of `checker/instr_rules.py::matrix_undefined_operands`.
-pub fn matrix_undefined_operands(_program: &Program, _profile: &Profile) -> Option<Vec<String>> {
-    todo!(
-        "checker/instr_rules.py::matrix_undefined_operands (omitted: stmt: untyped, env: untyped, known: untyped); use matrix_undefined_operands_with"
-    )
-}
-
-/// Port of `checker/instr_rules.py::matrix_undefined_operands` (full parameter list).
-pub fn matrix_undefined_operands_with(
+/// Port of checker/instr_rules.py::matrix_undefined_operands
+pub fn matrix_undefined_operands(
     stmt: &Instruction,
     program: &ProgramRef,
     env: &Env,
@@ -851,7 +753,7 @@ pub fn matrix_undefined_operands_with(
     if option > 3 && !matches!(args[2].as_deref(), Some(Expr::Number(_) | Expr::Name(_))) {
         return None;
     }
-    let shapes = _matrix_shapes_with(program, env);
+    let shapes = _matrix_shapes(program, env);
     let mut out: Vec<String> = Vec::new();
     let mut shape: Vec<(i64, i64)> = Vec::new();
     for a in ops {
@@ -888,15 +790,8 @@ pub fn matrix_undefined_operands_with(
     Some(out)
 }
 
-/// Port of `checker/instr_rules.py::_matrix_dimension_errors`.
-pub fn _matrix_dimension_errors(_option: i64) -> Vec<String> {
-    todo!(
-        "checker/instr_rules.py::_matrix_dimension_errors (omitted: args: untyped, shapes: untyped); use _matrix_dimension_errors_with"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_matrix_dimension_errors` (full parameter list).
-pub fn _matrix_dimension_errors_with(
+/// Port of checker/instr_rules.py::_matrix_dimension_errors
+pub fn _matrix_dimension_errors(
     option: i64,
     args: &[Option<ExprRef>],
     shapes: &OrderedMap<String, (i64, i64)>,
@@ -948,17 +843,10 @@ pub fn _matrix_dimension_errors_with(
     out
 }
 
-/// Port of `checker/instr_rules.py::check_const_int_args`.
-pub fn check_const_int_args(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_const_int_args_with(&prog, p, diags, &env);
-    }
-}
-
 static _P3_MINUS_SPACE_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"-\s", 0));
 
-/// Port of `checker/instr_rules.py::check_const_int_args` (full parameter list).
-pub fn check_const_int_args_with(
+/// Port of checker/instr_rules.py::check_const_int_args
+pub fn check_const_int_args(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -976,7 +864,7 @@ pub fn check_const_int_args_with(
             continue;
         }
         if !profile.single_pass
-            && _p3_earlier_error_in_stmt(
+            && _earlier_error_in_stmt(
                 program,
                 st,
                 diags,
@@ -998,7 +886,7 @@ pub fn check_const_int_args_with(
                 continue;
             }
             if let Some(a) = arg
-                && _is_integer_token_with(&text, a, env)
+                && _is_integer_token(&text, a, env)
             {
                 continue;
             }
@@ -1049,15 +937,8 @@ static _P3_INTEGER_TOKEN_RE: LazyLock<pyre::Regex> =
 static _P3_IDENT_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"[A-Za-z_][A-Za-z0-9_]*", 0));
 
-/// Port of `checker/instr_rules.py::_is_integer_token`.
-pub fn _is_integer_token(_text: &str, _arg: &Expr) -> bool {
-    todo!(
-        "checker/instr_rules.py::_is_integer_token (omitted: env: consteval.Env); use _is_integer_token_with"
-    )
-}
-
-/// Port of `checker/instr_rules.py::_is_integer_token` (full parameter list).
-pub fn _is_integer_token_with(text: &str, arg: &Expr, env: &Env) -> bool {
+/// Port of checker/instr_rules.py::_is_integer_token
+pub fn _is_integer_token(text: &str, arg: &Expr, env: &Env) -> bool {
     if _P3_INTEGER_TOKEN_RE.fullmatch(text).is_some() {
         return true;
     }
@@ -1080,20 +961,8 @@ fn _serialin_ports(profile_name: &str) -> Option<Vec<i64>> {
     }
 }
 
-/// Port of `checker/instr_rules.py::check_serialbrk_comport`.
+/// Port of checker/instr_rules.py::check_serialbrk_comport
 pub fn check_serialbrk_comport(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_serialbrk_comport_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_serialbrk_comport` (full parameter list).
-pub fn check_serialbrk_comport_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1130,7 +999,7 @@ pub fn check_serialbrk_comport_with(
     }
 }
 
-const _SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
+pub(super) const _SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
 
 /// Port of `checker/instr_rules.py::_serialin_bad_destination`.
 pub fn _serialin_bad_destination(arg: &Expr, types: &OrderedMap<String, String>) -> Option<bool> {
@@ -1152,20 +1021,8 @@ pub fn _serialin_bad_destination(arg: &Expr, types: &OrderedMap<String, String>)
     }
 }
 
-/// Port of `checker/instr_rules.py::check_serialin_destination`.
+/// Port of checker/instr_rules.py::check_serialin_destination
 pub fn check_serialin_destination(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_serialin_destination_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_serialin_destination` (full parameter list).
-pub fn check_serialin_destination_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1213,20 +1070,8 @@ pub fn check_serialin_destination_with(
     diags.items.splice(at..at, new);
 }
 
-/// Port of `checker/instr_rules.py::check_serialin_comport`.
+/// Port of checker/instr_rules.py::check_serialin_comport
 pub fn check_serialin_comport(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_serialin_comport_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_serialin_comport` (full parameter list).
-pub fn check_serialin_comport_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1242,7 +1087,7 @@ pub fn check_serialin_comport_with(
     let Some(record) = profile.instructions().get("SERIALIN") else {
         return;
     };
-    if _p3_shortfall_message(record, given_count(stmt, profile)).is_some() {
+    if shortfall_message(record, given_count(stmt, profile)).is_some() {
         return;
     }
     let ctx = context::of(program, Some(profile), Some(env.clone()));
@@ -1261,15 +1106,8 @@ pub fn check_serialin_comport_with(
     }
 }
 
-/// Port of `checker/instr_rules.py::check_serialinrecord`.
-pub fn check_serialinrecord(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_serialinrecord_with(&prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_serialinrecord` (full parameter list).
-pub fn check_serialinrecord_with(
+/// Port of checker/instr_rules.py::check_serialinrecord
+pub fn check_serialinrecord(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1361,16 +1199,8 @@ pub fn check_serialinrecord_with(
 
 const _DEBUG_HISTORY_LIMIT: i64 = 26_843_544;
 
-/// Port of `checker/instr_rules.py::debug_history_oom`.
-pub fn debug_history_oom(stmt: &Instruction, profile: &Profile, program: &Program) -> bool {
-    match _p3_rule_env(program, profile) {
-        Some((prog, p, env)) => debug_history_oom_with(stmt, &env, p, &prog),
-        None => false,
-    }
-}
-
-/// Port of `checker/instr_rules.py::debug_history_oom` (full parameter list).
-pub fn debug_history_oom_with(
+/// Port of checker/instr_rules.py::debug_history_oom
+pub fn debug_history_oom(
     stmt: &Instruction,
     env: &Env,
     profile: &'static Profile,
@@ -1415,20 +1245,8 @@ pub fn debug_history_oom_with(
     ((v * 4) & 0xFFFF_FFFF) > _DEBUG_HISTORY_LIMIT
 }
 
-/// Port of `checker/instr_rules.py::check_debug_args`.
+/// Port of checker/instr_rules.py::check_debug_args
 pub fn check_debug_args(
-    stmt: &Instruction,
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some((prog, p, env)) = _p3_rule_env(program, profile) {
-        check_debug_args_with(stmt, &prog, p, diags, &env);
-    }
-}
-
-/// Port of `checker/instr_rules.py::check_debug_args` (full parameter list).
-pub fn check_debug_args_with(
     stmt: &Instruction,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1533,7 +1351,7 @@ mod tests {
             |p, pr, d, e| {
                 for st in &p.statements {
                     if let Stmt::Instruction(i) = st.as_ref() {
-                        check_sdm_address_with(i, p, pr, d, e);
+                        check_sdm_address(i, p, pr, d, e);
                     }
                 }
             },
@@ -1553,7 +1371,7 @@ mod tests {
             panic!("not an instruction");
         };
         assert_eq!(
-            _matrix_dimension_errors_with(3, &i.args, &shapes),
+            _matrix_dimension_errors(3, &i.args, &shapes),
             vec!["multiply A columns and B rows must be the same"]
         );
     }
