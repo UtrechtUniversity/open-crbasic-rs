@@ -35,7 +35,7 @@ Operating notes (learned in wave 1):
 | P1-b | `sources.py` (125), `source.py` (625) | `src/sources.rs`, `src/source.rs` | S | merged | `29e207e`; macros excluded; `golden_lines` 77,903/77,903 |
 | P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
 | P1-d | `consteval.py` (327) | `src/consteval.rs` | S | merged | `0b6c140`; 7 unit tests |
-| P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | running | chunks 1–3 (`19aef06`, helpers/exprs/stmts/decls) merged; 7 unit tests |
+| P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | merged | `a2acf82`; `golden_ast` 77,903/77,903; 7 unit tests |
 | P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | merged | `5af36e1`; 54 files |
 | P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | merged | `d27829a`; 4 unit tests |
 | P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | merged | `06b9037`; 3 unit tests |
