@@ -231,6 +231,777 @@ pub fn check_pass2(_program: &Program, _diags: &mut Diagnostics, _links: Option<
     )
 }
 
+/// Port of checker/structure.py::check_pass2
+#[allow(
+    clippy::too_many_lines,
+    clippy::doc_markdown,
+    clippy::items_after_statements
+)]
+pub fn check_pass2_with(
+    program: &ProgramRef,
+    profile: &'static Profile,
+    diags: &mut Diagnostics,
+    env: Option<crate::consteval::Env>,
+    links: Option<&mut CallLinks>,
+) -> Option<i64> {
+    use super::part1::{
+        _ALIAS_NOTHING_AFTER_EQ, _ALIAS_WITHOUT_EQ, _BENIGN_REASONS, _BODY_BLOCK_ENDS,
+        _BODY_BLOCK_STARTS, _CONST_BAD_NAME, _CONST_BAD_VALUE, _CONST_LEAD, _CONST_WITHOUT_EQ,
+        _DECL_BLOCK_BOUNDS, _DO_LOOP_PARAM, _EXTRA_CLOSE_PAREN, _FOR_MISSING,
+        _FORBIDDEN_BEFORE_BEGINPROG, _INVALID_AS_CLAUSE, _KNOWN_PARSER_GAP_REASONS,
+        _UNCLOSED_DIM_PREFIX, _UNCLOSED_PAREN_EXPR, _UNITS_WITHOUT_EQ, _accept_known_with,
+        _assignment_head_with, _calltable_known_with, _check_accept_table_with,
+        _check_calltable_outside_scan_with, _scan_counts_for_table_placement_with,
+        _track_tables_with, NESTED_SCAN, TableState, first_misplaced_data_table_with,
+        first_misplaced_sub_with,
+    };
+    use super::part2::{
+        _FALLBACK_PREFIX, _before_beginprog_name_with, _block_word_with, _control_keyword,
+        _has_error_on, _keyword, _leftover_message_with, _no_matching_with, _out_of_place_with,
+        _table_names,
+    };
+    use super::part3::_slowsequence_resolves_with;
+    use super::part5::{
+        _inline_condition_stmt_with, _known_first_token, _logical_assign_accepted_with,
+        _logical_assign_undefined_messages_with, _logical_led_string, _pass1_scan_with,
+        _unclosed_paren_kind, _unparsed_string_messages_with, condition_part, is_hash_statement,
+        pass1_operands_with,
+    };
+    use super::part6::{
+        _function_symbol_finding_with, _function_syntax_findings_with,
+        _instruction_arg_findings_with, _pass1_message_with, _routine_arg_findings_with,
+        _unclosed_call_message_with,
+    };
+    use super::part7::{
+        _bare_sub_link_name_with, _check_assignment_pass2_with, _check_call_pass2_with,
+        _unlinked_call_with, LinkContext,
+    };
+    use super::part9::_junk_init_findings_with;
+    use crate::checker::{instr_rules, var_types};
+    use crate::diagnostics::ShowFile;
+    use std::cell::RefCell;
+
+    static SLOW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*SlowSequence\b", pyre::I));
+    static TARGET: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*([A-Za-z_]\w*)\s*=", 0));
+    static WORD_SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\W", 0));
+    static LEAD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*([A-Za-z_]\w*)\.", 0));
+    static HEAD: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\s*(IF|WHILE|DO|SELECT)\b", pyre::I));
+
+    let env = env.unwrap_or_else(|| {
+        crate::consteval::Env::with_consts(profile, Rc::new(RefCell::new(program.consts.clone())))
+    });
+    let ctx = context::of(program, Some(profile), Some(env.clone()));
+    let subs = ctx.declared_subs();
+    let pass1_count = diags.items.len();
+    let mut sub_params = OrderedMap::new();
+    let mut link_ctx = LinkContext::default();
+    for st in &program.statements {
+        if let Stmt::SubDef(sub) = st.as_ref() {
+            sub_params.insert(pystr::upper(&sub.name), sub.clone());
+            if pystr::upper(&sub.keyword) == "SUB" {
+                link_ctx.subs.insert(pystr::upper(&sub.name));
+            }
+        }
+    }
+    link_ctx.has_routines = !subs.is_empty();
+    let mut links = links;
+    if let Some(links) = links.as_deref_mut() {
+        *link_ctx.links.borrow_mut() = std::mem::take(links);
+    }
+    let known = ctx.known_names();
+    let dims_ds = ctx.dims_state();
+    let result = (|| {
+        let mut seen_beginprog = false;
+        let mut in_body_block = false;
+        let mut after_endseq = false;
+        let mut in_table = false;
+        let mut in_decl_block = false;
+        let mut tables = TableState::default();
+        let mut in_beginprog = false;
+        let mut program_marker_seen = false;
+        let declared_here = if matches!(profile.name, "cr300" | "cr350") {
+            ctx.declared_names()
+                .iter()
+                .map(|n| pystr::upper(n))
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+        let mut pass2_scans = Vec::new();
+        let mut pipeline_setup = false;
+        let misplaced = if profile.single_pass {
+            None
+        } else {
+            first_misplaced_sub_with(program)
+        };
+        let misplaced_table = if profile.single_pass {
+            None
+        } else {
+            first_misplaced_data_table_with(program, profile)
+        };
+        let nested = if profile.single_pass {
+            None
+        } else {
+            nested_table_with(program, profile)
+        };
+        if link_ctx.links.borrow().positions.is_empty() {
+            for (position, st) in program.statements.iter().enumerate() {
+                let key = (st.file().to_owned(), st.line());
+                if !link_ctx.links.borrow().positions.contains_key(&key) {
+                    link_ctx.links.borrow_mut().positions.insert(
+                        key,
+                        i64::try_from(position).expect("statement index fits i64"),
+                    );
+                }
+            }
+        }
+        for stmt in &program.statements {
+            link_ctx.links.borrow_mut().cutoff = Some((stmt.file().to_owned(), stmt.line()));
+            seen_beginprog |= _keyword(stmt) == "BEGINPROG";
+            if matches!(_keyword(stmt).as_str(), "PIPELINEMODE" | "SEQUENTIALMODE") {
+                pipeline_setup = _keyword(stmt) == "PIPELINEMODE";
+            }
+            let before_bp = !seen_beginprog && !profile.single_pass;
+            if let Some((st, messages)) = &misplaced
+                && Rc::ptr_eq(stmt, st)
+            {
+                for message in messages {
+                    diags.error_basic(stmt.line(), message, stmt.file());
+                }
+                return Some(stmt.line());
+            }
+            if misplaced_table
+                .as_ref()
+                .is_some_and(|st| Rc::ptr_eq(stmt, st))
+            {
+                diags.error_basic(
+                    stmt.line(),
+                    "DataTable is declared in the middle of an executing sequence",
+                    stmt.file(),
+                );
+                return Some(stmt.line());
+            }
+            if nested.as_ref().is_some_and(|st| Rc::ptr_eq(stmt, st)) {
+                diags.error_basic(stmt.line(), "DataTable without EndTable.", "");
+                return Some(stmt.line());
+            }
+            if let Stmt::SubDef(sub) = stmt.as_ref() {
+                in_body_block = true;
+                if pystr::upper(&sub.keyword) == "SUB" {
+                    link_ctx
+                        .links
+                        .borrow_mut()
+                        .registered
+                        .insert(pystr::upper(&sub.name));
+                }
+                continue;
+            }
+            let kw = _keyword(stmt);
+            if let Some(bound) = _DECL_BLOCK_BOUNDS.get(&kw.as_str()) {
+                in_decl_block = *bound;
+            }
+            _track_tables_with(stmt, &kw, &mut tables);
+            if kw == "DATATABLE" {
+                in_table = true;
+            } else if kw == "ENDTABLE" {
+                in_table = false;
+            } else if in_table
+                && matches!(stmt.as_ref(), Stmt::Instruction(_))
+                && matches!(profile.name, "cr6" | "cr1000x")
+            {
+                if let Stmt::Instruction(st) = stmt.as_ref()
+                    && let Some(bad) = _undefined_table_source_with(
+                        st,
+                        profile,
+                        &KnownView {
+                            names: &known.names,
+                            tables: &known.tables,
+                            out_of_scope: &known.out_of_scope,
+                            dotted_tables: known.dotted_tables,
+                        },
+                    )
+                {
+                    diags.error(
+                        stmt.line(),
+                        &format!("Invalid symbol in expression: {bad}."),
+                        stmt.file(),
+                        ShowFile::Bool(false),
+                        0,
+                        "",
+                        "",
+                    );
+                    return Some(stmt.line());
+                }
+            } else if kw == "BEGINPROG" {
+                if in_beginprog {
+                    diags.error_basic(stmt.line(), "Multiple BeginProgs.", stmt.file());
+                }
+                in_beginprog = true;
+            } else if kw == "ENDPROG" {
+                in_beginprog = false;
+            }
+            let ss_resolves = _slowsequence_resolves_with(
+                stmt,
+                &declared_here,
+                &profile
+                    .functions()
+                    .iter()
+                    .map(|(name, _)| name.to_owned())
+                    .collect(),
+            );
+            if kw == "SLOWSEQUENCE"
+                && !program_marker_seen
+                && (matches!(profile.name, "cr6" | "cr1000x") || ss_resolves)
+                && !diags.items.iter().any(|d| {
+                    d.severity == "error" && d.line == stmt.line() && d.file == stmt.file()
+                })
+            {
+                in_beginprog = true;
+            }
+            if matches!(kw.as_str(), "BEGINPROG" | "ENDPROG" | "SLOWSEQUENCE")
+                || (matches!(stmt.as_ref(), Stmt::Unparsed(_))
+                    && SLOW.match_(stmt.text()).is_some())
+            {
+                program_marker_seen = true;
+            }
+            if kw == "SLOWSEQUENCE" && !pass2_scans.is_empty() && !profile.single_pass {
+                diags.error_basic(stmt.line(), "Missing NextScan.", stmt.file());
+                return Some(stmt.line());
+            }
+            if kw == "SCAN" {
+                if !pass2_scans.is_empty() && !profile.single_pass {
+                    diags.error(
+                        stmt.line(),
+                        NESTED_SCAN,
+                        stmt.file(),
+                        ShowFile::Bool(true),
+                        0,
+                        "nested_scan",
+                        "early_scan",
+                    );
+                }
+                pass2_scans.push(_scan_counts_for_table_placement_with(stmt, Some(&env)));
+            } else if kw == "NEXTSCAN"
+                || (kw == "NEXT"
+                    && _block_word_with(match stmt.as_ref() {
+                        Stmt::Instruction(st) => &st.args,
+                        _ => &[],
+                    })
+                    .as_deref()
+                        == Some("SCAN"))
+            {
+                if !pass2_scans.is_empty() {
+                    pass2_scans.pop();
+                } else if !profile.single_pass {
+                    diags.error_basic(stmt.line(), "NextScan with no Scan.", stmt.file());
+                    return Some(stmt.line());
+                }
+            } else if kw == "CALLTABLE"
+                && !profile.single_pass
+                && !in_table
+                && (!pass2_scans.iter().any(|x| *x) || in_body_block)
+                && _calltable_known_with(stmt, &tables)
+            {
+                if let Stmt::Instruction(st) = stmt.as_ref() {
+                    _check_calltable_outside_scan_with(
+                        st,
+                        program,
+                        diags,
+                        in_body_block,
+                        !pass2_scans.is_empty() && !in_body_block,
+                        Some(&env),
+                    );
+                }
+            } else if kw == "ACCEPTDATARECORDS"
+                && !profile.single_pass
+                && !in_table
+                && _accept_known_with(stmt, &tables)
+                && let Stmt::Instruction(st) = stmt.as_ref()
+            {
+                _check_accept_table_with(
+                    st,
+                    program,
+                    diags,
+                    !pass2_scans.iter().any(|x| *x) || in_body_block,
+                    &env,
+                );
+            }
+            if _BODY_BLOCK_STARTS.contains(&kw.as_str()) {
+                in_body_block = true;
+                continue;
+            }
+            if crate::syntax::ends_routine(stmt) || _BODY_BLOCK_ENDS.contains(&kw.as_str()) {
+                in_body_block = false;
+                continue;
+            }
+            if matches!(kw.as_str(), "ENDSEQUENCE" | "SLOWSEQUENCE" | "ENDPROG") {
+                after_endseq = kw == "ENDSEQUENCE" && seen_beginprog;
+            } else if after_endseq
+                && !in_body_block
+                && !in_table
+                && let Some(display) = _before_beginprog_name_with(stmt, &kw, profile, subs)
+            {
+                diags.error_basic(
+                    stmt.line(),
+                    &format!("{display} illegally occurs after EndSequence."),
+                    stmt.file(),
+                );
+                return Some(stmt.line());
+            }
+            if matches!(stmt.as_ref(), Stmt::Call(_)) {
+                if let Some(stop) = _check_call_pass2_with(
+                    stmt,
+                    subs,
+                    profile,
+                    diags,
+                    before_bp && !in_table,
+                    in_body_block,
+                    Some(&sub_params),
+                    Some(known),
+                    Some(&link_ctx),
+                    Some(dims_ds),
+                ) {
+                    return Some(stop);
+                }
+            } else if matches!(stmt.as_ref(), Stmt::Assignment(_)) {
+                if let Some(stop) = _check_assignment_pass2_with(
+                    stmt,
+                    known,
+                    diags,
+                    before_bp && !in_table,
+                    in_body_block,
+                    Some(profile),
+                    Some(dims_ds),
+                ) {
+                    return Some(stop);
+                }
+            } else if _control_keyword(stmt).is_some()
+                && !in_body_block
+                && !in_table
+                && !seen_beginprog
+                && (!profile.single_pass || _has_error_on(stmt, diags))
+            {
+                let ctrl = _control_keyword(stmt).expect("control keyword");
+                let display = profile
+                    .instructions()
+                    .get(&ctrl)
+                    .map_or(ctrl.as_str(), |r| r.name.as_str());
+                diags.error_basic(
+                    stmt.line(),
+                    &format!("{display} illegally occurs before BeginProg."),
+                    stmt.file(),
+                );
+                return Some(stmt.line());
+            } else if let Stmt::Instruction(st) = stmt.as_ref()
+                && (_FORBIDDEN_BEFORE_BEGINPROG.contains(&kw.as_str())
+                    || profile.before_beginprog().contains(&kw))
+            {
+                if !in_body_block
+                    && !in_table
+                    && !in_decl_block
+                    && before_bp
+                    && (kw != "CALLTABLE" || _calltable_known_with(stmt, &tables))
+                    && !(pipeline_setup && matches!(kw.as_str(), "CDM_EXCITEV" | "CDM_MUXSELECT"))
+                {
+                    let display = profile
+                        .instructions()
+                        .get(&pystr::upper(&st.keyword))
+                        .map_or(st.keyword.as_str(), |r| r.name.as_str());
+                    diags.error_basic(
+                        stmt.line(),
+                        &format!("{display} illegally occurs before BeginProg."),
+                        stmt.file(),
+                    );
+                    return Some(stmt.line());
+                }
+            } else if let Stmt::Unparsed(st) = stmt.as_ref() {
+                if !_routine_arg_findings_with(st, program, profile).is_empty()
+                    || !_function_syntax_findings_with(stmt, program, profile).is_empty()
+                {
+                    continue;
+                }
+                if let Some(message) = _function_symbol_finding_with(stmt, program, profile) {
+                    diags.error_basic(stmt.line(), &message, stmt.file());
+                    continue;
+                }
+                if before_bp
+                    && !in_body_block
+                    && !in_table
+                    && !in_decl_block
+                    && _before_beginprog_name_with(stmt, "UNPARSED", profile, &BTreeSet::new())
+                        .is_some()
+                {
+                    diags.error_basic(
+                        stmt.line(),
+                        "ESSInitialize illegally occurs before BeginProg.",
+                        stmt.file(),
+                    );
+                    return Some(stmt.line());
+                }
+                if _KNOWN_PARSER_GAP_REASONS
+                    .iter()
+                    .any(|r| st.reason.starts_with(r))
+                    || _BENIGN_REASONS.contains(&st.reason.as_str())
+                    || is_hash_statement(st)
+                {
+                    continue;
+                }
+                if let Some(messages) =
+                    _logical_assign_undefined_messages_with(stmt, program, profile)
+                {
+                    for message in messages {
+                        diags.error(
+                            stmt.line(),
+                            &message,
+                            stmt.file(),
+                            ShowFile::Bool(message.ends_with(" is not defined.")),
+                            0,
+                            "",
+                            "",
+                        );
+                    }
+                    continue;
+                }
+                if _logical_assign_accepted_with(stmt, program, profile) {
+                    let assignment = Stmt::Assignment(Assignment {
+                        base: crate::syntax::StmtBase {
+                            node: crate::syntax::Node {
+                                line: stmt.line(),
+                                file: stmt.file().to_owned(),
+                            },
+                            ..Default::default()
+                        },
+                        target: Some(Rc::new(Expr::Name(crate::syntax::Name {
+                            node: crate::syntax::Node {
+                                line: stmt.line(),
+                                ..Default::default()
+                            },
+                            name: "_".to_owned(),
+                        }))),
+                        value: st.expr.clone(),
+                        ..Default::default()
+                    });
+                    for message in var_types::_string_operand_messages(
+                        &mut var_types::Typer::new(program, None, None),
+                        &assignment,
+                    ) {
+                        diags.error_basic(stmt.line(), &message, stmt.file());
+                    }
+                    continue;
+                }
+                if let Some(bare) = _bare_sub_link_name_with(stmt.text(), &link_ctx.subs) {
+                    link_ctx.links.borrow_mut().calls.push(bare.clone());
+                    if let Some(stop) = _unlinked_call_with(
+                        stmt,
+                        &bare,
+                        profile,
+                        diags,
+                        !in_body_block && before_bp && !in_table,
+                        &link_ctx,
+                    ) {
+                        return Some(stop);
+                    }
+                    continue;
+                }
+                if diags.items.iter().take(pass1_count).any(|d| {
+                    d.line == stmt.line()
+                        && d.file == stmt.file()
+                        && d.severity == "error"
+                        && (d.message.starts_with(_FALLBACK_PREFIX)
+                            || d.message.starts_with("Illegal Data parameter"))
+                }) {
+                    continue;
+                }
+                if instr_rules::unterminated_string_shape(
+                    stmt,
+                    profile,
+                    subs,
+                    Some(pass1_operands_with(program, profile)),
+                    &instr_rules::user_functions(program),
+                )
+                .is_some()
+                {
+                    continue;
+                }
+                if !_junk_init_findings_with(st, profile).is_empty() {
+                    continue;
+                }
+                if [
+                    _UNITS_WITHOUT_EQ,
+                    _CONST_WITHOUT_EQ,
+                    _ALIAS_WITHOUT_EQ,
+                    _FOR_MISSING,
+                ]
+                .contains(&st.reason.as_str())
+                    || [
+                        _INVALID_AS_CLAUSE,
+                        _CONST_BAD_VALUE,
+                        _CONST_BAD_NAME,
+                        _DO_LOOP_PARAM,
+                        _CONST_LEAD,
+                        _ALIAS_NOTHING_AFTER_EQ,
+                        _UNCLOSED_DIM_PREFIX,
+                    ]
+                    .iter()
+                    .any(|r| st.reason.starts_with(r))
+                {
+                    continue;
+                }
+                let text = stmt.text();
+                let at_eol = st.base.at_eol.get();
+                if st.reason == _UNCLOSED_PAREN_EXPR {
+                    let mut kind = if profile.known_first_word_pass1 {
+                        _unclosed_paren_kind(text, &known.names)
+                    } else {
+                        "pass1".to_owned()
+                    };
+                    if kind == "pass1" && pystr::rstrip(text).ends_with('(') {
+                        "fallback".clone_into(&mut kind);
+                    }
+                    if kind == "symbol" {
+                        diags.error(
+                            stmt.line(),
+                            &format!("Invalid symbol in expression: {text}."),
+                            stmt.file(),
+                            ShowFile::Bool(false),
+                            0,
+                            "",
+                            "",
+                        );
+                    } else if kind == "fallback" {
+                        diags.error(
+                            stmt.line(),
+                            &_out_of_place_with(profile, text, at_eol),
+                            stmt.file(),
+                            ShowFile::Bool(false),
+                            0,
+                            "",
+                            "",
+                        );
+                    } else {
+                        if profile.fallback_echo_newline
+                            && let Some(target) = TARGET.match_(text)
+                            && let Some(name) = target.group(1)
+                            && !context::of(program, Some(profile), None)
+                                .known_names()
+                                .names
+                                .contains(&pystr::upper(name))
+                        {
+                            diags.error(
+                                stmt.line(),
+                                &profile.unresolved_symbol_message.format(name),
+                                stmt.file(),
+                                ShowFile::Bool(false),
+                                0,
+                                "",
+                                "",
+                            );
+                        }
+                        if profile.single_pass {
+                            for message in _unparsed_string_messages_with(st, program, profile) {
+                                diags.error_basic(stmt.line(), &message, stmt.file());
+                            }
+                        }
+                        let cond = condition_part(text);
+                        let operands = pass1_operands_with(program, profile);
+                        let message = cond
+                            .as_deref()
+                            .filter(|c| !pystr::strip(c).is_empty())
+                            .and_then(|c| _unclosed_call_message_with(profile, c, false, &operands))
+                            .filter(|m| !m.is_empty())
+                            .or_else(|| {
+                                _unclosed_call_message_with(profile, text, at_eol, &operands)
+                                    .filter(|m| !m.is_empty())
+                            })
+                            .unwrap_or_else(|| _no_matching_with(profile, text, at_eol));
+                        diags.error(
+                            stmt.line(),
+                            &message,
+                            stmt.file(),
+                            ShowFile::Bool(false),
+                            0,
+                            "",
+                            "",
+                        );
+                    }
+                } else if st.reason == _EXTRA_CLOSE_PAREN
+                    && !_assignment_head_with(text, program, profile)
+                {
+                    diags.error_basic(
+                        stmt.line(),
+                        &_out_of_place_with(profile, text, at_eol),
+                        stmt.file(),
+                    );
+                } else if st.reason == _EXTRA_CLOSE_PAREN {
+                    let sep = if profile.fallback_echo_newline && at_eol {
+                        "\n"
+                    } else {
+                        ""
+                    };
+                    diags.error(
+                        stmt.line(),
+                        &format!("Incomplete expression: {text}{sep}."),
+                        stmt.file(),
+                        ShowFile::Bool(false),
+                        0,
+                        "",
+                        "",
+                    );
+                } else {
+                    let findings = if profile.known_first_word_pass1 {
+                        _instruction_arg_findings_with(
+                            text,
+                            &pass1_operands_with(program, profile),
+                            profile,
+                            context::of(program, Some(profile), None).declared_variable_names(),
+                        )
+                    } else {
+                        vec![]
+                    };
+                    if let Some(first) = findings.first() {
+                        if matches!(first.0, 2 | 6) {
+                            diags.error(
+                                stmt.line(),
+                                &format!("Invalid symbol in expression: {}.", first.2),
+                                stmt.file(),
+                                ShowFile::Bool(false),
+                                0,
+                                "",
+                                "",
+                            );
+                            if first.0 == 6 && in_table {
+                                return Some(stmt.line());
+                            }
+                            for (stage, message, _) in findings.iter().skip(1) {
+                                if *stage == 5 {
+                                    diags.error_basic(stmt.line(), message, stmt.file());
+                                }
+                            }
+                            let ikw = pystr::upper(WORD_SPLIT.split(pystr::lstrip(text), 1)[0]);
+                            if let Some(record) = profile.instructions().get(&ikw)
+                                && !in_body_block
+                                && !in_table
+                                && !in_decl_block
+                                && before_bp
+                                && profile.before_beginprog().contains(&ikw)
+                            {
+                                diags.error_basic(
+                                    stmt.line(),
+                                    &format!("{} illegally occurs before BeginProg.", record.name),
+                                    stmt.file(),
+                                );
+                                return Some(stmt.line());
+                            }
+                        }
+                        continue;
+                    }
+                    let scan_stmt = _inline_condition_stmt_with(stmt, profile);
+                    let verdict = if profile.known_first_word_pass1 {
+                        _pass1_scan_with(
+                            scan_stmt.text(),
+                            &pass1_operands_with(program, profile),
+                            profile,
+                        )
+                    } else {
+                        None
+                    };
+                    if verdict
+                        .as_ref()
+                        .is_some_and(|(phase, kind)| phase == "pass2" && kind == "symbol")
+                    {
+                        diags.error(
+                            stmt.line(),
+                            &_pass1_message_with(profile, &scan_stmt, "symbol", None),
+                            stmt.file(),
+                            ShowFile::Cr3xx,
+                            0,
+                            "",
+                            "",
+                        );
+                    } else if let Some((phase, kind)) = &verdict
+                        && phase == "pass1"
+                        && (kind != "fallback" || condition_part(text).is_some())
+                    {
+                        diags.error(
+                            stmt.line(),
+                            &_pass1_message_with(profile, stmt, kind, None),
+                            stmt.file(),
+                            ShowFile::Bool(false),
+                            0,
+                            "",
+                            "",
+                        );
+                    } else {
+                        if verdict
+                            .as_ref()
+                            .is_some_and(|(phase, kind)| phase == "pass2" && kind == "fallback")
+                            || (verdict.is_none()
+                                && profile.known_first_word_pass1
+                                && _known_first_token(text, &pass1_operands_with(program, profile)))
+                            || (verdict.is_none()
+                                && profile.single_pass
+                                && _logical_led_string(text))
+                        {
+                            for message in _unparsed_string_messages_with(st, program, profile) {
+                                diags.error_basic(stmt.line(), &message, stmt.file());
+                            }
+                        }
+                        if let Some(lead) = LEAD.match_(text)
+                            && profile.known_first_word_pass1
+                            && let Some(name) = lead.group(1)
+                            && !context::of(program, Some(profile), None)
+                                .system_table_names()
+                                .contains(&pystr::upper(name))
+                            && !_table_names(program).contains(&pystr::upper(name))
+                        {
+                            diags.error_basic(
+                                stmt.line(),
+                                &format!("Could not find {name}."),
+                                stmt.file(),
+                            );
+                        }
+                        diags.error(
+                            stmt.line(),
+                            &_leftover_message_with(profile, stmt),
+                            stmt.file(),
+                            ShowFile::Cr3xx,
+                            0,
+                            "",
+                            "",
+                        );
+                    }
+                    if profile.undefined_call_message {
+                        continue;
+                    }
+                }
+                if !in_body_block && before_bp && !in_table {
+                    let head = HEAD.match_(text);
+                    let record = head
+                        .as_ref()
+                        .and_then(|h| h.group(1))
+                        .and_then(|h| profile.instructions().get(&pystr::upper(h)));
+                    let display = record
+                        .filter(|_| profile.known_first_word_pass1)
+                        .map_or("Expr", |r| r.name.as_str());
+                    diags.error_basic(
+                        stmt.line(),
+                        &format!("{display} illegally occurs before BeginProg."),
+                        stmt.file(),
+                    );
+                    return Some(stmt.line());
+                }
+            }
+        }
+        link_ctx.links.borrow_mut().cutoff = None;
+        None
+    })();
+    if let Some(links) = links {
+        *links = std::mem::take(&mut *link_ctx.links.borrow_mut());
+    }
+    result
+}
+
 /// Port of `checker/structure.py::_CLOSER_MESSAGES`.
 pub static _CLOSER_MESSAGES: LazyLock<OrderedMap<&'static str, (&'static str, &'static str)>> =
     LazyLock::new(|| {
@@ -473,6 +1244,110 @@ pub fn _leftover_first_name_known(text: &str, known: &BTreeSet<String>) -> bool 
 mod tests {
     use super::*;
     use crate::syntax::{Name, Node, NumberValue};
+
+    #[test]
+    fn pass2_matches_python_placement_and_program_state() {
+        for logger in ["cr6", "cr1000x", "cr300", "cr350"] {
+            let profile = crate::profiles::get(logger).unwrap();
+            for (source, line, message, multi_pass_only) in [
+                (
+                    "BeginProg\nBeginProg\nEndProg\n",
+                    2,
+                    "Multiple BeginProgs.",
+                    false,
+                ),
+                (
+                    "BeginProg\nNextScan\nNextScan\nEndProg\n",
+                    2,
+                    "NextScan with no Scan.",
+                    true,
+                ),
+                (
+                    "DataTable(T,1,-1)\nSample(1,Nope,FP2)\nEndTable\nBeginProg\nEndProg\n",
+                    2,
+                    "Invalid symbol in expression: Nope.",
+                    true,
+                ),
+                (
+                    "BeginProg\nScan(0,Sec,0,0)\nSlowSequence\nEndProg\n",
+                    3,
+                    "Missing NextScan.",
+                    true,
+                ),
+                (
+                    "SlowSequence\nBeginProg\nEndProg\n",
+                    2,
+                    "Multiple BeginProgs.",
+                    false,
+                ),
+                (
+                    "BeginProg\nEndSequence\nBattery(X)\nEndProg\n",
+                    3,
+                    "Battery illegally occurs after EndSequence.",
+                    false,
+                ),
+            ] {
+                let (program, parse_diags) =
+                    crate::parser::parse_text(source, "probe.CR6", None, Some(profile));
+                assert!(parse_diags.items.is_empty(), "{logger}: {source:?}");
+                let mut diags = Diagnostics::new();
+                let mut links = CallLinks::default();
+                let stop = check_pass2_with(&program, profile, &mut diags, None, Some(&mut links));
+                let suppressed = multi_pass_only && profile.single_pass;
+                let expected_stop =
+                    (!suppressed && message != "Multiple BeginProgs.").then_some(line);
+                assert_eq!(stop, expected_stop, "{logger}: {source:?}");
+                let actual: Vec<_> = diags
+                    .items
+                    .iter()
+                    .map(|d| (d.line, d.message.as_str()))
+                    .collect();
+                let expected = if suppressed {
+                    vec![]
+                } else {
+                    vec![(line, message)]
+                };
+                assert_eq!(actual, expected, "{logger}: {source:?}");
+                assert_eq!(
+                    links.cutoff,
+                    expected_stop.map(|line| ("probe.CR6".to_owned(), line))
+                );
+                assert_eq!(links.positions.len(), program.statements.len());
+            }
+        }
+    }
+
+    #[test]
+    fn pass2_preserves_supplied_links_on_early_return_and_completion() {
+        let profile = crate::profiles::get("cr6").unwrap();
+        for source in [
+            "BeginProg\nNextScan\n",
+            "Sub S1\nEndSub\nBeginProg\nEndProg\n",
+        ] {
+            let (program, _) = crate::parser::parse_text(source, "probe.CR6", None, Some(profile));
+            let mut links = CallLinks::default();
+            links.calls.push("PREVIOUS".to_owned());
+            links.registered.insert("PREVIOUS".to_owned());
+            links.positions.insert(("earlier.CR6".to_owned(), 7), 0);
+            links.first = Some((7, "deferred".to_owned(), "earlier.CR6".to_owned()));
+            let mut diags = Diagnostics::new();
+            let stop = check_pass2_with(&program, profile, &mut diags, None, Some(&mut links));
+            assert_eq!(links.calls, ["PREVIOUS"]);
+            assert!(links.registered.contains("PREVIOUS"));
+            assert_eq!(links.positions.len(), 1);
+            assert_eq!(
+                links.first,
+                Some((7, "deferred".to_owned(), "earlier.CR6".to_owned()))
+            );
+            assert_eq!(
+                links.cutoff,
+                stop.map(|line| ("probe.CR6".to_owned(), line))
+            );
+            if stop.is_none() {
+                assert!(links.registered.contains("S1"));
+            }
+        }
+    }
 
     #[test]
     fn unparsed_opener_matches_python_probes() {
