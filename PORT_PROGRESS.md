@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: P1-a, P1-b, P1-d in parallel (Phase 0 is complete).
+Next wave: P1-b, P1-d, P1-e, P2-a in parallel (`P1-a` merged).
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -31,8 +31,8 @@ Operating notes (learned in wave 1):
 | P0-b | `syntax.py` (342), `diagnostics.py` (278), `provenance.py` (17) | `src/syntax.rs`, `src/diagnostics.rs` | S | merged | `diagnostics.rs` regex helpers carry `TODO(P1): switch to pyre` |
 | P0-c | `profiles.py` (266), `data/**` | `src/profiles.rs`, `data/**` | S | merged | |
 | P0-d | (harness) | `tools/pydump.py`, `tests/fixtures.rs`, `tests/fixture_baseline.txt`, `.github/workflows/ci.yml` | H | merged | 77,293 cases in 613 files; Python equals the reference on 71,524; lines/ast dumps come with P1 |
-| P1-a | `lexer.py` (183), `sources.py` (125) | `src/lexer.rs`, `src/sources.rs` | H | todo | |
-| P1-b | `source.py` (625) | `src/source.rs` | S | todo | macros excluded |
+| P1-a | `lexer.py` (183) | `src/lexer.rs` | H | merged | `sources.py` moved to P1-b; 6 unit tests |
+| P1-b | `sources.py` (125), `source.py` (625) | `src/sources.rs`, `src/source.rs` | S | todo | macros excluded |
 | P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
 | P1-d | `consteval.py` (327) | `src/consteval.rs` | S | todo | |
 | P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | todo | serial; ranges fixed when P1-b merges |
