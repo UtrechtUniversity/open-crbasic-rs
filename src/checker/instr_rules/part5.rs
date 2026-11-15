@@ -42,8 +42,31 @@ pub fn _fieldcal_bad_variable() -> bool {
 }
 
 /// Port of `checker/instr_rules.py::check_samplefieldcal`.
-pub fn check_samplefieldcal(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_samplefieldcal")
+pub fn check_samplefieldcal(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
+    let mut instructions = program
+        .statements
+        .iter()
+        .filter_map(|stmt| match stmt.as_ref() {
+            Stmt::Instruction(instr) => Some(instr),
+            _ => None,
+        });
+    if !profile.instructions().contains("SAMPLEFIELDCAL")
+        || instructions.clone().any(|instr| {
+            instr.keyword.eq_ignore_ascii_case("FIELDCAL")
+                || instr.keyword.eq_ignore_ascii_case("FIELDCALSTRAIN")
+        })
+    {
+        return;
+    }
+    if let Some(instr) =
+        instructions.find(|instr| instr.keyword.eq_ignore_ascii_case("SAMPLEFIELDCAL"))
+    {
+        diags.error_basic(
+            instr.base.node.line,
+            "SampleFieldCal with no FieldCal in program.",
+            &instr.base.node.file,
+        );
+    }
 }
 
 /// Port of `checker/instr_rules.py::_cdm_type_value`.

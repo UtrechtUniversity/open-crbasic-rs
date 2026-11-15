@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: continue P4 with `instr_rules.py::check_samplefieldcal` in part 5.
+Next wave: continue P4 with SPI open-order checks in `instr_rules` part 4.
 
 The first live verdict replay matched Python on 25,964 of 77,293 cases and all cases in 20 of
 613 files. CLI probes matched Python's stdout, message-file bytes and exit status in 14 of
@@ -29,6 +29,10 @@ P4 argument-text round: ported `_pick_tokens` and `_arg_text`. Direct tests cove
 spacing. Verdict parity reached 26,122 of 77,293 and all 21 baseline files passed. The Boolean
 picklist stubs need their `Env` parameters, `_pick_value_bad` needs the environment, program,
 profile and variable names, and `_check_pick_consts` needs its full parameter list.
+
+P4 SampleFieldCal round: ported the FieldCal/FieldCalStrain prerequisite check. The two
+SampleFieldCal fixture files matched all 24 cases, and `samplefieldcal_a.json` became the 22nd
+baseline file. Full verdict parity reached 26,130 of 77,293 cases.
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3

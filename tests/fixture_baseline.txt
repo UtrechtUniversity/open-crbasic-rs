@@ -20,4 +20,5 @@ r77_datainterval_lapses.json
 r7_include_cutoff.json
 r7_include_existing_ext.json
 r9_chr_arg.json
+samplefieldcal_a.json
 samplefieldcal_b.json
