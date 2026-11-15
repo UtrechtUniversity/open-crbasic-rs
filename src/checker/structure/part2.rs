@@ -1,8 +1,18 @@
 //! Port of `checker/structure.py` (lines 780-1293).
 
+use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::rc::Rc;
 use std::sync::LazyLock;
 
+use super::part1::{
+    _BODY_BLOCK_ENDS, _BODY_BLOCK_STARTS, _DECL_BLOCK_BOUNDS, _accept_known_with,
+    _calltable_known_with, _check_accept_table_with, _check_calltable_outside_scan_with,
+    _scan_counts_for_table_placement_with, _track_tables_with, NESTED_SCAN, TableState,
+    first_misplaced_sub_with,
+};
+use crate::checker::context;
+use crate::consteval::Env;
 use crate::diagnostics::{Diagnostics, ShowFile};
 use crate::profiles::Profile;
 use crate::syntax::{Case, Expr, ExprRef, NumberValue, OrderedMap, Program, Stmt, stmt_id};
@@ -13,16 +23,137 @@ pub fn _scan_placement_walk(_program: &Program, _diags: &mut Diagnostics) {
     todo!("checker/structure.py::_scan_placement_walk (omitted: profile: untyped)")
 }
 
-/// Port of `checker/structure.py::_scan_placement_walk`.
+/// Port of checker/structure.py::_scan_placement_walk
+#[allow(
+    clippy::doc_markdown,
+    reason = "AGENTS.md requires literal one-line port comments"
+)]
 pub fn _scan_placement_walk_with(
-    _program: &crate::syntax::ProgramRef,
-    _profile: &'static Profile,
-    _diags: &mut Diagnostics,
+    program: &crate::syntax::ProgramRef,
+    profile: &'static Profile,
+    diags: &mut Diagnostics,
 ) -> Option<(String, i64)> {
-    // Blocked at Python line 799: part1's first_misplaced_sub returns (), and its
-    // table-state helpers omit both their state and their required return types.
-    // Do not reproduce those helpers in this file or invent placement results.
-    todo!("requires typed part1 placement helpers; see HANDOFF.md")
+    if !profile.single_pass {
+        return None;
+    }
+    let env = Env::with_consts(profile, Rc::new(RefCell::new(program.consts.clone())));
+    let (mut in_table, mut in_body, mut in_decl, mut seen_beginprog) = (false, false, false, false);
+    let mut scans = Vec::new();
+    let mut tables = TableState::default();
+    let ctx = context::of(program, None, None);
+    let subs = ctx.declared_subs();
+    let mut stray = stray_controls_with(program);
+    for (k, m) in scan_only_outside(program).iter() {
+        stray.insert(*k, (m.clone(), true));
+    }
+    for (k, m) in subscan_controls_with(program, profile).iter() {
+        stray.insert(*k, m.clone());
+    }
+    let misplaced = first_misplaced_sub_with(program);
+    for stmt in &program.statements {
+        if let Some((misplaced_stmt, messages)) = &misplaced
+            && Rc::ptr_eq(stmt, misplaced_stmt)
+        {
+            for message in messages {
+                diags.error_basic(stmt.line(), message, stmt.file());
+            }
+            return Some((stmt.file().to_owned(), stmt.line()));
+        }
+        let mut items = vec![stmt.clone()];
+        if matches!(stmt.as_ref(), Stmt::If(_)) {
+            items.extend(stmt.inline_bodies());
+        }
+        for item in items {
+            if let Some((message, stops)) = stray.get(&stmt_id(&item)) {
+                diags.error_basic(item.line(), message, item.file());
+                if *stops {
+                    return Some((item.file().to_owned(), item.line()));
+                }
+            }
+        }
+        seen_beginprog = seen_beginprog || _keyword(stmt) == "BEGINPROG";
+        if matches!(stmt.as_ref(), Stmt::SubDef(_)) {
+            in_body = true;
+            continue;
+        }
+        let kw = _keyword(stmt);
+        in_decl = _DECL_BLOCK_BOUNDS
+            .get(kw.as_str())
+            .copied()
+            .unwrap_or(in_decl);
+        _track_tables_with(stmt, &kw, &mut tables);
+        if kw == "DATATABLE" {
+            in_table = true;
+        } else if kw == "ENDTABLE" {
+            in_table = false;
+        } else if kw == "SLOWSEQUENCE" && !scans.is_empty() {
+            diags.error_basic(stmt.line(), "Missing NextScan.", stmt.file());
+            return Some((stmt.file().to_owned(), stmt.line()));
+        } else if kw == "SCAN" {
+            if !scans.is_empty() {
+                diags.error(
+                    stmt.line(),
+                    NESTED_SCAN,
+                    stmt.file(),
+                    ShowFile::Bool(true),
+                    0,
+                    "nested_scan",
+                    "",
+                );
+            }
+            scans.push(_scan_counts_for_table_placement_with(stmt, Some(&env)));
+        } else if kw == "NEXTSCAN"
+            || kw == "NEXT" && _block_word_with(stmt.args()).as_deref() == Some("SCAN")
+        {
+            if scans.is_empty() {
+                diags.error_basic(stmt.line(), "NextScan with no Scan.", stmt.file());
+                return Some((stmt.file().to_owned(), stmt.line()));
+            }
+            scans.pop();
+        } else if kw == "CALLTABLE"
+            && !in_table
+            && (!scans.iter().any(|scan| *scan) || in_body)
+            && _calltable_known_with(stmt, &tables)
+        {
+            if let Stmt::Instruction(inst) = stmt.as_ref() {
+                _check_calltable_outside_scan_with(
+                    inst,
+                    program,
+                    diags,
+                    in_body,
+                    !scans.is_empty() && !in_body,
+                    Some(&env),
+                );
+            }
+        } else if kw == "ACCEPTDATARECORDS" && !in_table && _accept_known_with(stmt, &tables) {
+            if let Stmt::Instruction(inst) = stmt.as_ref() {
+                _check_accept_table_with(
+                    inst,
+                    program,
+                    diags,
+                    !scans.iter().any(|scan| *scan) || in_body,
+                    &env,
+                );
+            }
+        }
+        if _BODY_BLOCK_STARTS.contains(&kw.as_str()) {
+            in_body = true;
+        } else if crate::syntax::ends_routine(stmt) || _BODY_BLOCK_ENDS.contains(&kw.as_str()) {
+            in_body = false;
+        } else if !(seen_beginprog || in_body || in_table || in_decl)
+            && (kw != "CALLTABLE" || _calltable_known_with(stmt, &tables))
+            && let Some(display) = _before_beginprog_name_with(stmt, &kw, profile, subs)
+            && !display.is_empty()
+        {
+            diags.error_basic(
+                stmt.line(),
+                &format!("{display} illegally occurs before BeginProg."),
+                stmt.file(),
+            );
+            return Some((stmt.file().to_owned(), stmt.line()));
+        }
+    }
+    None
 }
 
 static CASE_ELSE_RE: LazyLock<pyre::Regex> =
@@ -730,6 +861,79 @@ pub fn _block_word_with(args: &[Option<ExprRef>]) -> Option<String> {
 mod tests {
     use super::*;
     use crate::{parser, profiles};
+
+    #[test]
+    fn placement_walk_matches_python_stops_and_diagnostic_order() {
+        let cases: &[(&str, i64, &[(i64, &str)])] = &[
+            (
+                "DataTable(T,1,-1)\nDataInterval(0,1,Sec,10)\nEndTable\nBeginProg\nCallTable(T)\nNextScan\nElse\nEndProg",
+                6,
+                &[
+                    (
+                        5,
+                        "Table with DataInterval must be called within Scan..NextScan.",
+                    ),
+                    (
+                        5,
+                        "Cannot autoallocate memory for DataTable T called outside of Scan, e.g., called by Sub.",
+                    ),
+                    (6, "NextScan with no Scan."),
+                ],
+            ),
+            (
+                "BeginProg\nIf 1 Then Exit Do Else Exit For\nElse\nNextScan\nEndProg",
+                3,
+                &[
+                    (2, "Exit Do without DO."),
+                    (2, "Exit For without FOR."),
+                    (3, "Else with no If."),
+                ],
+            ),
+            (
+                "BeginProg\nSub A\nElse\nEndSub\nEndProg",
+                2,
+                &[(2, "Sub is declared in the middle of an executing sequence")],
+            ),
+            (
+                "WebPageBegin\nX=1\nWebPageEnd\nX=2\nBeginProg\nEndProg",
+                4,
+                &[(4, "Expr illegally occurs before BeginProg.")],
+            ),
+            (
+                "BeginProg\nScan(0,Sec,0,0)\nScan(0,Sec,0,0)\nSlowSequence\nEndProg",
+                4,
+                &[
+                    (3, "Scan without NextScan or nested Scans."),
+                    (4, "Missing NextScan."),
+                ],
+            ),
+        ];
+        for name in ["cr6", "cr1000x", "cr300", "cr350"] {
+            let profile = profiles::get(name).unwrap();
+            for (source, line, expected) in cases {
+                let (program, _) = parser::parse_text(source, "t.cr6", None, Some(profile));
+                let mut diags = Diagnostics::new();
+                let stop = _scan_placement_walk_with(&program, profile, &mut diags);
+                if profile.single_pass {
+                    assert_eq!(stop, Some(("t.cr6".to_owned(), *line)), "{name}: {source}");
+                    let actual: Vec<_> = diags
+                        .items
+                        .iter()
+                        .map(|d| (d.line, d.message.as_str()))
+                        .collect();
+                    assert_eq!(actual, *expected, "{name}: {source}");
+                    for diag in &diags.items {
+                        if diag.message == NESTED_SCAN {
+                            assert_eq!(diag.kind, "nested_scan");
+                        }
+                    }
+                } else {
+                    assert_eq!(stop, None);
+                    assert_eq!(diags.items.len(), 0);
+                }
+            }
+        }
+    }
 
     fn located(
         program: &Program,
