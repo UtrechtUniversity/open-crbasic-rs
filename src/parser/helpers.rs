@@ -931,8 +931,8 @@ pub const _WORD_BINARY_OPS: [&str; 6] = ["MOD", "AND", "OR", "XOR", "EQV", "IMP"
 pub static _FUNCTION_DEF_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*Function\s+([A-Za-z_][A-Za-z0-9_]*)", pyre::I));
 
-pub const _LOGICAL_LEAD_OPS: [&str; 16] = [
-    "+", "-", "*", "/", "\\", "^", "&", "<", ">", "<=", ">=", "<>", "=<", "=>", "><", "",
+pub const _LOGICAL_LEAD_OPS: [&str; 15] = [
+    "+", "-", "*", "/", "\\", "^", "&", "<", ">", "<=", ">=", "<>", "=<", "=>", "><",
 ];
 
 pub const LOGICAL_ASSIGN: &str = "logical-prefixed assignment";
