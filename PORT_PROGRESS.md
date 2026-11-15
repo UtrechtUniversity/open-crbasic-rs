@@ -4,16 +4,18 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (state at 2026-11-15 23:55 CET): nothing is left to port, only to wire. Wiring is
+Next wave (state at 2026-11-16 00:25 CET): nothing is left to port, only to wire. Wiring is
 strictly one task at a time because it edits callers across files. Wired and verified on
-`port`: instr_rules (`2deee67`), structure (`d714d5b`), expressions (`e37d558`); each left a
-`handoffs/wire-*.md` with the caller TODOs for the modules that follow. Running: instr_data
-wiring, one Codex worker, worktree `.claude/worktrees/wire-data`, branch `wire-data`; its
-`HANDOFF.md` says where it is. If it is found stopped: verify (check set, no baseline file
-lost), commit what compiles and passes, and re-launch for the rest. Then, in order:
-instr_measure, cr3xx, tables (expressions `_data_table_fields` needs a `BuildTablesHooks`
-adapter), then the single files with stubs left (`grep -c 'todo!(' src/checker/*.rs src/*.rs`):
-intervals, symbols, structs, longconv, mode, ess and the rest.
+`port`: instr_rules (`2deee67`), structure (`d714d5b`), expressions (`e37d558`), instr_data
+(`797a6ba`), instr_measure (`bcf3724`); each left a `handoffs/wire-*.md`. The Codex window ran
+out at 00:19 CET (back at 03:08 CET) in the middle of the cr3xx wiring; a Sonnet agent
+continues it in the same worktree `.claude/worktrees/wire-cr3xx` (branch `wire-cr3xx`,
+uncommitted, `HANDOFF.md` says where it is). If it is found stopped: verify (check set, no
+baseline file lost), commit what compiles and passes, and re-launch for the rest. Then, in
+order: tables (expressions `_data_table_fields` and instr_data need the real table builder:
+a `BuildTablesHooks` adapter, GetRecord field counts, duplicate-field metadata), then the
+single files with stubs left (`grep -c 'todo!(' src/checker/*.rs src/*.rs`): intervals,
+symbols, structs, longconv, mode, ess and the rest.
 Wiring rules: for each `todo!()` skeleton stub that has a `*_with` sibling, delete the stub,
 rename the sibling to the Python name, and give every caller the real arguments (take them
 from the Python call site); drop the private `_pN_*` copies; resolve what `handoffs/*.md` list.
@@ -22,8 +24,8 @@ convergence on the fixture files (P5; known first buckets: `r12_cr3xx_table_fiel
 `r10_cr3xx_block_quotes` lost cases in the expressions wiring) and close-out (P6; delete
 `handoffs/`).
 
-After the expressions wiring, check set green on `port`: 282 unit tests, verdict parity
-59,494 of 77,293, 306 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
+After the instr_measure wiring, check set green on `port`: 282 unit tests, verdict parity
+69,819 of 77,293, 413 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
 
 Merged in this round: all nine `structure` parts and all five `instr_rules` parts, as `*_with`
 siblings with `handoffs/<task>.md`. Full check set green on `port` at `bb39c3b`: 278 unit
