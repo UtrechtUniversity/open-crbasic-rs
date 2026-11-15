@@ -140,6 +140,10 @@ fn _size_class(raw: Option<&ConstValue>) -> Option<SizeClass> {
             let f32v = _f32_safe_local(*f);
             return _classify_f32(f32v);
         }
+        ConstValue::BigInt(s) => {
+            let f32v = _f32_safe_local(s.parse::<f64>().unwrap_or(f64::INFINITY));
+            return _classify_f32(f32v);
+        }
         ConstValue::Str(_) => return None,
     };
     if v == -1 {
@@ -193,6 +197,7 @@ fn _as_int_local(v: Option<&ConstValue>, default: i64) -> i64 {
     let f = match v {
         ConstValue::Int(i) => return *i,
         ConstValue::Float(f) | ConstValue::CFloat(f) => *f,
+        ConstValue::BigInt(s) => s.parse::<f64>().unwrap_or(f64::INFINITY),
         ConstValue::Str(s) => match pystr::parse_float(s) {
             Some(f) => f,
             None => return default,

@@ -213,24 +213,54 @@ fn py_isspace(c: char) -> bool {
 
 // ---------------------------------------------------------------- constant values
 
+fn serialize_bigint<S: serde::Serializer>(s: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    if let Ok(f) = s.parse::<f64>()
+        && f.is_finite()
+    {
+        return serializer.serialize_f64(f);
+    }
+    serializer.serialize_str(s)
+}
+
 /// Python `type ConstValue = int | float | str`: a folded constant (see `consteval.value_of`).
 /// `CFloat` is `consteval.CFloat`, a `float` subclass marking a `Const` known to be float-typed
 /// (a plain `Float` is "not established"); Python `bool` is never stored in `consts`.
-#[derive(Debug, Clone, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 pub enum ConstValue {
     Int(i64),
     Float(f64),
     CFloat(f64),
+    BigInt(String),
     Str(String),
 }
 
+impl Serialize for ConstValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Int(i) => serializer.serialize_i64(*i),
+            Self::Float(f) | Self::CFloat(f) => serializer.serialize_f64(*f),
+            Self::BigInt(s) => serialize_bigint(s, serializer),
+            Self::Str(s) => serializer.serialize_str(s),
+        }
+    }
+}
+
 /// Python `Number.value: float | int`.
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 pub enum NumberValue {
     Int(i64),
     Float(f64),
+    BigInt(String),
+}
+
+impl Serialize for NumberValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Int(i) => serializer.serialize_i64(*i),
+            Self::Float(f) => serializer.serialize_f64(*f),
+            Self::BigInt(s) => serialize_bigint(s, serializer),
+        }
+    }
 }
 
 impl Default for NumberValue {
@@ -1155,14 +1185,26 @@ pub struct Token {
 }
 
 /// Python `Token.value: object`.
-#[derive(Debug, Clone, PartialEq, Default, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum TokenValue {
     #[default]
     None,
     Int(i64),
     Float(f64),
+    BigInt(String),
     Str(String),
+}
+
+impl Serialize for TokenValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::None => serializer.serialize_none(),
+            Self::Int(i) => serializer.serialize_i64(*i),
+            Self::Float(f) => serializer.serialize_f64(*f),
+            Self::BigInt(s) => serialize_bigint(s, serializer),
+            Self::Str(s) => serializer.serialize_str(s),
+        }
+    }
 }
 
 /// Python `source.Piece` (`NamedTuple`).

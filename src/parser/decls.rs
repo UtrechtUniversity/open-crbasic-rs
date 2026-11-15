@@ -739,6 +739,7 @@ impl Parser<'_> {
                     let val = match num.value {
                         TokenValue::Int(n) => NumberValue::Int(n),
                         TokenValue::Float(f) => NumberValue::Float(f),
+                        TokenValue::BigInt(s) => NumberValue::BigInt(s),
                         _ => NumberValue::Int(0),
                     };
                     strsize = Some(Rc::new(Expr::Number(Number {

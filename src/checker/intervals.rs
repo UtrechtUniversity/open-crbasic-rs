@@ -368,6 +368,7 @@ pub fn _put_get_option_with(args: &[Option<ExprRef>], env: &Env) -> Option<i64> 
     let value = consteval::value_of(args[5].as_deref(), env).ok()?;
     let option = match value {
         ConstValue::Str(_) => return None,
+        ConstValue::BigInt(_) => _INT_MIN,
         ConstValue::Int(v) => {
             if v < _INT_MIN {
                 return None;
@@ -885,7 +886,7 @@ pub fn wide_constants_with(program: &Program, profile: &Profile) -> BTreeSet<Str
             && let Some(val_expr) = &c.value
             && let Expr::Number(n) = &**val_expr
             && !n.text.starts_with('&')
-            && _out_of_range_with(n.value, profile)
+            && _out_of_range_with(n.value.clone(), profile)
         {
             out.insert(pystr::upper(&c.name));
         }
@@ -909,6 +910,7 @@ pub fn _out_of_range_with(value: NumberValue, profile: &Profile) -> bool {
         let f = match value {
             NumberValue::Int(i) => i as f64,
             NumberValue::Float(f) => f,
+            NumberValue::BigInt(s) => s.parse::<f64>().unwrap_or(f64::INFINITY),
         };
         let rounded = if f.abs() < 3.4e38 {
             f64::from(f as f32)
@@ -920,6 +922,7 @@ pub fn _out_of_range_with(value: NumberValue, profile: &Profile) -> bool {
     match value {
         NumberValue::Int(i) => !(_INT_MIN..=_INT_MAX).contains(&i),
         NumberValue::Float(f) => !(_INT_MIN_F64..=_INT_MAX_F64).contains(&f),
+        NumberValue::BigInt(_) => true,
     }
 }
 
@@ -946,6 +949,7 @@ pub fn not_integral_with(
     let (num, is_whole) = match value {
         ConstValue::Str(_) => return false,
         ConstValue::Int(i) => (NumberValue::Int(i), true),
+        ConstValue::BigInt(s) => (NumberValue::BigInt(s), true),
         ConstValue::Float(f) | ConstValue::CFloat(f) => {
             (NumberValue::Float(f), f.is_finite() && pystr::is_integer(f))
         }
@@ -1329,7 +1333,7 @@ pub fn _int_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     }
     let value = consteval::value_of(Some(e), env).ok()?;
     let v = match value {
-        ConstValue::Str(_) => return None,
+        ConstValue::Str(_) | ConstValue::BigInt(_) => return None,
         ConstValue::Int(i) => i,
         ConstValue::Float(f) | ConstValue::CFloat(f) => {
             if !f.is_finite() || !pystr::is_integer(f) {

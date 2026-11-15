@@ -43,7 +43,7 @@ pub fn _const_int_with_env(expr: Option<&Expr>, env: &Env) -> Option<i64> {
             }
             pystr::py_int_from_f64(f)
         }
-        ConstValue::Str(_) => None,
+        ConstValue::BigInt(_) | ConstValue::Str(_) => None,
     }
 }
 

@@ -410,7 +410,7 @@ fn _const_int_impl(
                 None
             }
         }
-        ConstValue::Str(_) => None,
+        ConstValue::BigInt(_) | ConstValue::Str(_) => None,
     }
 }
 
@@ -741,7 +741,7 @@ fn _check_arg_impl(
     let is_str_or_nan = match &folded_val {
         ConstValue::Str(_) => true,
         ConstValue::Float(f) | ConstValue::CFloat(f) => f.is_nan(),
-        ConstValue::Int(_) => false,
+        ConstValue::Int(_) | ConstValue::BigInt(_) => false,
     };
     if non_numeric_int_min && is_str_or_nan {
         folded_val = ConstValue::Int(INT_MIN);
@@ -752,6 +752,7 @@ fn _check_arg_impl(
     let mut value = match folded_val {
         ConstValue::Int(i) => int_to_f64(i),
         ConstValue::Float(f) | ConstValue::CFloat(f) => f,
+        ConstValue::BigInt(s) => s.parse::<f64>().unwrap_or(f64::INFINITY),
         ConstValue::Str(_) => return,
     };
     if kind

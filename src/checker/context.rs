@@ -423,7 +423,7 @@ pub fn _declared_all_dims(statements: &[StmtRef], env: &Env) -> OrderedMap<Strin
                         };
                         sizes.push(n);
                     }
-                    ConstValue::Str(_) => {
+                    ConstValue::BigInt(_) | ConstValue::Str(_) => {
                         ok = false;
                         break;
                     }
@@ -1066,7 +1066,7 @@ impl Context {
                                 sizes.insert(pystr::upper(&v.name), n);
                             }
                         }
-                        ConstValue::Str(_) => {}
+                        ConstValue::BigInt(_) | ConstValue::Str(_) => {}
                     }
                 }
             }
@@ -1289,7 +1289,7 @@ impl Context {
                                     false
                                 }
                             }
-                            ConstValue::Str(_) => false,
+                            ConstValue::BigInt(_) | ConstValue::Str(_) => false,
                         };
                         if !num_ok {
                             ok = false;

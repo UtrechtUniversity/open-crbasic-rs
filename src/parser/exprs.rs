@@ -17,6 +17,7 @@ fn number_value_from_token(val: &TokenValue) -> NumberValue {
     match val {
         TokenValue::Int(n) => NumberValue::Int(*n),
         TokenValue::Float(f) => NumberValue::Float(*f),
+        TokenValue::BigInt(s) => NumberValue::BigInt(s.clone()),
         _ => NumberValue::Int(0),
     }
 }

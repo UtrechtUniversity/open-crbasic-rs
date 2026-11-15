@@ -155,12 +155,28 @@ fn _fn_len(args: &[ConstValue]) -> Result<ConstValue, NotConstant> {
     }
 }
 
+/// `int(sys.float_info.max)` in Python.
+const FLOAT_MAX_INT: &str = "179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368";
+
+fn exceeds_float_max_int(s: &str) -> bool {
+    let digits = s.strip_prefix('-').unwrap_or(s).trim_start_matches('0');
+    digits.len() > FLOAT_MAX_INT.len()
+        || (digits.len() == FLOAT_MAX_INT.len() && digits > FLOAT_MAX_INT)
+}
+
 /// Port of `consteval.py::_num`
 #[allow(clippy::cast_precision_loss, reason = "Python int to float")]
 fn _num(v: &ConstValue) -> Result<f64, NotConstant> {
     match v {
         ConstValue::Int(i) => Ok(*i as f64),
         ConstValue::Float(f) | ConstValue::CFloat(f) => Ok(*f),
+        ConstValue::BigInt(s) => {
+            if exceeds_float_max_int(s) {
+                return Err(NotConstant::msg("number outside the float range"));
+            }
+            s.parse::<f64>()
+                .map_err(|_| NotConstant::msg("number outside the float range"))
+        }
         ConstValue::Str(_) => Err(NotConstant::msg("expected a number")),
     }
 }
@@ -175,7 +191,7 @@ pub fn to_long(value: &ConstValue) -> i64 {
     const MIN_LONG: i64 = -2_147_483_648;
     const MAX_LONG: i64 = 2_147_483_647;
     let n = match value {
-        ConstValue::Str(_) => return MIN_LONG,
+        ConstValue::Str(_) | ConstValue::BigInt(_) => return MIN_LONG,
         ConstValue::Int(i) => *i,
         ConstValue::Float(f) | ConstValue::CFloat(f) => match pystr::py_int_from_f64(*f) {
             Some(i) => i,
@@ -192,7 +208,7 @@ pub fn to_long(value: &ConstValue) -> i64 {
 /// Port of `consteval.py::is_finite_number`
 pub fn is_finite_number(value: &ConstValue) -> bool {
     match value {
-        ConstValue::Int(_) => true,
+        ConstValue::Int(_) | ConstValue::BigInt(_) => true,
         ConstValue::Float(f) | ConstValue::CFloat(f) => f.is_finite(),
         ConstValue::Str(_) => false,
     }
@@ -205,7 +221,13 @@ fn _truth(v: bool) -> ConstValue {
 
 /// Port of `consteval.py::value_of`
 pub fn value_of(expr: Option<&Expr>, env: &Env) -> Result<ConstValue, NotConstant> {
-    _value_of(expr, env)
+    let value = _value_of(expr, env)?;
+    if let ConstValue::BigInt(ref s) = value
+        && exceeds_float_max_int(s)
+    {
+        return Err(NotConstant::msg("number outside the float range"));
+    }
+    Ok(value)
 }
 
 /// Port of `consteval.py::_value_of`
@@ -214,9 +236,10 @@ fn _value_of(expr: Option<&Expr>, env: &Env) -> Result<ConstValue, NotConstant> 
         return Err(NotConstant::msg("empty expression"));
     };
     match expr {
-        Expr::Number(n) => Ok(match n.value {
-            NumberValue::Int(i) => ConstValue::Int(i),
-            NumberValue::Float(f) => ConstValue::Float(f),
+        Expr::Number(n) => Ok(match &n.value {
+            NumberValue::Int(i) => ConstValue::Int(*i),
+            NumberValue::Float(f) => ConstValue::Float(*f),
+            NumberValue::BigInt(s) => ConstValue::BigInt(s.clone()),
         }),
         Expr::String(s) => Ok(ConstValue::Str(s.value.clone())),
         Expr::Name(n) => _lookup(&n.name, env),
@@ -274,7 +297,7 @@ pub fn is_float(expr: Option<&Expr>, env: &Env) -> Option<bool> {
             if let Some(v) = env.consts.borrow().get(&upper) {
                 return match v {
                     ConstValue::CFloat(_) => Some(true),
-                    ConstValue::Int(_) => Some(false),
+                    ConstValue::Int(_) | ConstValue::BigInt(_) => Some(false),
                     ConstValue::Float(_) | ConstValue::Str(_) => None,
                 };
             }
@@ -306,6 +329,7 @@ pub fn truthy(v: &ConstValue) -> bool {
     match v {
         ConstValue::Str(s) => !s.is_empty(),
         ConstValue::Int(i) => *i != 0,
+        ConstValue::BigInt(s) => s != "0",
         ConstValue::Float(f) | ConstValue::CFloat(f) => *f != 0.0,
     }
 }
@@ -334,7 +358,7 @@ fn _lookup(name: &str, env: &Env) -> Result<ConstValue, NotConstant> {
 
 /// Port of `consteval.py::_as_str`
 fn _as_str(v: &ConstValue) -> Result<String, NotConstant> {
-    if let ConstValue::Str(s) = v {
+    if let ConstValue::Str(s) | ConstValue::BigInt(s) = v {
         return Ok(s.clone());
     }
     let n = _num(v)?;
@@ -732,5 +756,52 @@ mod tests {
 
         let top_cond = binary("=", name_expr("Section"), str_lit("Foo"));
         assert!(value_of(Some(&top_cond), &env).is_err());
+    }
+
+    #[test]
+    fn test_bigint_value_of_and_float_range() {
+        let env = Env::new(profiles::get("cr6").unwrap());
+
+        let ok_big = Expr::Number(Number {
+            node: Node::default(),
+            value: NumberValue::BigInt("123456789012345678901".to_owned()),
+            text: "123456789012345678901".to_owned(),
+        });
+        assert!(matches!(
+            value_of(Some(&ok_big), &env),
+            Ok(ConstValue::BigInt(ref s)) if s == "123456789012345678901"
+        ));
+        assert_eq!(is_float(Some(&ok_big), &env), Some(false));
+        assert!(is_finite_number(&ConstValue::BigInt(
+            "123456789012345678901".to_owned()
+        )));
+        assert!(truthy(&ConstValue::BigInt(
+            "123456789012345678901".to_owned()
+        )));
+
+        // Exact sys.float_info.max integer (309 digits) is accepted; +1 is rejected.
+        let at_max = Expr::Number(Number {
+            node: Node::default(),
+            value: NumberValue::BigInt(FLOAT_MAX_INT.to_owned()),
+            text: FLOAT_MAX_INT.to_owned(),
+        });
+        assert!(value_of(Some(&at_max), &env).is_ok());
+
+        let mut over_max_str = FLOAT_MAX_INT.to_owned();
+        over_max_str.replace_range(308..309, "9");
+        let over_max = Expr::Number(Number {
+            node: Node::default(),
+            value: NumberValue::BigInt(over_max_str.clone()),
+            text: over_max_str,
+        });
+        let err = value_of(Some(&over_max), &env).unwrap_err();
+        assert_eq!(err.to_string(), "number outside the float range");
+
+        let too_many_digits = Expr::Number(Number {
+            node: Node::default(),
+            value: NumberValue::BigInt(format!("1{}", "0".repeat(309))),
+            text: format!("1{}", "0".repeat(309)),
+        });
+        assert!(value_of(Some(&too_many_digits), &env).is_err());
     }
 }

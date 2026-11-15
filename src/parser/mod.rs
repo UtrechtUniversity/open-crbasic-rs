@@ -92,6 +92,7 @@ pub(crate) fn tokenize_for_parser(text: &str, line: i64) -> Result<Vec<Token>, l
                 lexer::TokenValue::None => TokenValue::None,
                 lexer::TokenValue::Int(n) => TokenValue::Int(n),
                 lexer::TokenValue::Float(f) => TokenValue::Float(f),
+                lexer::TokenValue::BigInt(s) => TokenValue::BigInt(s),
                 lexer::TokenValue::Str(s) => TokenValue::Str(s),
             },
         })

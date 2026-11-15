@@ -37,6 +37,7 @@ pub enum TokenValue {
     None,
     Int(i64),
     Float(f64),
+    BigInt(String),
     Str(String),
 }
 
@@ -96,6 +97,32 @@ impl fmt::Display for LexError {
 
 impl std::error::Error for LexError {}
 
+fn radix_digits_to_decimal(digits: &str, base: u32) -> String {
+    let mut dec: Vec<u8> = vec![0];
+    for ch in digits.chars() {
+        let digit = ch
+            .to_digit(base)
+            .unwrap_or_else(|| panic!("invalid radix-{base} digit: {ch:?}"));
+        let mut carry = digit;
+        for d in &mut dec {
+            let v = u32::from(*d) * base + carry;
+            *d = u8::try_from(v % 10).unwrap_or(0);
+            carry = v / 10;
+        }
+        while carry > 0 {
+            dec.push(u8::try_from(carry % 10).unwrap_or(0));
+            carry /= 10;
+        }
+    }
+    while dec.len() > 1 && dec.last() == Some(&0) {
+        dec.pop();
+    }
+    dec.into_iter()
+        .rev()
+        .map(|d| char::from(b'0' + d))
+        .collect()
+}
+
 /// Port of `lexer.py::_number_value`.
 #[allow(clippy::used_underscore_items)]
 fn _number_value(text: &str) -> TokenValue {
@@ -106,17 +133,22 @@ fn _number_value(text: &str) -> TokenValue {
             2
         };
         let digits = pystr::slice(text, Some(2), None);
-        let n = pystr::parse_int_radix(digits, base)
-            .unwrap_or_else(|| panic!("invalid radix-{base} integer literal: {text:?}"));
-        return TokenValue::Int(n);
+        if let Some(n) = pystr::parse_int_radix(digits, base) {
+            return TokenValue::Int(n);
+        }
+        return TokenValue::BigInt(radix_digits_to_decimal(digits, base));
     }
     if text.contains('.') || text.contains('e') || text.contains('E') {
         let x =
             pystr::parse_float(text).unwrap_or_else(|| panic!("invalid float literal: {text:?}"));
         return TokenValue::Float(x);
     }
-    let n = pystr::parse_int(text).unwrap_or_else(|| panic!("invalid int literal: {text:?}"));
-    TokenValue::Int(n)
+    if let Some(n) = pystr::parse_int(text) {
+        return TokenValue::Int(n);
+    }
+    let trimmed = text.trim_start_matches('0');
+    let dec = if trimmed.is_empty() { "0" } else { trimmed };
+    TokenValue::BigInt(dec.to_string())
 }
 
 /// Port of `lexer.py::tokenize`.
@@ -370,5 +402,42 @@ mod tests {
         assert_eq!(err, LexError::new("unterminated string", 0));
         let err = tokenize("x ~ y", 1).unwrap_err();
         assert_eq!(err, LexError::new("unrecognised character '~'", 2));
+    }
+
+    #[test]
+    fn bigint_literals_match_python() {
+        let toks = tokenize("123456789012345678901", 1).unwrap();
+        assert_eq!(
+            toks[0].value,
+            TokenValue::BigInt("123456789012345678901".to_string())
+        );
+
+        let toks = tokenize("1000000000000000000000000000000000000000", 1).unwrap();
+        assert_eq!(
+            toks[0].value,
+            TokenValue::BigInt("1000000000000000000000000000000000000000".to_string())
+        );
+
+        let toks = tokenize("00123456789012345678901", 1).unwrap();
+        assert_eq!(
+            toks[0].value,
+            TokenValue::BigInt("123456789012345678901".to_string())
+        );
+
+        let toks = tokenize("&HFFFFFFFFFFFFFFFF", 1).unwrap();
+        assert_eq!(
+            toks[0].value,
+            TokenValue::BigInt("18446744073709551615".to_string())
+        );
+
+        let toks = tokenize(
+            "&B1000000000000000000000000000000000000000000000000000000000000000",
+            1,
+        )
+        .unwrap();
+        assert_eq!(
+            toks[0].value,
+            TokenValue::BigInt("9223372036854775808".to_string())
+        );
     }
 }

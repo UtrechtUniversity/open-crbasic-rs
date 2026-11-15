@@ -70,9 +70,10 @@ pub fn _float_typed_with(expr: Option<&Expr>, names: &BTreeSet<String>) -> bool 
             if text.contains('.') || text.contains('E') {
                 return true;
             }
-            match n.value {
-                NumberValue::Int(i) => !(INT_MIN..=i64::from(i32::MAX)).contains(&i),
-                NumberValue::Float(f) => !(f64::from(i32::MIN) <= f && f < 2_147_483_648.0_f64),
+            match &n.value {
+                NumberValue::Int(i) => !(INT_MIN..=i64::from(i32::MAX)).contains(i),
+                NumberValue::Float(f) => !(f64::from(i32::MIN) <= *f && *f < 2_147_483_648.0_f64),
+                NumberValue::BigInt(_) => true,
             }
         }
         Expr::Name(n) => names.contains(&pystr::upper(&n.name)),
@@ -152,7 +153,7 @@ pub fn long_value_with(
                 }
                 pystr::py_int_from_f64(f)?
             }
-            ConstValue::Str(_) => return None,
+            ConstValue::BigInt(_) | ConstValue::Str(_) => return None,
         };
         return Some(if i >= (1_i64 << 31) {
             i - (1_i64 << 32)
@@ -163,8 +164,8 @@ pub fn long_value_with(
     if _hex_inside(Some(arg)) {
         return None;
     }
-    let is_whole = match value {
-        ConstValue::Int(_) => true,
+    let is_whole = match &value {
+        ConstValue::Int(_) | ConstValue::BigInt(_) => true,
         ConstValue::Float(f) | ConstValue::CFloat(f) => f.fract() == 0.0,
         ConstValue::Str(_) => false,
     };
@@ -172,21 +173,28 @@ pub fn long_value_with(
         return match value {
             ConstValue::Int(i) => Some(_wrap(i)),
             ConstValue::Float(f) | ConstValue::CFloat(f) => pystr::py_int_from_f64(f).map(_wrap),
+            ConstValue::BigInt(s) => {
+                let mut r: i64 = 0;
+                for b in s.bytes() {
+                    r = (r * 10 + i64::from(b - b'0')) & 0xFFFF_FFFF;
+                }
+                Some(_wrap(r))
+            }
             ConstValue::Str(_) => None,
         };
     }
-    let in_range = match value {
-        ConstValue::Int(i) => i > INT_MIN && i < (1_i64 << 31),
+    let in_range = match &value {
+        ConstValue::Int(i) => *i > INT_MIN && *i < (1_i64 << 31),
         ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            f64::from(i32::MIN) < f && f < 2_147_483_648.0_f64
+            f64::from(i32::MIN) < *f && *f < 2_147_483_648.0_f64
         }
-        ConstValue::Str(_) => false,
+        ConstValue::BigInt(_) | ConstValue::Str(_) => false,
     };
     if in_range {
         return match value {
             ConstValue::Int(i) => Some(i),
             ConstValue::Float(f) | ConstValue::CFloat(f) => pystr::py_int_from_f64(f),
-            ConstValue::Str(_) => None,
+            ConstValue::BigInt(_) | ConstValue::Str(_) => None,
         };
     }
     if matches!(profile.name, "cr300" | "cr350")
@@ -197,6 +205,7 @@ pub fn long_value_with(
         let fval = match value {
             ConstValue::Int(i) => i as f64,
             ConstValue::Float(f) | ConstValue::CFloat(f) => f,
+            ConstValue::BigInt(s) => s.parse::<f64>().unwrap_or(f64::INFINITY),
             ConstValue::Str(_) => return Some(INT_MIN),
         };
         return Some(_float32_long(fval));

@@ -556,6 +556,7 @@ pub fn _indexed_past_first_with(typer: &Typer, dest: Option<&Expr>, env: &Env) -
             Expr::Number(n) => match n.value {
                 NumberValue::Int(i) => i >= 2,
                 NumberValue::Float(f) => f >= 2.0,
+                NumberValue::BigInt(_) => true,
             },
             _ => false,
         };
@@ -818,7 +819,7 @@ pub fn _ctype_illegal_with(
         return true;
     };
     match value {
-        ConstValue::Str(_) => true,
+        ConstValue::Str(_) | ConstValue::BigInt(_) => true,
         ConstValue::Int(i) => !legal.contains(&i),
         ConstValue::Float(f) | ConstValue::CFloat(f) => {
             !pystr::is_integer(f) || pystr::py_int_from_f64(f).is_none_or(|i| !legal.contains(&i))
