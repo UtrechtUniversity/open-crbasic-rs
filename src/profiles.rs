@@ -1064,7 +1064,6 @@ mod tests {
             .into_iter()
             .collect();
         roots.push(manifest.join("../open-crbasic"));
-        roots.push(PathBuf::from("/Users/Visse226/Repos/UU/open-crbasic"));
         let Some(py) = roots
             .iter()
             .map(|r| r.join("src/opencrbasic/data"))
