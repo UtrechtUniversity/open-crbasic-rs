@@ -14,3 +14,44 @@ unsafe_code = "forbid"
 [lints.clippy]
 all = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+
+[dependencies]
+fancy-regex = "0.20.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+# The port mirrors the Python functions one to one (AGENTS.md "Porting rules"), so the lints that
+# only object to their size and shape are off; everything else in `pedantic` still applies.
+[lints.clippy.too_many_lines]
+level = "allow"
+priority = 1
+[lints.clippy.too_many_arguments]
+level = "allow"
+priority = 1
+[lints.clippy.type_complexity]
+level = "allow"
+priority = 1
+[lints.clippy.similar_names]
+level = "allow"
+priority = 1
+[lints.clippy.many_single_char_names]
+level = "allow"
+priority = 1
+[lints.clippy.module_name_repetitions]
+level = "allow"
+priority = 1
+[lints.clippy.must_use_candidate]
+level = "allow"
+priority = 1
+[lints.clippy.missing_panics_doc]
+level = "allow"
+priority = 1
+[lints.clippy.missing_errors_doc]
+level = "allow"
+priority = 1
+[lints.clippy.struct_excessive_bools]
+level = "allow"
+priority = 1
+[lints.clippy.fn_params_excessive_bools]
+level = "allow"
+priority = 1
