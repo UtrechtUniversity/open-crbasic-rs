@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: finish P1-e (chunk 4 + AST golden), then P1-c, P3, P4 (`P1-a`, `P1-b`, `P1-d`, `P2-a..c` merged).
+Next wave: finish P3-s (`cli.py`) and P4 (`P1-a..e`, `P2-a..c`, `P3-h`, `P3-s1..5` merged).
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -33,7 +33,7 @@ Operating notes (learned in wave 1):
 | P0-d | (harness) | `tools/pydump.py`, `tests/fixtures.rs`, `tests/fixture_baseline.txt`, `.github/workflows/ci.yml` | H | merged | 77,293 cases in 613 files; Python equals the reference on 71,524; lines/ast dumps come with P1 |
 | P1-a | `lexer.py` (183) | `src/lexer.rs` | H | merged | `sources.py` moved to P1-b; 6 unit tests |
 | P1-b | `sources.py` (125), `source.py` (625) | `src/sources.rs`, `src/source.rs` | S | merged | `29e207e`; macros excluded; `golden_lines` 77,903/77,903 |
-| P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
+| P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | merged | `2bb6952`; 3 unit tests |
 | P1-d | `consteval.py` (327) | `src/consteval.rs` | S | merged | `0b6c140`; 7 unit tests |
 | P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | merged | `a2acf82`; `golden_ast` 77,903/77,903; 7 unit tests |
 | P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | merged | `5af36e1`; 54 files |
