@@ -415,11 +415,10 @@ impl Parser {
                 }
                 return TailChunkResult::Empty;
             }
-            if chunk.iter().any(|a| a.kind == "STRING")
-                || chunk.windows(2).any(|w| {
-                    w[1].col != w[0].col + i64::try_from(pystr::len(&w[0].text)).unwrap_or(0)
-                })
-            {
+            if chunk.windows(2).any(|w| {
+                w[0].kind == "STRING"
+                    || w[1].col != w[0].col + i64::try_from(pystr::len(&w[0].text)).unwrap_or(0)
+            }) {
                 continue;
             }
             let mut toks = chunk.to_vec();

@@ -556,6 +556,14 @@ impl Parser {
                 self.profile,
                 &self.program.statements,
             ),
+            ConstValue::BigInt(s) => _numeric_include_spec(
+                s.parse::<f64>().unwrap_or(f64::INFINITY),
+                None,
+                arg,
+                &self.env,
+                self.profile,
+                &self.program.statements,
+            ),
         };
         let Some(spec) = spec_opt else {
             return false;
