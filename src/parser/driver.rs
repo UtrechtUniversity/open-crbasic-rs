@@ -537,62 +537,28 @@ impl Parser {
         if inst.args.len() != index + 1 {
             return false;
         }
-        let spec = match value {
-            ConstValue::Str(s) => s,
-            ConstValue::Int(mut iv) => {
-                if let Expr::Number(num) = arg.as_ref() {
-                    let up = pystr::upper(&num.text);
-                    if (up.starts_with("&H") || up.starts_with("&B"))
-                        && ((1i64 << 31)..(1i64 << 32)).contains(&iv)
-                    {
-                        iv -= 1i64 << 32;
-                    }
-                }
-                if consteval::is_float(Some(arg), &self.env).unwrap_or(false) {
-                    i32::try_from(iv)
-                        .map_or_else(|_| iv.to_string(), |n| pystr::format_g(f64::from(n), 7))
-                } else {
-                    if let Expr::Binary(_) = arg.as_ref()
-                        && let Some(converted) = _long_value_fallback(arg, &self.env)
-                    {
-                        iv = converted;
-                    }
-                    if !(-(1i64 << 31)..(1i64 << 31)).contains(&iv) {
-                        return false;
-                    }
-                    if iv == -(1i64 << 31)
-                        && (!self.profile.single_pass || matches!(arg.as_ref(), Expr::Binary(_)))
-                    {
-                        "NAN".to_string()
-                    } else if !self.profile.single_pass {
-                        iv.to_string()
-                    } else {
-                        let n = i32::try_from(iv).unwrap_or(0);
-                        pystr::format_g(f64::from(n), 7)
-                    }
-                }
-            }
-            ConstValue::Float(fv) | ConstValue::CFloat(fv) => {
-                if consteval::is_float(Some(arg), &self.env).unwrap_or(false) {
-                    pystr::format_g(fv, 7)
-                } else {
-                    let Some(iv) = pystr::py_int_from_f64(fv) else {
-                        return false;
-                    };
-                    if !(-(1i64 << 31)..(1i64 << 31)).contains(&iv) {
-                        return false;
-                    }
-                    if iv == -(1i64 << 31)
-                        && (!self.profile.single_pass || matches!(arg.as_ref(), Expr::Binary(_)))
-                    {
-                        "NAN".to_string()
-                    } else if !self.profile.single_pass {
-                        iv.to_string()
-                    } else {
-                        pystr::format_g(fv, 7)
-                    }
-                }
-            }
+        #[allow(clippy::cast_precision_loss)]
+        let spec_opt = match value {
+            ConstValue::Str(s) => Some(s),
+            ConstValue::Int(iv) => _numeric_include_spec(
+                iv as f64,
+                Some(iv),
+                arg,
+                &self.env,
+                self.profile,
+                &self.program.statements,
+            ),
+            ConstValue::Float(fv) | ConstValue::CFloat(fv) => _numeric_include_spec(
+                fv,
+                pystr::py_int_from_f64(fv),
+                arg,
+                &self.env,
+                self.profile,
+                &self.program.statements,
+            ),
+        };
+        let Some(spec) = spec_opt else {
+            return false;
         };
         let bad = crate::source::bad_include_extension(
             &spec,
@@ -1367,6 +1333,59 @@ fn _stmt_base(line: i64, file: &str, text: &str) -> StmtBase {
     let mut b = StmtBase::new(line, file);
     b.text = text.to_string();
     b
+}
+
+fn _numeric_include_spec(
+    mut fv: f64,
+    mut iv_opt: Option<i64>,
+    arg: &Expr,
+    env: &consteval::Env,
+    profile: &crate::profiles::Profile,
+    statements: &[crate::syntax::StmtRef],
+) -> Option<String> {
+    if let Expr::Number(num) = arg {
+        let up = pystr::upper(&num.text);
+        if (up.starts_with("&H") || up.starts_with("&B"))
+            && let Some(iv) = iv_opt
+            && ((1i64 << 31)..(1i64 << 32)).contains(&iv)
+        {
+            let wrapped = iv - (1i64 << 32);
+            iv_opt = Some(wrapped);
+            #[allow(clippy::cast_precision_loss)]
+            {
+                fv = wrapped as f64;
+            }
+        }
+    }
+    if consteval::is_float(Some(arg), env).unwrap_or(false) {
+        return Some(pystr::format_g(fv, 7));
+    }
+    if let Expr::Binary(_) = arg
+        && let Some(converted) = crate::checker::longconv::long_value_with(
+            Some(arg),
+            env,
+            profile,
+            &crate::checker::longconv::float_names_in(statements),
+            &crate::checker::longconv::literal_names_in(statements),
+        )
+    {
+        iv_opt = Some(converted);
+        #[allow(clippy::cast_precision_loss)]
+        {
+            fv = converted as f64;
+        }
+    }
+    let iv = iv_opt?;
+    if !(-(1i64 << 31)..(1i64 << 31)).contains(&iv) {
+        return None;
+    }
+    if iv == -(1i64 << 31) && (!profile.single_pass || matches!(arg, Expr::Binary(_))) {
+        Some("NAN".to_string())
+    } else if !profile.single_pass {
+        Some(iv.to_string())
+    } else {
+        Some(pystr::format_g(fv, 7))
+    }
 }
 
 fn _matches_cr3xx_or_crb(spec: &str, profile_name: &str) -> bool {

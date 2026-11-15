@@ -101,8 +101,10 @@ fn run_case(
     let (program, diags) = parsed
         .map_err(|_| format!("{id}: parse_file panicked"))?
         .map_err(|e| format!("{id}: parse_file failed: {e}"))?;
-    let actual_program =
-        serde_json::to_value(program.as_ref()).map_err(|e| format!("{id}: serialize: {e}"))?;
+    let actual_json =
+        serde_json::to_string(program.as_ref()).map_err(|e| format!("{id}: serialize: {e}"))?;
+    let actual_program: Value =
+        serde_json::from_str(&actual_json).map_err(|e| format!("{id}: reparse: {e}"))?;
     let actual_diags: Vec<Value> = diags
         .items
         .iter()
