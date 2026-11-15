@@ -3,6 +3,7 @@
 //! `PORT_PROGRESS.md`.
 
 pub mod diagnostics;
+pub mod lexer;
 pub mod profiles;
 pub mod pyre;
 pub mod pystr;
