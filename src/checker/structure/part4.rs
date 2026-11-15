@@ -4,9 +4,12 @@
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
+use crate::lexer;
 use crate::profiles::Profile;
+use crate::pyre::{self, Regex};
 use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
@@ -39,8 +42,20 @@ pub fn _names_unresolved(_known: &BTreeSet<String>, _stmt: &Instruction, _source
 }
 
 /// Port of `checker/structure.py::_unparsed_opener`.
-pub fn _unparsed_opener(_text: &str) -> Option<String> {
-    todo!("checker/structure.py::_unparsed_opener")
+pub fn _unparsed_opener(text: &str) -> Option<String> {
+    static IF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*IF\b", pyre::I));
+    static THEN_BODY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bTHEN\s*\S", pyre::I));
+    static SELECT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*SELECT\s+CASE\b", pyre::I));
+    static DO: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\s*(?:DO\s+(?:WHILE|UNTIL)|WHILE)\b", pyre::I));
+
+    if IF.match_(text).is_some() && THEN_BODY.search(text).is_none() {
+        Some("IF".to_owned())
+    } else if SELECT.match_(text).is_some() {
+        Some("SELECT".to_owned())
+    } else {
+        DO.match_(text).map(|_| "DO".to_owned())
+    }
 }
 
 /// Port of `checker/structure.py::check_block_closers`.
@@ -54,6 +69,12 @@ pub fn _undefined_table_source(_stmt: &Instruction, _known: &BTreeSet<String>) -
 }
 
 /// Port of `checker/structure.py::_leftover_first_name_known`.
-pub fn _leftover_first_name_known(_text: &str, _known: &BTreeSet<String>) -> bool {
-    todo!("checker/structure.py::_leftover_first_name_known")
+pub fn _leftover_first_name_known(text: &str, known: &BTreeSet<String>) -> bool {
+    let Ok(tokens) = lexer::tokenize(text, 0) else {
+        return false;
+    };
+    tokens
+        .iter()
+        .find(|token| token.kind == "IDENT")
+        .is_none_or(|token| known.contains(&token.upper))
 }

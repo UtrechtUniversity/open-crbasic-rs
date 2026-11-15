@@ -4,7 +4,13 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: finish P3-s (`cli.py`) and P4 (`P1-a..e`, `P2-a..c`, `P3-h`, `P3-s1..5` merged).
+Next wave: continue P4. The P3-s verdict CLI and fixture runner are in place.
+
+The first live verdict replay matched Python on 25,964 of 77,293 cases and all cases in 20 of
+613 files. CLI probes matched Python's stdout, message-file bytes and exit status in 14 of
+15 cases, including a minimal program for each logger. An empty CR6 file still misses
+`No BeginProg in Program.`, and unfinished checker functions emit panic reports on stderr
+when compiling existing files.
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -40,7 +46,7 @@ Operating notes (learned in wave 1):
 | P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | merged | `d27829a`; 4 unit tests |
 | P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | merged | `06b9037`; 3 unit tests |
 | P3-h | `ess` 81, `longconv` 133, `symbols` 157, `structs` 236, `terminals` 427, `storage` 456, `mode.py` 143, `tdf.py` structs | one file each | H | merged | P3-h1..4 (`1266faa`, `43f16a0`, `c5cd931`, `d504604`), `tdf.rs` (`126277f`) merged; 15 unit tests |
-| P3-s | `var_types` 553, `intervals` 679, `scan_time` 580, `warnings` 666, `compiler.py` 324, `cli.py` verdict path | one file each | S | running | P3-s1..5 (`4511f1f`, `7c61220`, `aac8de2`, `01bd124`, `126277f`) merged; 27 unit tests |
-| P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | todo | ranges fixed by P2-a's file split |
+| P3-s | `var_types` 553, `intervals` 679, `scan_time` 580, `warnings` 666, `compiler.py` 324, `cli.py` verdict path | one file each | S | merged | P3-s1..5 (`4511f1f`, `7c61220`, `aac8de2`, `01bd124`, `126277f`) merged; 27 unit tests. P3-s6 adds `crbc`, connects the existing mode implementation and runs actual compiler verdicts in the fixture harness. |
+| P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | running | Ported `_unparsed_opener` and `_leftover_first_name_known` in structure part 4. `check_end_blocks` needs the `_block_word` argument slice and the `calltable_targets` implementation. |
 | P5 | convergence: bucket (H), fix per bucket (S), station + fuzz + CLI bytes (S) | | H/S | todo | |
 | P6 | README, AGENTS status, CI | | H | todo | |

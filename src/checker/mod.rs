@@ -618,7 +618,7 @@ pub fn _check_with_context(
     profile: &'static Profile,
     diags: &mut Diagnostics,
     result: &mut CompileResult,
-    _env: &Env,
+    env: &Env,
     ctx: &Rc<context::Context>,
 ) {
     _run_pass("expressions::set_arity_context", "", || {
@@ -1591,10 +1591,14 @@ pub fn _check_with_context(
     });
 
     if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
-        let _mode = crate::mode::decide(&program.statements, profile);
-        // TODO(P3-s): `result.mode = Some(_mode);` once `CompileResult` is ported.
+        result.mode = Some(crate::mode::decide_with_env(
+            &program.statements,
+            profile,
+            env,
+        ));
     })) {
         _record_exception("mode::decide", &*payload);
+        result.mode = None;
         if std::env::var("OPENCRBASIC_STRICT").as_deref() == Ok("1") {
             resume_unwind(payload);
         }

@@ -1,1 +1,22 @@
-# Fixture files that must fully pass; see tests/fixtures.rs. Empty until the compiler is wired in.
+# Fixture files that must fully pass (tests/fixtures.rs). Regenerate with
+# FIXTURE_WRITE_BASELINE=1 cargo test --test fixtures after tools/pydump.py.
+acpower_channels.json
+argos_error_dest.json
+called_inline_if.json
+exitscan_inline_if.json
+function_names_active.json
+m3_check_evidence.json
+r110_pulsecount_channels.json
+r123_include_integer_names.json
+r13_unclosed_if_warning.json
+r14_cascade_inline_if.json
+r15_routers_neighbors_index.json
+r16_delay_long_interval.json
+r53_include_runtime_names.json
+r5_call_never_reached.json
+r67_ctype_typing.json
+r77_datainterval_lapses.json
+r7_include_cutoff.json
+r7_include_existing_ext.json
+r9_chr_arg.json
+samplefieldcal_b.json

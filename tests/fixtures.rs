@@ -5,6 +5,7 @@
 //! Env: `FIXTURE_ONLY=<substring>` runs only matching fixture files and prints their failing
 //! cases; `FIXTURE_WRITE_BASELINE=1` rewrites the baseline with the fully passing files.
 
+use opencrbasic::{compiler, profiles};
 use serde_json::Value;
 use std::fmt::Write as _;
 use std::fs;
@@ -22,10 +23,13 @@ fn baseline_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_baseline.txt")
 }
 
-// Wired to opencrbasic::compiler::compile_file once it exists (task P3).
-fn compile_case(dir: &Path, program: &str, logger: &str) -> Option<(i32, String)> {
-    let _ = (dir, program, logger);
-    None
+fn compile_case(dir: &Path, program: &str, logger: &str) -> Result<(i32, String), String> {
+    let profile = profiles::get(logger).map_err(|error| error.to_string())?;
+    let result = compiler::compile_file(&dir.join(program), Some(profile), None, false, true);
+    Ok((
+        i32::from(!result.ok()),
+        result.result_lines(false).join("\n"),
+    ))
 }
 
 /// Encodes program and sibling text the way the recording was written.
@@ -104,19 +108,18 @@ fn run_case(case: &Value, encoding: &str, index: usize, file: &str) -> Outcome {
     );
     let matches_reference = expected == reference;
     let dir = std::env::temp_dir().join(format!(
-        "opencrbasic-fixture-{}-{index}",
+        "opencrbasic-fixture-{}-{file}-{index}",
         std::process::id()
     ));
     let _ = fs::remove_dir_all(&dir);
-    let (actual, error) = match write_case(&dir, case, encoding) {
-        Ok(()) => (
-            compile_case(
-                &dir,
-                text_field(case, "program_filename"),
-                text_field(case, "logger"),
-            ),
-            None,
-        ),
+    let (actual, error) = match write_case(&dir, case, encoding).and_then(|()| {
+        compile_case(
+            &dir,
+            text_field(case, "program_filename"),
+            text_field(case, "logger"),
+        )
+    }) {
+        Ok(verdict) => (Some(verdict), None),
         Err(e) => (None, Some(e)),
     };
     let _ = fs::remove_dir_all(&dir);
@@ -159,7 +162,7 @@ fn describe(outcome: &Outcome) -> String {
         return out;
     }
     let Some((actual_exit, actual_stdout)) = &outcome.actual else {
-        out += "    not compiled (compile_case returns None)\n";
+        out += "    no compiler verdict\n";
         return out;
     };
     let (exit, stdout) = &outcome.expected;
@@ -217,6 +220,21 @@ fn verdict_fixtures() {
         })
         .collect();
     paths.sort();
+
+    // The fixture runner is its own test process. Avoid capturing a panic report for each
+    // unfinished port function the checker catches across the corpus.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let unfinished = info
+            .payload()
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| info.payload().downcast_ref::<&str>().copied())
+            .is_some_and(|message| message.starts_with("not yet implemented: "));
+        if !unfinished {
+            default_hook(info);
+        }
+    }));
 
     let next = AtomicUsize::new(0);
     let results = Mutex::new(Vec::new());
