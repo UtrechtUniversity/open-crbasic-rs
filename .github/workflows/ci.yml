@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: UtrechtUniversity/open-crbasic
+          ref: c547b85c1880b8356e3adfb75f99236e23be0ffa  # the pinned spec commit (PORT_PROGRESS.md)
           path: open-crbasic-py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
