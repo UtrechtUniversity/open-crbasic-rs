@@ -1263,7 +1263,10 @@ impl Parser {
                     };
                     return Stmt::Unparsed(Unparsed {
                         base: _stmt_base(line, file, seg_text),
-                        reason: format!("unexpected trailing input starting at {label:?}"),
+                        reason: format!(
+                            "unexpected trailing input starting at {}",
+                            pystr::repr_str(label)
+                        ),
                         expr: None,
                     });
                 }

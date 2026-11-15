@@ -7,7 +7,9 @@ Run from this repository with:
     OPENCRBASIC_PY=<checkout> uv run --project <checkout> python tools/pydump.py
 """
 
+import dataclasses
 import json
+import math
 import os
 import re
 import shutil
@@ -24,6 +26,7 @@ DEFAULT_PROGRAM = "t.CR6"
 REPO = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO / "target" / "golden" / "verdict"
 LINES_DIR = REPO / "target" / "golden" / "lines"
+AST_DIR = REPO / "target" / "golden" / "ast"
 INCLUDE_OWN_EXT = {"cr6": "CR6", "cr1000x": "CR1X"}
 CR3XX_INCLUDE_EXTS = {"cr300": ("CR300", "CR310"), "cr350": ("CR350",)}
 # Keys that make a case a non-verdict observation (its expected output is not a compile verdict).
@@ -156,6 +159,57 @@ def run_lines(program_name: str, source_text: str, files: dict[str, str], logger
         return [serialize_line(ll) for ll in lines]
 
 
+def _serialize_ast(obj):
+    from opencrbasic import syntax as S
+
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        out = {}
+        if isinstance(obj, (S.Expr, S.Stmt)):
+            out["type"] = type(obj).__name__
+        for f in dataclasses.fields(obj):
+            key = "type_" if isinstance(obj, S.ConstDecl) and f.name == "type" else f.name
+            out[key] = _serialize_ast(getattr(obj, f.name))
+        return out
+    if isinstance(obj, list):
+        return [_serialize_ast(x) for x in obj]
+    if isinstance(obj, tuple):
+        return [_serialize_ast(x) for x in obj]
+    if isinstance(obj, dict):
+        return {str(k): _serialize_ast(v) for k, v in obj.items()}
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    return obj
+
+
+def _serialize_diag(d) -> dict:
+    return {
+        "severity": d.severity,
+        "line": d.line,
+        "message": d.message,
+        "file": d.file,
+        "kind": d.kind,
+    }
+
+
+def run_ast(program_name: str, source_text: str, files: dict[str, str], logger: str, encoding: str) -> dict:
+    from opencrbasic import parser as parser_mod
+    from opencrbasic import profiles
+
+    with tempfile.TemporaryDirectory(prefix="pydump-ast-") as tmp:
+        root = Path(tmp).resolve()
+        for name, text in files.items():
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(text.encode(encoding))
+        program_path = root / program_name
+        program_path.write_bytes(source_text.encode(encoding))
+        program, diags = parser_mod.parse_file(program_path, profiles.get(logger))
+        return {
+            "program": _serialize_ast(program),
+            "diags": [_serialize_diag(d) for d in diags.items],
+        }
+
+
 def _case_files(case: dict) -> tuple[str, dict[str, str]]:
     program_name = case.get("program_filename", DEFAULT_PROGRAM)
     files: dict[str, str] = {}
@@ -170,19 +224,21 @@ def dump_fixture(path_text: str) -> dict:
     path = Path(path_text)
     data = json.loads(path.read_text(encoding="utf-8"))
     summary = {"fixture": path.name, "written": False, "recorded": 0, "equal": 0, "exceptions": 0,
-               "lines_recorded": 0, "skipped": Counter(), "bare_list": False}
+               "lines_recorded": 0, "ast_recorded": 0, "skipped": Counter(), "bare_list": False}
     if isinstance(data, list):  # tdf_rules_cases.json: a bare list of non-verdict cases
         summary["bare_list"] = True
         return _finish(summary)
 
     cases_out = []
     lines_out = []
+    ast_out = []
     for index, case in enumerate(data.get("cases", [])):
         if "source" in case and "logger" in case:
             program_name, files = _case_files(case)
             if not (unsafe_name(program_name) or any(unsafe_name(n) for n in files)):
+                case_id = case.get("id", f"{path.stem}-{index}")
                 lines_out.append({
-                    "id": case.get("id", f"{path.stem}-{index}"),
+                    "id": case_id,
                     "logger": case["logger"],
                     "program_filename": program_name,
                     "source": case["source"],
@@ -190,6 +246,17 @@ def dump_fixture(path_text: str) -> dict:
                     "lines": run_lines(program_name, case["source"], files, case["logger"], ENCODING),
                 })
                 summary["lines_recorded"] += 1
+                ast_data = run_ast(program_name, case["source"], files, case["logger"], ENCODING)
+                ast_out.append({
+                    "id": case_id,
+                    "logger": case["logger"],
+                    "program_filename": program_name,
+                    "source": case["source"],
+                    "files": files,
+                    "program": ast_data["program"],
+                    "diags": ast_data["diags"],
+                })
+                summary["ast_recorded"] += 1
 
         if not (REQUIRED_KEYS <= case.keys()) or NON_VERDICT_KEYS & case.keys():
             continue
@@ -225,6 +292,12 @@ def dump_fixture(path_text: str) -> dict:
         out_lines = {"fixture": path.name, "encoding": ENCODING, "cases": lines_out}
         (fixtures_lines_dir / path.name).write_text(json.dumps(out_lines, ensure_ascii=False), encoding="utf-8")
 
+    if ast_out:
+        fixtures_ast_dir = AST_DIR / "fixtures"
+        fixtures_ast_dir.mkdir(parents=True, exist_ok=True)
+        out_ast = {"fixture": path.name, "encoding": ENCODING, "cases": ast_out}
+        (fixtures_ast_dir / path.name).write_text(json.dumps(out_ast, ensure_ascii=False), encoding="utf-8")
+
     if not cases_out:
         return _finish(summary)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -235,10 +308,12 @@ def dump_fixture(path_text: str) -> dict:
 
 
 def dump_corpus_lines(checkout: Path) -> tuple[int, int]:
-    """Dump logical lines for station and fuzz corpus programs into target/golden/lines."""
+    """Dump logical lines and ASTs for station and fuzz corpus programs."""
     LINES_DIR.mkdir(parents=True, exist_ok=True)
+    AST_DIR.mkdir(parents=True, exist_ok=True)
     station_dir = checkout / "tests" / "corpus" / "station"
     station_cases = []
+    station_ast_cases = []
     if station_dir.is_dir():
         siblings = {
             p.name: p.read_bytes().decode("latin-1")
@@ -258,12 +333,26 @@ def dump_corpus_lines(checkout: Path) -> tuple[int, int]:
                 "files": siblings,
                 "lines": run_lines(p.name, source_text, siblings, logger, "latin-1"),
             })
+            ast_data = run_ast(p.name, source_text, siblings, logger, "latin-1")
+            station_ast_cases.append({
+                "id": p.name,
+                "logger": logger,
+                "program_filename": p.name,
+                "source": source_text,
+                "files": siblings,
+                "program": ast_data["program"],
+                "diags": ast_data["diags"],
+            })
     if station_cases:
         out = {"fixture": "station.json", "encoding": "latin-1", "cases": station_cases}
         (LINES_DIR / "station.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    if station_ast_cases:
+        out = {"fixture": "station.json", "encoding": "latin-1", "cases": station_ast_cases}
+        (AST_DIR / "station.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
 
     fuzz_dir = checkout / "tests" / "corpus" / "fuzz"
     fuzz_cases = []
+    fuzz_ast_cases = []
     if fuzz_dir.is_dir():
         for logger_dir in sorted(fuzz_dir.iterdir()):
             if not logger_dir.is_dir():
@@ -280,9 +369,22 @@ def dump_corpus_lines(checkout: Path) -> tuple[int, int]:
                     "files": {},
                     "lines": run_lines(p.name, source_text, {}, logger, "latin-1"),
                 })
+                ast_data = run_ast(p.name, source_text, {}, logger, "latin-1")
+                fuzz_ast_cases.append({
+                    "id": rel,
+                    "logger": logger,
+                    "program_filename": p.name,
+                    "source": source_text,
+                    "files": {},
+                    "program": ast_data["program"],
+                    "diags": ast_data["diags"],
+                })
     if fuzz_cases:
         out = {"fixture": "fuzz.json", "encoding": "latin-1", "cases": fuzz_cases}
         (LINES_DIR / "fuzz.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    if fuzz_ast_cases:
+        out = {"fixture": "fuzz.json", "encoding": "latin-1", "cases": fuzz_ast_cases}
+        (AST_DIR / "fuzz.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     return len(station_cases), len(fuzz_cases)
 
 
@@ -299,6 +401,8 @@ def main() -> None:
         shutil.rmtree(OUT_DIR)
     if LINES_DIR.exists():
         shutil.rmtree(LINES_DIR)
+    if AST_DIR.exists():
+        shutil.rmtree(AST_DIR)
     fixtures = sorted(str(p) for p in (checkout / "tests" / "fixtures").glob("*.json"))
 
     start = time.monotonic()
@@ -312,6 +416,7 @@ def main() -> None:
             totals["equal"] += summary["equal"]
             totals["exceptions"] += summary["exceptions"]
             totals["lines_recorded"] += summary["lines_recorded"]
+            totals["ast_recorded"] += summary["ast_recorded"]
             skipped.update(summary["skipped"])
     station_count, fuzz_count = dump_corpus_lines(checkout)
     elapsed = time.monotonic() - start
@@ -321,6 +426,7 @@ def main() -> None:
     print(f"fixtures written: {totals['written']} (files with no verdict case are not written)")
     print(f"cases recorded: {totals['recorded']}")
     print(f"lines recorded: {totals['lines_recorded']} fixture, {station_count} station, {fuzz_count} fuzz")
+    print(f"ast recorded: {totals['ast_recorded']} fixture, {station_count} station, {fuzz_count} fuzz")
     print(f"cases skipped: {sum(skipped.values())}")
     for reason, count in sorted(skipped.items()):
         print(f"  {count} skipped: {reason}")
