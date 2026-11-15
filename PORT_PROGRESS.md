@@ -35,7 +35,7 @@ Operating notes (learned in wave 1):
 | P1-b | `sources.py` (125), `source.py` (625) | `src/sources.rs`, `src/source.rs` | S | todo | macros excluded |
 | P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
 | P1-d | `consteval.py` (327) | `src/consteval.rs` | S | merged | `0b6c140`; 7 unit tests |
-| P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | todo | serial; ranges fixed when P1-b merges |
+| P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | running | chunk 1 (`67908b2`, helpers + mod.rs) merged; 7 unit tests |
 | P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | todo | serial, one task per module group |
 | P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | todo | |
 | P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | todo | |
