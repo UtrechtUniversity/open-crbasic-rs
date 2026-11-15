@@ -4,7 +4,20 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: continue P4. The SPI open-order round is implemented.
+Next wave: Codex workers (gpt-6.1-sol, medium) are porting `structure.py` parts 1-6 in the
+worktrees `.claude/worktrees/cx-struct-N` (branches `cx-struct-N`, work left uncommitted, each
+with a `HANDOFF.md`). Then: structure parts 7-8 and `instr_rules` parts 1, 2, 3, 5 the same way;
+then one wiring task per module (replace the `todo!()` skeleton stubs with the real signatures
+that delegate to the `*_with` implementations, and fix the callers in `checker/mod.rs`).
+
+2026-11-15 resume: verified `port` (check set green), cherry-picked the four finished branches
+`p4-measure-2`, `p4-measure-3`, `p4-rules-4`, `p4-struct-9`. Verdict parity 27,110 of 77,293,
+26 files fully passing, 413 `todo!()` left, all in `checker/` and `mode.rs`.
+
+Codex worker recipe: `cd <worktree> && codex exec -m gpt-6.1-sol -c 'model_reasoning_effort="medium"'
+-s workspace-write --add-dir ~/.cargo -o <last-message file> - < <brief>`; symlink the main
+checkout's `target/golden` into the worktree's `target/`; the worker may edit one file, never
+commits, and keeps `HANDOFF.md` current because it can stop early.
 
 The first live verdict replay matched Python on 25,964 of 77,293 cases and all cases in 20 of
 613 files. CLI probes matched Python's stdout, message-file bytes and exit status in 14 of
