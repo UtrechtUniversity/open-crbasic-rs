@@ -19,7 +19,7 @@ use crate::syntax::{
 };
 use crate::{lexer, pystr};
 
-/// Port of `checker/structure.py::check_end_blocks`.
+/// Port of checker/structure.py::check_end_blocks
 pub fn check_end_blocks(program: &Program, diags: &mut Diagnostics) {
     let last_line = if program.last_line != 0 {
         program.last_line
@@ -53,14 +53,12 @@ pub fn check_end_blocks(program: &Program, diags: &mut Diagnostics) {
     let mut table_name = None;
     for stmt in &program.statements {
         let keyword = _keyword(stmt);
-        let kw = match keyword.as_str() {
-            "WHILE" => "DO",
-            "WEND" => "LOOP",
-            kw => kw,
-        };
-        // Integration: part2::_block_word still omits its Python `args` parameter.
+        let kw = super::part3::_DO_ALIASES
+            .get(keyword.as_str())
+            .copied()
+            .unwrap_or(keyword.as_str());
         let word = if matches!(kw, "END" | "NEXT") {
-            _block_word()
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -151,7 +149,7 @@ pub fn check_end_blocks(program: &Program, diags: &mut Diagnostics) {
     }
 }
 
-/// Port of `checker/structure.py::CallLinks`.
+/// Port of checker/structure.py::CallLinks
 #[derive(Debug, Default)]
 pub struct CallLinks {
     pub calls: Vec<String>,
@@ -161,13 +159,8 @@ pub struct CallLinks {
     pub cutoff: Option<(String, i64)>,
 }
 
-/// Port of `checker/structure.py::nested_table`.
-pub fn nested_table(_program: &Program) -> Option<StmtRef> {
-    todo!("checker/structure.py::nested_table (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::nested_table`.
-pub fn nested_table_with(program: &ProgramRef, profile: &'static Profile) -> Option<StmtRef> {
+/// Port of checker/structure.py::nested_table
+pub fn nested_table(program: &ProgramRef, profile: &'static Profile) -> Option<StmtRef> {
     let mut in_table = false;
     let mut closed = false;
     let mut nested = None;
@@ -188,7 +181,7 @@ pub fn nested_table_with(program: &ProgramRef, profile: &'static Profile) -> Opt
             known = Some(ctx.known_names().clone());
             unresolved |= open_table.iter().any(|st| {
                 let names = known.as_ref().expect("known names");
-                _names_unresolved_with(
+                _names_unresolved(
                     &KnownView {
                         names: &names.names,
                         tables: &names.tables,
@@ -206,7 +199,7 @@ pub fn nested_table_with(program: &ProgramRef, profile: &'static Profile) -> Opt
             if nested.is_none() {
                 open_table.push(st);
             } else if !closed && let Some(known) = &known {
-                unresolved |= _names_unresolved_with(
+                unresolved |= _names_unresolved(
                     &KnownView {
                         names: &known.names,
                         tables: &known.tables,
@@ -222,22 +215,13 @@ pub fn nested_table_with(program: &ProgramRef, profile: &'static Profile) -> Opt
     if unresolved { None } else { nested }
 }
 
-/// Port of `checker/structure.py::check_pass2`.
-pub fn check_pass2(_program: &Program, _diags: &mut Diagnostics, _links: Option<&CallLinks>) {
-    // Resume Python line 2270 after dependencies have typed return values and LinkContext fields.
-    // In particular first_misplaced_sub currently returns (), not the optional placement finding.
-    todo!(
-        "checker/structure.py::check_pass2 (omitted: profile: untyped, env: consteval.Env | None)"
-    )
-}
-
 /// Port of checker/structure.py::check_pass2
 #[allow(
     clippy::too_many_lines,
     clippy::doc_markdown,
     clippy::items_after_statements
 )]
-pub fn check_pass2_with(
+pub fn check_pass2(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -249,34 +233,30 @@ pub fn check_pass2_with(
         _BODY_BLOCK_STARTS, _CONST_BAD_NAME, _CONST_BAD_VALUE, _CONST_LEAD, _CONST_WITHOUT_EQ,
         _DECL_BLOCK_BOUNDS, _DO_LOOP_PARAM, _EXTRA_CLOSE_PAREN, _FOR_MISSING,
         _FORBIDDEN_BEFORE_BEGINPROG, _INVALID_AS_CLAUSE, _KNOWN_PARSER_GAP_REASONS,
-        _UNCLOSED_DIM_PREFIX, _UNCLOSED_PAREN_EXPR, _UNITS_WITHOUT_EQ, _accept_known_with,
-        _assignment_head_with, _calltable_known_with, _check_accept_table_with,
-        _check_calltable_outside_scan_with, _scan_counts_for_table_placement_with,
-        _track_tables_with, NESTED_SCAN, TableState, first_misplaced_data_table_with,
-        first_misplaced_sub_with,
+        _UNCLOSED_DIM_PREFIX, _UNCLOSED_PAREN_EXPR, _UNITS_WITHOUT_EQ, _accept_known,
+        _assignment_head, _calltable_known, _check_accept_table, _check_calltable_outside_scan,
+        _scan_counts_for_table_placement, _track_tables, NESTED_SCAN, TableState,
+        first_misplaced_data_table, first_misplaced_sub,
     };
     use super::part2::{
-        _FALLBACK_PREFIX, _before_beginprog_name_with, _block_word_with, _control_keyword,
-        _has_error_on, _keyword, _leftover_message_with, _no_matching_with, _out_of_place_with,
-        _table_names,
+        _FALLBACK_PREFIX, _before_beginprog_name, _block_word, _control_keyword, _has_error_on,
+        _keyword, _leftover_message, _no_matching, _out_of_place, _table_names,
     };
-    use super::part3::_slowsequence_resolves_with;
+    use super::part3::_slowsequence_resolves;
     use super::part5::{
-        _inline_condition_stmt_with, _known_first_token, _logical_assign_accepted_with,
-        _logical_assign_undefined_messages_with, _logical_led_string, _pass1_scan_with,
-        _unclosed_paren_kind, _unparsed_string_messages_with, condition_part, is_hash_statement,
-        pass1_operands_with,
+        _inline_condition_stmt, _known_first_token, _logical_assign_accepted,
+        _logical_assign_undefined_messages, _logical_led_string, _pass1_scan, _unclosed_paren_kind,
+        _unparsed_string_messages, condition_part, is_hash_statement, pass1_operands,
     };
     use super::part6::{
-        _function_symbol_finding_with, _function_syntax_findings_with,
-        _instruction_arg_findings_with, _pass1_message_with, _routine_arg_findings_with,
-        _unclosed_call_message_with,
+        _function_symbol_finding, _function_syntax_findings, _instruction_arg_findings,
+        _pass1_message, _routine_arg_findings, _unclosed_call_message,
     };
     use super::part7::{
-        _bare_sub_link_name_with, _check_assignment_pass2_with, _check_call_pass2_with,
-        _unlinked_call_with, LinkContext,
+        _bare_sub_link_name, _check_assignment_pass2, _check_call_pass2, _unlinked_call,
+        LinkContext,
     };
-    use super::part9::_junk_init_findings_with;
+    use super::part9::_junk_init_findings;
     use crate::checker::{instr_rules, var_types};
     use crate::diagnostics::ShowFile;
     use std::cell::RefCell;
@@ -333,17 +313,17 @@ pub fn check_pass2_with(
         let misplaced = if profile.single_pass {
             None
         } else {
-            first_misplaced_sub_with(program)
+            first_misplaced_sub(program)
         };
         let misplaced_table = if profile.single_pass {
             None
         } else {
-            first_misplaced_data_table_with(program, profile)
+            first_misplaced_data_table(program, profile)
         };
         let nested = if profile.single_pass {
             None
         } else {
-            nested_table_with(program, profile)
+            nested_table(program, profile)
         };
         if link_ctx.links.borrow().positions.is_empty() {
             for (position, st) in program.statements.iter().enumerate() {
@@ -401,7 +381,7 @@ pub fn check_pass2_with(
             if let Some(bound) = _DECL_BLOCK_BOUNDS.get(&kw.as_str()) {
                 in_decl_block = *bound;
             }
-            _track_tables_with(stmt, &kw, &mut tables);
+            _track_tables(stmt, &kw, &mut tables);
             if kw == "DATATABLE" {
                 in_table = true;
             } else if kw == "ENDTABLE" {
@@ -411,7 +391,7 @@ pub fn check_pass2_with(
                 && matches!(profile.name, "cr6" | "cr1000x")
             {
                 if let Stmt::Instruction(st) = stmt.as_ref()
-                    && let Some(bad) = _undefined_table_source_with(
+                    && let Some(bad) = _undefined_table_source(
                         st,
                         profile,
                         &KnownView {
@@ -441,7 +421,7 @@ pub fn check_pass2_with(
             } else if kw == "ENDPROG" {
                 in_beginprog = false;
             }
-            let ss_resolves = _slowsequence_resolves_with(
+            let ss_resolves = _slowsequence_resolves(
                 stmt,
                 &declared_here,
                 &profile
@@ -481,10 +461,10 @@ pub fn check_pass2_with(
                         "early_scan",
                     );
                 }
-                pass2_scans.push(_scan_counts_for_table_placement_with(stmt, Some(&env)));
+                pass2_scans.push(_scan_counts_for_table_placement(stmt, Some(&env)));
             } else if kw == "NEXTSCAN"
                 || (kw == "NEXT"
-                    && _block_word_with(match stmt.as_ref() {
+                    && _block_word(match stmt.as_ref() {
                         Stmt::Instruction(st) => &st.args,
                         _ => &[],
                     })
@@ -501,10 +481,10 @@ pub fn check_pass2_with(
                 && !profile.single_pass
                 && !in_table
                 && (!pass2_scans.iter().any(|x| *x) || in_body_block)
-                && _calltable_known_with(stmt, &tables)
+                && _calltable_known(stmt, &tables)
             {
                 if let Stmt::Instruction(st) = stmt.as_ref() {
-                    _check_calltable_outside_scan_with(
+                    _check_calltable_outside_scan(
                         st,
                         program,
                         diags,
@@ -516,10 +496,10 @@ pub fn check_pass2_with(
             } else if kw == "ACCEPTDATARECORDS"
                 && !profile.single_pass
                 && !in_table
-                && _accept_known_with(stmt, &tables)
+                && _accept_known(stmt, &tables)
                 && let Stmt::Instruction(st) = stmt.as_ref()
             {
-                _check_accept_table_with(
+                _check_accept_table(
                     st,
                     program,
                     diags,
@@ -540,7 +520,7 @@ pub fn check_pass2_with(
             } else if after_endseq
                 && !in_body_block
                 && !in_table
-                && let Some(display) = _before_beginprog_name_with(stmt, &kw, profile, subs)
+                && let Some(display) = _before_beginprog_name(stmt, &kw, profile, subs)
             {
                 diags.error_basic(
                     stmt.line(),
@@ -550,7 +530,7 @@ pub fn check_pass2_with(
                 return Some(stmt.line());
             }
             if matches!(stmt.as_ref(), Stmt::Call(_)) {
-                if let Some(stop) = _check_call_pass2_with(
+                if let Some(stop) = _check_call_pass2(
                     stmt,
                     subs,
                     profile,
@@ -565,7 +545,7 @@ pub fn check_pass2_with(
                     return Some(stop);
                 }
             } else if matches!(stmt.as_ref(), Stmt::Assignment(_)) {
-                if let Some(stop) = _check_assignment_pass2_with(
+                if let Some(stop) = _check_assignment_pass2(
                     stmt,
                     known,
                     diags,
@@ -601,7 +581,7 @@ pub fn check_pass2_with(
                     && !in_table
                     && !in_decl_block
                     && before_bp
-                    && (kw != "CALLTABLE" || _calltable_known_with(stmt, &tables))
+                    && (kw != "CALLTABLE" || _calltable_known(stmt, &tables))
                     && !(pipeline_setup && matches!(kw.as_str(), "CDM_EXCITEV" | "CDM_MUXSELECT"))
                 {
                     let display = profile
@@ -616,12 +596,12 @@ pub fn check_pass2_with(
                     return Some(stmt.line());
                 }
             } else if let Stmt::Unparsed(st) = stmt.as_ref() {
-                if !_routine_arg_findings_with(st, program, profile).is_empty()
-                    || !_function_syntax_findings_with(stmt, program, profile).is_empty()
+                if !_routine_arg_findings(st, program, profile).is_empty()
+                    || !_function_syntax_findings(stmt, program, profile).is_empty()
                 {
                     continue;
                 }
-                if let Some(message) = _function_symbol_finding_with(stmt, program, profile) {
+                if let Some(message) = _function_symbol_finding(stmt, program, profile) {
                     diags.error_basic(stmt.line(), &message, stmt.file());
                     continue;
                 }
@@ -629,8 +609,7 @@ pub fn check_pass2_with(
                     && !in_body_block
                     && !in_table
                     && !in_decl_block
-                    && _before_beginprog_name_with(stmt, "UNPARSED", profile, &BTreeSet::new())
-                        .is_some()
+                    && _before_beginprog_name(stmt, "UNPARSED", profile, &BTreeSet::new()).is_some()
                 {
                     diags.error_basic(
                         stmt.line(),
@@ -647,9 +626,7 @@ pub fn check_pass2_with(
                 {
                     continue;
                 }
-                if let Some(messages) =
-                    _logical_assign_undefined_messages_with(stmt, program, profile)
-                {
+                if let Some(messages) = _logical_assign_undefined_messages(stmt, program, profile) {
                     for message in messages {
                         diags.error(
                             stmt.line(),
@@ -663,7 +640,7 @@ pub fn check_pass2_with(
                     }
                     continue;
                 }
-                if _logical_assign_accepted_with(stmt, program, profile) {
+                if _logical_assign_accepted(stmt, program, profile) {
                     let assignment = Stmt::Assignment(Assignment {
                         base: crate::syntax::StmtBase {
                             node: crate::syntax::Node {
@@ -690,9 +667,9 @@ pub fn check_pass2_with(
                     }
                     continue;
                 }
-                if let Some(bare) = _bare_sub_link_name_with(stmt.text(), &link_ctx.subs) {
+                if let Some(bare) = _bare_sub_link_name(stmt.text(), &link_ctx.subs) {
                     link_ctx.links.borrow_mut().calls.push(bare.clone());
-                    if let Some(stop) = _unlinked_call_with(
+                    if let Some(stop) = _unlinked_call(
                         stmt,
                         &bare,
                         profile,
@@ -717,14 +694,14 @@ pub fn check_pass2_with(
                     stmt,
                     profile,
                     subs,
-                    Some(pass1_operands_with(program, profile)),
+                    Some(pass1_operands(program, profile)),
                     &instr_rules::user_functions(program),
                 )
                 .is_some()
                 {
                     continue;
                 }
-                if !_junk_init_findings_with(st, profile).is_empty() {
+                if !_junk_init_findings(st, profile).is_empty() {
                     continue;
                 }
                 if [
@@ -772,7 +749,7 @@ pub fn check_pass2_with(
                     } else if kind == "fallback" {
                         diags.error(
                             stmt.line(),
-                            &_out_of_place_with(profile, text, at_eol),
+                            &_out_of_place(profile, text, at_eol),
                             stmt.file(),
                             ShowFile::Bool(false),
                             0,
@@ -799,22 +776,22 @@ pub fn check_pass2_with(
                             );
                         }
                         if profile.single_pass {
-                            for message in _unparsed_string_messages_with(st, program, profile) {
+                            for message in _unparsed_string_messages(st, program, profile) {
                                 diags.error_basic(stmt.line(), &message, stmt.file());
                             }
                         }
                         let cond = condition_part(text);
-                        let operands = pass1_operands_with(program, profile);
+                        let operands = pass1_operands(program, profile);
                         let message = cond
                             .as_deref()
                             .filter(|c| !pystr::strip(c).is_empty())
-                            .and_then(|c| _unclosed_call_message_with(profile, c, false, &operands))
+                            .and_then(|c| _unclosed_call_message(profile, c, false, &operands))
                             .filter(|m| !m.is_empty())
                             .or_else(|| {
-                                _unclosed_call_message_with(profile, text, at_eol, &operands)
+                                _unclosed_call_message(profile, text, at_eol, &operands)
                                     .filter(|m| !m.is_empty())
                             })
-                            .unwrap_or_else(|| _no_matching_with(profile, text, at_eol));
+                            .unwrap_or_else(|| _no_matching(profile, text, at_eol));
                         diags.error(
                             stmt.line(),
                             &message,
@@ -826,11 +803,11 @@ pub fn check_pass2_with(
                         );
                     }
                 } else if st.reason == _EXTRA_CLOSE_PAREN
-                    && !_assignment_head_with(text, program, profile)
+                    && !_assignment_head(text, program, profile)
                 {
                     diags.error_basic(
                         stmt.line(),
-                        &_out_of_place_with(profile, text, at_eol),
+                        &_out_of_place(profile, text, at_eol),
                         stmt.file(),
                     );
                 } else if st.reason == _EXTRA_CLOSE_PAREN {
@@ -850,9 +827,9 @@ pub fn check_pass2_with(
                     );
                 } else {
                     let findings = if profile.known_first_word_pass1 {
-                        _instruction_arg_findings_with(
+                        _instruction_arg_findings(
                             text,
-                            &pass1_operands_with(program, profile),
+                            &pass1_operands(program, profile),
                             profile,
                             context::of(program, Some(profile), None).declared_variable_names(),
                         )
@@ -896,11 +873,11 @@ pub fn check_pass2_with(
                         }
                         continue;
                     }
-                    let scan_stmt = _inline_condition_stmt_with(stmt, profile);
+                    let scan_stmt = _inline_condition_stmt(stmt, profile);
                     let verdict = if profile.known_first_word_pass1 {
-                        _pass1_scan_with(
+                        _pass1_scan(
                             scan_stmt.text(),
-                            &pass1_operands_with(program, profile),
+                            Some(&pass1_operands(program, profile)),
                             profile,
                         )
                     } else {
@@ -912,7 +889,7 @@ pub fn check_pass2_with(
                     {
                         diags.error(
                             stmt.line(),
-                            &_pass1_message_with(profile, &scan_stmt, "symbol", None),
+                            &_pass1_message(profile, &scan_stmt, "symbol", None),
                             stmt.file(),
                             ShowFile::Cr3xx,
                             0,
@@ -925,7 +902,7 @@ pub fn check_pass2_with(
                     {
                         diags.error(
                             stmt.line(),
-                            &_pass1_message_with(profile, stmt, kind, None),
+                            &_pass1_message(profile, stmt, kind, None),
                             stmt.file(),
                             ShowFile::Bool(false),
                             0,
@@ -938,12 +915,12 @@ pub fn check_pass2_with(
                             .is_some_and(|(phase, kind)| phase == "pass2" && kind == "fallback")
                             || (verdict.is_none()
                                 && profile.known_first_word_pass1
-                                && _known_first_token(text, &pass1_operands_with(program, profile)))
+                                && _known_first_token(text, &pass1_operands(program, profile)))
                             || (verdict.is_none()
                                 && profile.single_pass
                                 && _logical_led_string(text))
                         {
-                            for message in _unparsed_string_messages_with(st, program, profile) {
+                            for message in _unparsed_string_messages(st, program, profile) {
                                 diags.error_basic(stmt.line(), &message, stmt.file());
                             }
                         }
@@ -963,7 +940,7 @@ pub fn check_pass2_with(
                         }
                         diags.error(
                             stmt.line(),
-                            &_leftover_message_with(profile, stmt),
+                            &_leftover_message(profile, stmt),
                             stmt.file(),
                             ShowFile::Cr3xx,
                             0,
@@ -1002,7 +979,7 @@ pub fn check_pass2_with(
     result
 }
 
-/// Port of `checker/structure.py::_CLOSER_MESSAGES`.
+/// Port of checker/structure.py::_CLOSER_MESSAGES
 pub static _CLOSER_MESSAGES: LazyLock<OrderedMap<&'static str, (&'static str, &'static str)>> =
     LazyLock::new(|| {
         let mut messages = OrderedMap::new();
@@ -1030,28 +1007,10 @@ pub static _CLOSER_MESSAGES: LazyLock<OrderedMap<&'static str, (&'static str, &'
         messages
     });
 
-/// Port of `checker/structure.py::_names_unresolved`.
-pub fn _names_unresolved(known: &BTreeSet<String>, stmt: &Instruction, sources: bool) -> bool {
-    _names_unresolved_with(&KnownView::from_set(known), stmt, sources)
-}
-
-/// Port of `checker/structure.py::_names_unresolved`.
-pub fn _names_unresolved_with(known: &KnownView<'_>, stmt: &Instruction, sources: bool) -> bool {
-    // instr_data::part2::_TABLE_OUTPUT is private; keep its exact membership here until exposed.
+/// Port of checker/structure.py::_names_unresolved
+pub fn _names_unresolved(known: &KnownView<'_>, stmt: &Instruction, sources: bool) -> bool {
     let skip = !sources
-        && matches!(
-            pystr::upper(&stmt.keyword).as_str(),
-            "TOTALIZE"
-                | "AVERAGE"
-                | "MAXIMUM"
-                | "MINIMUM"
-                | "SAMPLEMAXMIN"
-                | "STDDEV"
-                | "MOMENT"
-                | "SAMPLE"
-                | "COVARIANCE"
-                | "MEDIAN"
-        );
+        && instr_data::part2::_TABLE_OUTPUT.contains(&pystr::upper(&stmt.keyword).as_str());
     stmt.args.iter().enumerate().any(|(i, arg)| {
         arg.is_some()
             && !(skip && i == 1)
@@ -1059,7 +1018,7 @@ pub fn _names_unresolved_with(known: &KnownView<'_>, stmt: &Instruction, sources
     })
 }
 
-/// Port of `checker/structure.py::_unparsed_opener`.
+/// Port of checker/structure.py::_unparsed_opener
 pub fn _unparsed_opener(text: &str) -> Option<String> {
     static IF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*IF\b", pyre::I));
     static THEN_BODY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bTHEN\s*\S", pyre::I));
@@ -1076,13 +1035,8 @@ pub fn _unparsed_opener(text: &str) -> Option<String> {
     }
 }
 
-/// Port of `checker/structure.py::check_block_closers`.
-pub fn check_block_closers(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_block_closers (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::check_block_closers`.
-pub fn check_block_closers_with(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
+/// Port of checker/structure.py::check_block_closers
+pub fn check_block_closers(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
     /// Port of `checker/structure.py::check_block_closers.push`.
     fn push(frames: &mut Vec<String>, depth: &mut usize, kind: &str) {
         if *depth == frames.len() {
@@ -1104,14 +1058,12 @@ pub fn check_block_closers_with(program: &Program, profile: &Profile, diags: &mu
 
     for stmt in &program.statements {
         let keyword = _keyword(stmt);
-        let kw = match keyword.as_str() {
-            "WHILE" => "DO",
-            "WEND" => "LOOP",
-            kw => kw,
-        };
-        // Integration: part2::_block_word needs the instruction's args parameter.
+        let kw = super::part3::_DO_ALIASES
+            .get(keyword.as_str())
+            .copied()
+            .unwrap_or(keyword.as_str());
         let word = if matches!(kw, "END" | "NEXT") {
-            _block_word()
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -1195,13 +1147,8 @@ pub fn check_block_closers_with(program: &Program, profile: &Profile, diags: &mu
     }
 }
 
-/// Port of `checker/structure.py::_undefined_table_source`.
-pub fn _undefined_table_source(_stmt: &Instruction, _known: &BTreeSet<String>) -> Option<String> {
-    todo!("checker/structure.py::_undefined_table_source (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_undefined_table_source`.
-pub fn _undefined_table_source_with(
+/// Port of checker/structure.py::_undefined_table_source
+pub fn _undefined_table_source(
     stmt: &Instruction,
     profile: &Profile,
     known: &KnownView<'_>,
@@ -1229,7 +1176,7 @@ pub fn _undefined_table_source_with(
     None
 }
 
-/// Port of `checker/structure.py::_leftover_first_name_known`.
+/// Port of checker/structure.py::_leftover_first_name_known
 pub fn _leftover_first_name_known(text: &str, known: &BTreeSet<String>) -> bool {
     let Ok(tokens) = lexer::tokenize(text, 0) else {
         return false;
@@ -1292,7 +1239,7 @@ mod tests {
                 assert!(parse_diags.items.is_empty(), "{logger}: {source:?}");
                 let mut diags = Diagnostics::new();
                 let mut links = CallLinks::default();
-                let stop = check_pass2_with(&program, profile, &mut diags, None, Some(&mut links));
+                let stop = check_pass2(&program, profile, &mut diags, None, Some(&mut links));
                 let suppressed = multi_pass_only && profile.single_pass;
                 let expected_stop =
                     (!suppressed && message != "Multiple BeginProgs.").then_some(line);
@@ -1331,7 +1278,7 @@ mod tests {
             links.positions.insert(("earlier.CR6".to_owned(), 7), 0);
             links.first = Some((7, "deferred".to_owned(), "earlier.CR6".to_owned()));
             let mut diags = Diagnostics::new();
-            let stop = check_pass2_with(&program, profile, &mut diags, None, Some(&mut links));
+            let stop = check_pass2(&program, profile, &mut diags, None, Some(&mut links));
             assert_eq!(links.calls, ["PREVIOUS"]);
             assert!(links.registered.contains("PREVIOUS"));
             assert_eq!(links.positions.len(), 1);
@@ -1400,10 +1347,14 @@ mod tests {
             ..Default::default()
         };
         let known = BTreeSet::from(["FP2".to_owned()]);
-        assert!(_names_unresolved(&known, &stmt, true));
-        assert!(!_names_unresolved(&known, &stmt, false));
+        assert!(_names_unresolved(&KnownView::from_set(&known), &stmt, true));
+        assert!(!_names_unresolved(
+            &KnownView::from_set(&known),
+            &stmt,
+            false
+        ));
         assert_eq!(
-            _undefined_table_source_with(
+            _undefined_table_source(
                 &stmt,
                 crate::profiles::get("cr6").unwrap(),
                 &KnownView::from_set(&known),

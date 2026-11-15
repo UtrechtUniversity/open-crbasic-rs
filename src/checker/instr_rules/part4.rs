@@ -274,7 +274,7 @@ pub fn check_tcpopen_connections(
     let mut declared: BTreeMap<String, i64> = BTreeMap::new();
     for st in &program.statements {
         if let Stmt::Declaration(decl) = st.as_ref() {
-            for v in &decl.vars {
+            for v in decl.vars.borrow().iter() {
                 let upper = pystr::upper(&v.name);
                 *declared.entry(upper).or_insert(0) += 1;
             }

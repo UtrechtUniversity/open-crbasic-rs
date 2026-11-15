@@ -69,7 +69,7 @@ pub fn stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
     let mut out = Vec::new();
     match stmt {
         Stmt::Declaration(d) => {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 out.extend(v.dims.iter().cloned().map(Some));
                 if let Some(init) = &v.init {
                     out.extend(init.iter().cloned());
@@ -251,10 +251,19 @@ pub fn check_local_name_collision_with_profile(
     profile: &Profile,
     diags: &mut Diagnostics,
 ) {
+    let declaration_vars = match stmt {
+        Stmt::Declaration(d) => Some(d.vars.borrow()),
+        _ => None,
+    };
     let (names, shadows_functions): (Vec<&str>, bool) = match stmt {
         Stmt::ConstDecl(c) => (vec![c.name.as_str()], false),
         Stmt::Declaration(d) if d.kind == "PUBLIC" || d.kind == "DIM" => (
-            d.vars.iter().map(|v| v.name.as_str()).collect(),
+            declaration_vars
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|v| v.name.as_str())
+                .collect(),
             d.kind == "DIM",
         ),
         Stmt::SubDef(s) => (s.params.iter().map(|p| p.name.as_str()).collect(), true),

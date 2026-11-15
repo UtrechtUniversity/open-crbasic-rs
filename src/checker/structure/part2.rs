@@ -6,10 +6,9 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 
 use super::part1::{
-    _BODY_BLOCK_ENDS, _BODY_BLOCK_STARTS, _DECL_BLOCK_BOUNDS, _accept_known_with,
-    _calltable_known_with, _check_accept_table_with, _check_calltable_outside_scan_with,
-    _scan_counts_for_table_placement_with, _track_tables_with, NESTED_SCAN, TableState,
-    first_misplaced_sub_with,
+    _BODY_BLOCK_ENDS, _BODY_BLOCK_STARTS, _DECL_BLOCK_BOUNDS, _accept_known, _calltable_known,
+    _check_accept_table, _check_calltable_outside_scan, _scan_counts_for_table_placement,
+    _track_tables, NESTED_SCAN, TableState, first_misplaced_sub,
 };
 use crate::checker::context;
 use crate::consteval::Env;
@@ -18,17 +17,12 @@ use crate::profiles::Profile;
 use crate::syntax::{Case, Expr, ExprRef, NumberValue, OrderedMap, Program, Stmt, stmt_id};
 use crate::{lexer, pyre, pystr};
 
-/// Port of `checker/structure.py::_scan_placement_walk`.
-pub fn _scan_placement_walk(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::_scan_placement_walk (omitted: profile: untyped)")
-}
-
 /// Port of checker/structure.py::_scan_placement_walk
 #[allow(
     clippy::doc_markdown,
     reason = "AGENTS.md requires literal one-line port comments"
 )]
-pub fn _scan_placement_walk_with(
+pub fn _scan_placement_walk(
     program: &crate::syntax::ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -42,14 +36,14 @@ pub fn _scan_placement_walk_with(
     let mut tables = TableState::default();
     let ctx = context::of(program, None, None);
     let subs = ctx.declared_subs();
-    let mut stray = stray_controls_with(program);
+    let mut stray = stray_controls(program);
     for (k, m) in scan_only_outside(program).iter() {
         stray.insert(*k, (m.clone(), true));
     }
-    for (k, m) in subscan_controls_with(program, profile).iter() {
+    for (k, m) in subscan_controls(program, profile).iter() {
         stray.insert(*k, m.clone());
     }
-    let misplaced = first_misplaced_sub_with(program);
+    let misplaced = first_misplaced_sub(program);
     for stmt in &program.statements {
         if let Some((misplaced_stmt, messages)) = &misplaced
             && Rc::ptr_eq(stmt, misplaced_stmt)
@@ -81,7 +75,7 @@ pub fn _scan_placement_walk_with(
             .get(kw.as_str())
             .copied()
             .unwrap_or(in_decl);
-        _track_tables_with(stmt, &kw, &mut tables);
+        _track_tables(stmt, &kw, &mut tables);
         if kw == "DATATABLE" {
             in_table = true;
         } else if kw == "ENDTABLE" {
@@ -101,9 +95,9 @@ pub fn _scan_placement_walk_with(
                     "",
                 );
             }
-            scans.push(_scan_counts_for_table_placement_with(stmt, Some(&env)));
+            scans.push(_scan_counts_for_table_placement(stmt, Some(&env)));
         } else if kw == "NEXTSCAN"
-            || kw == "NEXT" && _block_word_with(stmt.args()).as_deref() == Some("SCAN")
+            || kw == "NEXT" && _block_word(stmt.args()).as_deref() == Some("SCAN")
         {
             if scans.is_empty() {
                 diags.error_basic(stmt.line(), "NextScan with no Scan.", stmt.file());
@@ -113,10 +107,10 @@ pub fn _scan_placement_walk_with(
         } else if kw == "CALLTABLE"
             && !in_table
             && (!scans.iter().any(|scan| *scan) || in_body)
-            && _calltable_known_with(stmt, &tables)
+            && _calltable_known(stmt, &tables)
         {
             if let Stmt::Instruction(inst) = stmt.as_ref() {
-                _check_calltable_outside_scan_with(
+                _check_calltable_outside_scan(
                     inst,
                     program,
                     diags,
@@ -125,9 +119,9 @@ pub fn _scan_placement_walk_with(
                     Some(&env),
                 );
             }
-        } else if kw == "ACCEPTDATARECORDS" && !in_table && _accept_known_with(stmt, &tables) {
+        } else if kw == "ACCEPTDATARECORDS" && !in_table && _accept_known(stmt, &tables) {
             if let Stmt::Instruction(inst) = stmt.as_ref() {
-                _check_accept_table_with(
+                _check_accept_table(
                     inst,
                     program,
                     diags,
@@ -141,8 +135,8 @@ pub fn _scan_placement_walk_with(
         } else if crate::syntax::ends_routine(stmt) || _BODY_BLOCK_ENDS.contains(&kw.as_str()) {
             in_body = false;
         } else if !(seen_beginprog || in_body || in_table || in_decl)
-            && (kw != "CALLTABLE" || _calltable_known_with(stmt, &tables))
-            && let Some(display) = _before_beginprog_name_with(stmt, &kw, profile, subs)
+            && (kw != "CALLTABLE" || _calltable_known(stmt, &tables))
+            && let Some(display) = _before_beginprog_name(stmt, &kw, profile, subs)
             && !display.is_empty()
         {
             diags.error_basic(
@@ -159,7 +153,7 @@ pub fn _scan_placement_walk_with(
 static CASE_ELSE_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"\s*case\s+else", pyre::I));
 
-/// Port of `checker/structure.py::_is_case_else`.
+/// Port of checker/structure.py::_is_case_else
 pub fn _is_case_else(stmt: &Case) -> bool {
     stmt.is_else || CASE_ELSE_RE.match_(&stmt.base.text).is_some()
 }
@@ -167,13 +161,8 @@ pub fn _is_case_else(stmt: &Case) -> bool {
 static SELECT_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"\s*SELECT\b", pyre::I));
 
-/// Port of `checker/structure.py::stray_controls`.
-pub fn stray_controls(program: &Program) {
-    let _ = stray_controls_with(program);
-}
-
-/// Port of `checker/structure.py::stray_controls`.
-pub fn stray_controls_with(program: &Program) -> OrderedMap<usize, (String, bool)> {
+/// Port of checker/structure.py::stray_controls
+pub fn stray_controls(program: &Program) -> OrderedMap<usize, (String, bool)> {
     let mut found = OrderedMap::new();
     let mut elses = Vec::new();
     let mut opens = Vec::new();
@@ -183,7 +172,7 @@ pub fn stray_controls_with(program: &Program) -> OrderedMap<usize, (String, bool
     for stmt in &program.statements {
         let kw = _keyword(stmt);
         let word = if matches!(kw.as_str(), "END" | "NEXT" | "EXIT") {
-            _block_word_with(stmt.args())
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -287,7 +276,7 @@ pub fn stray_controls_with(program: &Program) -> OrderedMap<usize, (String, bool
             {
                 let sub_kw = _keyword(sub);
                 let sub_word = if matches!(sub_kw.as_str(), "EXIT" | "END") {
-                    _block_word_with(sub.args())
+                    _block_word(sub.args())
                 } else {
                     None
                 };
@@ -336,7 +325,7 @@ pub static SCAN_ONLY: LazyLock<OrderedMap<&'static str, &'static str>> = LazyLoc
     found
 });
 
-/// Port of `checker/structure.py::scan_only_outside`.
+/// Port of checker/structure.py::scan_only_outside
 pub fn scan_only_outside(program: &Program) -> OrderedMap<usize, String> {
     let mut found = OrderedMap::new();
     let mut scans = 0_i64;
@@ -352,7 +341,7 @@ pub fn scan_only_outside(program: &Program) -> OrderedMap<usize, String> {
         if kw == "SCAN" {
             scans += 1;
         } else if kw == "NEXTSCAN"
-            || kw == "NEXT" && _block_word_with(stmt.args()).as_deref() == Some("SCAN")
+            || kw == "NEXT" && _block_word(stmt.args()).as_deref() == Some("SCAN")
         {
             scans = (scans - 1).max(0);
         } else if let Some(name) = SCAN_ONLY.get(kw.as_str())
@@ -396,13 +385,8 @@ pub const _SUBSCAN_PLAIN: [&str; 9] = [
     "For",
 ];
 
-/// Port of `checker/structure.py::_subscan_body_time`.
-pub fn _subscan_body_time(_stmt: &Stmt) -> Option<bool> {
-    todo!("checker/structure.py::_subscan_body_time (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_subscan_body_time`.
-pub fn _subscan_body_time_with(stmt: &Stmt, profile: &Profile) -> Option<bool> {
+/// Port of checker/structure.py::_subscan_body_time
+pub fn _subscan_body_time(stmt: &Stmt, profile: &Profile) -> Option<bool> {
     if matches!(
         stmt,
         Stmt::Assignment(_)
@@ -438,16 +422,8 @@ pub fn _subscan_body_time_with(stmt: &Stmt, profile: &Profile) -> Option<bool> {
     None
 }
 
-/// Port of `checker/structure.py::subscan_controls`.
-pub fn subscan_controls(_program: &Program) {
-    todo!("checker/structure.py::subscan_controls (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::subscan_controls`.
-pub fn subscan_controls_with(
-    program: &Program,
-    profile: &Profile,
-) -> OrderedMap<usize, (String, bool)> {
+/// Port of checker/structure.py::subscan_controls
+pub fn subscan_controls(program: &Program, profile: &Profile) -> OrderedMap<usize, (String, bool)> {
     let mut found = OrderedMap::new();
     let mut scans = 0_i64;
     let mut in_sub = false;
@@ -462,7 +438,7 @@ pub fn subscan_controls_with(
     for stmt in flat {
         let kw = _keyword(&stmt);
         let word = if matches!(kw.as_str(), "END" | "NEXT") {
-            _block_word_with(stmt.args())
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -496,7 +472,7 @@ pub fn subscan_controls_with(
             }
         } else if let Some(last) = frames.last_mut()
             && *last
-            && _subscan_body_time_with(&stmt, profile).is_none()
+            && _subscan_body_time(&stmt, profile).is_none()
         {
             *last = false;
         }
@@ -504,13 +480,8 @@ pub fn subscan_controls_with(
     found
 }
 
-/// Port of `checker/structure.py::check_stray_controls`.
-pub fn check_stray_controls(_program: &Program, _diags: &mut Diagnostics) -> Option<(String, i64)> {
-    todo!("checker/structure.py::check_stray_controls (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::check_stray_controls`.
-pub fn check_stray_controls_with(
+/// Port of checker/structure.py::check_stray_controls
+pub fn check_stray_controls(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -518,11 +489,11 @@ pub fn check_stray_controls_with(
     if profile.single_pass {
         return None;
     }
-    let mut found = stray_controls_with(program);
+    let mut found = stray_controls(program);
     for (k, m) in scan_only_outside(program).iter() {
         found.insert(*k, (m.clone(), true));
     }
-    for (k, m) in subscan_controls_with(program, profile).iter() {
+    for (k, m) in subscan_controls(program, profile).iter() {
         found.insert(*k, m.clone());
     }
     let mut statements = Vec::new();
@@ -556,7 +527,7 @@ pub fn check_stray_controls_with(
     None
 }
 
-/// Port of `checker/structure.py::_has_error_on`.
+/// Port of checker/structure.py::_has_error_on
 pub fn _has_error_on(stmt: &Stmt, diags: &mut Diagnostics) -> bool {
     diags
         .items
@@ -564,16 +535,11 @@ pub fn _has_error_on(stmt: &Stmt, diags: &mut Diagnostics) -> bool {
         .any(|d| d.severity == "error" && d.line == stmt.line() && d.file == stmt.file())
 }
 
-/// Port of `checker/structure.py::_before_beginprog_name`.
-pub fn _before_beginprog_name(_stmt: &Stmt, _kw: &str, _subs: &BTreeSet<String>) -> Option<String> {
-    todo!("checker/structure.py::_before_beginprog_name (omitted: profile: untyped)")
-}
-
 static ESS_INITIALIZE_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*ESSInitialize\s*\(", 0));
 
-/// Port of `checker/structure.py::_before_beginprog_name`.
-pub fn _before_beginprog_name_with(
+/// Port of checker/structure.py::_before_beginprog_name
+pub fn _before_beginprog_name(
     stmt: &Stmt,
     kw: &str,
     profile: &Profile,
@@ -583,7 +549,8 @@ pub fn _before_beginprog_name_with(
     // _FORBIDDEN_BEFORE_BEGINPROG lives in part1.py; the Rust part1 currently omits it.
     if control.is_some()
         || matches!(stmt, Stmt::Instruction(_))
-            && (matches!(kw, "SCAN" | "DELAY") || profile.before_beginprog().contains(kw))
+            && (super::part1::_FORBIDDEN_BEFORE_BEGINPROG.contains(&kw)
+                || profile.before_beginprog().contains(kw))
     {
         let key = control.as_deref().unwrap_or(kw);
         if let Some(record) = profile.instructions().get(key) {
@@ -620,7 +587,7 @@ pub fn _before_beginprog_name_with(
     None
 }
 
-/// Port of `checker/structure.py::_quote_in_first_arg`.
+/// Port of checker/structure.py::_quote_in_first_arg
 pub fn _quote_in_first_arg(text: &str) -> bool {
     let mut i = pystr::find(text, "(", None, None).map_or(0, |i| i + 1);
     while i > 0 && i < pystr::len(text) {
@@ -637,7 +604,7 @@ pub fn _quote_in_first_arg(text: &str) -> bool {
     false
 }
 
-/// Port of `checker/structure.py::_control_keyword`.
+/// Port of checker/structure.py::_control_keyword
 pub fn _control_keyword(stmt: &Stmt) -> Option<String> {
     match stmt {
         Stmt::If(_) => Some("IF".to_owned()),
@@ -647,10 +614,7 @@ pub fn _control_keyword(stmt: &Stmt) -> Option<String> {
             let kw = pystr::upper(&s.keyword);
             if matches!(kw.as_str(), "SELECT" | "ENDIF")
                 || kw == "NEXT"
-                    && !matches!(
-                        _block_word_with(&s.args).as_deref(),
-                        Some("SCAN" | "SUBSCAN")
-                    )
+                    && !matches!(_block_word(&s.args).as_deref(), Some("SCAN" | "SUBSCAN"))
             {
                 Some(kw)
             } else {
@@ -663,7 +627,7 @@ pub fn _control_keyword(stmt: &Stmt) -> Option<String> {
 
 pub const _FALLBACK_PREFIX: &str = "Invalid, or out of place expression:";
 
-/// Port of `checker/structure.py::_table_names`.
+/// Port of checker/structure.py::_table_names
 pub fn _table_names(program: &Program) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for stmt in &program.statements {
@@ -688,13 +652,8 @@ pub static _CONTROL_COND: LazyLock<pyre::Regex> = LazyLock::new(|| {
     )
 });
 
-/// Port of `checker/structure.py::_leftover_message`.
-pub fn _leftover_message(_stmt: &Stmt) -> String {
-    todo!("checker/structure.py::_leftover_message (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_leftover_message`.
-pub fn _leftover_message_with(profile: &Profile, stmt: &Stmt) -> String {
+/// Port of checker/structure.py::_leftover_message
+pub fn _leftover_message(profile: &Profile, stmt: &Stmt) -> String {
     let text = pystr::strip(stmt.text());
     if !profile.single_pass
         && _CONTROL_COND.match_(stmt.text()).is_some()
@@ -704,29 +663,24 @@ pub fn _leftover_message_with(profile: &Profile, stmt: &Stmt) -> String {
         return format!("{_FALLBACK_PREFIX} {cond}.");
     }
     if !(profile.fallback_echo_newline && text.starts_with('(')) {
-        return _out_of_place_with(profile, stmt.text(), stmt.at_eol());
+        return _out_of_place(profile, stmt.text(), stmt.at_eol());
     }
     let mut depth = 0_i64;
     for (i, ch) in text.chars().enumerate() {
         depth += i64::from(ch == '(') - i64::from(ch == ')');
         if depth == 0 {
             let inner = pystr::slice(text, Some(1), Some(i64::try_from(i).unwrap()));
-            if _constant_assignment_with(inner, profile) {
+            if _constant_assignment(inner, profile) {
                 return format!("Invalid assignment in expression: {inner}.");
             }
             return format!("{_FALLBACK_PREFIX} {inner}.");
         }
     }
-    _out_of_place_with(profile, pystr::slice(text, Some(1), None), stmt.at_eol())
+    _out_of_place(profile, pystr::slice(text, Some(1), None), stmt.at_eol())
 }
 
-/// Port of `checker/structure.py::_constant_assignment`.
-pub fn _constant_assignment(_text: &str) -> bool {
-    todo!("checker/structure.py::_constant_assignment (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_constant_assignment`.
-pub fn _constant_assignment_with(text: &str, profile: &Profile) -> bool {
+/// Port of checker/structure.py::_constant_assignment
+pub fn _constant_assignment(text: &str, profile: &Profile) -> bool {
     let Ok(toks) = lexer::tokenize(text, 0) else {
         return false;
     };
@@ -743,13 +697,8 @@ pub fn _constant_assignment_with(text: &str, profile: &Profile) -> bool {
                     .contains(&first.upper.as_str()))
 }
 
-/// Port of `checker/structure.py::_no_matching`.
-pub fn _no_matching(_text: &str, _at_eol: bool) -> String {
-    todo!("checker/structure.py::_no_matching (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_no_matching`.
-pub fn _no_matching_with(profile: &Profile, text: &str, at_eol: bool) -> String {
+/// Port of checker/structure.py::_no_matching
+pub fn _no_matching(profile: &Profile, text: &str, at_eol: bool) -> String {
     let sep = if profile.fallback_echo_newline && at_eol {
         "\n"
     } else {
@@ -758,13 +707,8 @@ pub fn _no_matching_with(profile: &Profile, text: &str, at_eol: bool) -> String 
     format!("No Matching, or out of place ) in expression: {text}{sep}.")
 }
 
-/// Port of `checker/structure.py::_out_of_place`.
-pub fn _out_of_place(_text: &str, _at_eol: bool) -> String {
-    todo!("checker/structure.py::_out_of_place (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_out_of_place`.
-pub fn _out_of_place_with(profile: &Profile, text: &str, at_eol: bool) -> String {
+/// Port of checker/structure.py::_out_of_place
+pub fn _out_of_place(profile: &Profile, text: &str, at_eol: bool) -> String {
     let sep = if profile.fallback_echo_newline && at_eol {
         "\n"
     } else {
@@ -772,23 +716,18 @@ pub fn _out_of_place_with(profile: &Profile, text: &str, at_eol: bool) -> String
     };
     if profile.fallback_echo_newline
         && text.contains(';')
-        && (_semicolon_assignment(text) || _function_statement_with(text, profile))
+        && (_semicolon_assignment(text) || _function_statement(text, profile))
     {
         return format!("Invalid symbol in expression: {text}{sep}.");
     }
     format!("Invalid, or out of place expression: {text}{sep}.")
 }
 
-/// Port of `checker/structure.py::_function_statement`.
-pub fn _function_statement(_text: &str) -> bool {
-    todo!("checker/structure.py::_function_statement (omitted: profile: untyped)")
-}
-
 static FUNCTION_STATEMENT_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"\s*([A-Za-z_]\w*)\s*\(", 0));
 
-/// Port of `checker/structure.py::_function_statement`.
-pub fn _function_statement_with(text: &str, profile: &Profile) -> bool {
+/// Port of checker/structure.py::_function_statement
+pub fn _function_statement(text: &str, profile: &Profile) -> bool {
     FUNCTION_STATEMENT_RE
         .match_(text)
         .and_then(|m| m.group(1))
@@ -798,7 +737,7 @@ pub fn _function_statement_with(text: &str, profile: &Profile) -> bool {
         })
 }
 
-/// Port of `checker/structure.py::_semicolon_assignment`.
+/// Port of checker/structure.py::_semicolon_assignment
 pub fn _semicolon_assignment(text: &str) -> bool {
     let Ok(toks) = crate::parser::tokenize_for_parser(text, 0) else {
         return false;
@@ -829,7 +768,7 @@ pub fn _semicolon_assignment(text: &str) -> bool {
         )
 }
 
-/// Port of `checker/structure.py::_keyword`.
+/// Port of checker/structure.py::_keyword
 pub fn _keyword(stmt: &Stmt) -> String {
     match stmt {
         Stmt::Instruction(s) => pystr::upper(&s.keyword),
@@ -844,13 +783,8 @@ pub const _END_EXIT_WORDS: [&str; 9] = [
     "IF", "SELECT", "SUB", "FUNCTION", "PROG", "TABLE", "SCAN", "DO", "FOR",
 ];
 
-/// Port of `checker/structure.py::_block_word`.
-pub fn _block_word() -> Option<String> {
-    todo!("checker/structure.py::_block_word (omitted: args: list)")
-}
-
-/// Port of `checker/structure.py::_block_word`.
-pub fn _block_word_with(args: &[Option<ExprRef>]) -> Option<String> {
+/// Port of checker/structure.py::_block_word
+pub fn _block_word(args: &[Option<ExprRef>]) -> Option<String> {
     match args.first()?.as_deref()? {
         Expr::Name(n) => Some(pystr::upper(&n.name)),
         _ => None,
@@ -913,7 +847,7 @@ mod tests {
             for (source, line, expected) in cases {
                 let (program, _) = parser::parse_text(source, "t.cr6", None, Some(profile));
                 let mut diags = Diagnostics::new();
-                let stop = _scan_placement_walk_with(&program, profile, &mut diags);
+                let stop = _scan_placement_walk(&program, profile, &mut diags);
                 if profile.single_pass {
                     assert_eq!(stop, Some(("t.cr6".to_owned(), *line)), "{name}: {source}");
                     let actual: Vec<_> = diags
@@ -959,7 +893,7 @@ mod tests {
         for name in ["cr6", "cr1000x", "cr300", "cr350"] {
             let (p, _) =
                 parser::parse_text(source, "t.cr6", None, Some(profiles::get(name).unwrap()));
-            let actual = located(&p, &stray_controls_with(&p));
+            let actual = located(&p, &stray_controls(&p));
             let expected: Vec<_> = [
                 (3, "If without EndIf inside of Sub."),
                 (4, "Sub declaration inside If..EndIf."),
@@ -982,7 +916,7 @@ mod tests {
             let (p, _) =
                 parser::parse_text(source, "t.cr6", None, Some(profiles::get(name).unwrap()));
             assert_eq!(
-                located(&p, &stray_controls_with(&p)),
+                located(&p, &stray_controls(&p)),
                 vec![
                     (4, "If statement with duplicate Else.".to_owned(), false),
                     (6, "Case with no Select.".to_owned(), true),
@@ -1005,7 +939,7 @@ mod tests {
                 expected.push((7, "No Measurements in SubScan.".to_owned(), false));
             }
             assert_eq!(
-                located(&p, &subscan_controls_with(&p, profile)),
+                located(&p, &subscan_controls(&p, profile)),
                 expected,
                 "{name}"
             );
@@ -1019,7 +953,7 @@ mod tests {
             let profile = profiles::get(name).unwrap();
             let (p, _) = parser::parse_text(source, "t.cr6", None, Some(profile));
             assert_eq!(
-                located(&p, &subscan_controls_with(&p, profile)),
+                located(&p, &subscan_controls(&p, profile)),
                 vec![(
                     4,
                     "SubScan used outside of Scan .. NextScan.".to_owned(),
@@ -1033,7 +967,7 @@ mod tests {
                 "PulseCount must be used within a Scan...NextScan."
             );
             let mut diags = Diagnostics::new();
-            let stop = check_stray_controls_with(&p, profile, &mut diags);
+            let stop = check_stray_controls(&p, profile, &mut diags);
             if profile.single_pass {
                 assert_eq!(stop, None);
                 assert_eq!(diags.items.len(), 0);
@@ -1078,14 +1012,10 @@ mod tests {
                 ("NAN = 1", true),
                 ("Battery = 1", false),
             ] {
-                assert_eq!(
-                    _constant_assignment_with(text, p),
-                    expected,
-                    "{name}: {text}"
-                );
+                assert_eq!(_constant_assignment(text, p), expected, "{name}: {text}");
             }
             assert_eq!(
-                _out_of_place_with(p, "X=1;", true),
+                _out_of_place(p, "X=1;", true),
                 if name == "cr6" {
                     "Invalid, or out of place expression: X=1;."
                 } else {
@@ -1093,7 +1023,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                _no_matching_with(p, "X=1;", true),
+                _no_matching(p, "X=1;", true),
                 if name == "cr6" {
                     "No Matching, or out of place ) in expression: X=1;."
                 } else {
@@ -1101,7 +1031,7 @@ mod tests {
                 }
             );
             assert_eq!(
-                _out_of_place_with(p, "Timer(1 ;,Sec,0)", true),
+                _out_of_place(p, "Timer(1 ;,Sec,0)", true),
                 if name == "cr6" {
                     "Invalid, or out of place expression: Timer(1 ;,Sec,0)."
                 } else {

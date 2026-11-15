@@ -6,8 +6,8 @@
 
 use crate::checker::expressions::part1::{KnownView, UndefinedName};
 use crate::checker::{context, expressions, var_types};
+use crate::lexer::Token;
 use crate::profiles::{Function, Table};
-use crate::syntax::Token;
 use crate::{lexer, parser, pyre, pystr};
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -22,7 +22,7 @@ use crate::syntax::{
 
 /// Port of checker/structure.py::_unclosed_paren_kind
 pub fn _unclosed_paren_kind(text: &str, known: &BTreeSet<String>) -> String {
-    let Ok(tokens) = parser::tokenize_for_parser(text, 0) else {
+    let Ok(tokens) = lexer::tokenize(text, 0) else {
         return "fallback".into();
     };
     let tokens: Vec<_> = tokens.iter().filter(|t| t.kind != "EOF").collect();
@@ -90,12 +90,7 @@ pub const _BINARY_OPS: &[&str] = &[
 ];
 
 /// Port of checker/structure.py::pass1_operands
-pub fn pass1_operands(_program: &Program) -> BTreeSet<String> {
-    todo!("checker/structure.py::pass1_operands (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::pass1_operands
-pub fn pass1_operands_with(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
+pub fn pass1_operands(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
     let ctx = context::of(program, Some(profile), None);
     let mut names = ctx.declared_variable_names().clone();
     for (k, _) in program.consts.iter() {
@@ -156,12 +151,7 @@ pub fn inline_if_condition(text: &str) -> Option<String> {
 }
 
 /// Port of checker/structure.py::_inline_condition_stmt
-pub fn _inline_condition_stmt(_stmt: &Stmt) -> StmtRef {
-    todo!("checker/structure.py::_inline_condition_stmt (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_inline_condition_stmt
-pub fn _inline_condition_stmt_with(stmt: &StmtRef, profile: &Profile) -> StmtRef {
+pub fn _inline_condition_stmt(stmt: &StmtRef, profile: &Profile) -> StmtRef {
     if !profile.single_pass
         && let Stmt::Unparsed(u) = stmt.as_ref()
         && (u.reason.starts_with("expected THEN") || u.reason.starts_with("expected ')'"))
@@ -202,12 +192,7 @@ pub const _LEADING_OPS: &[&str] = &[
 ];
 
 /// Port of checker/structure.py::_invalid_assignment
-pub fn _invalid_assignment() -> bool {
-    todo!("checker/structure.py::_invalid_assignment (omitted: toks: untyped)")
-}
-
-/// Port of checker/structure.py::_invalid_assignment
-pub fn _invalid_assignment_with(toks: &[Token]) -> bool {
+pub fn _invalid_assignment(toks: &[Token]) -> bool {
     let mut depth = 0;
     let mut eq = None;
     for (i, t) in toks.iter().enumerate() {
@@ -244,13 +229,8 @@ pub fn _invalid_assignment_with(toks: &[Token]) -> bool {
             return false;
         }
     }
-    let known = lhs
-        .iter()
-        .filter(|t| t.kind == "IDENT")
-        .map(|t| t.upper.clone())
-        .collect();
     if scan_expr_dependency(
-        lhs, 0, &known, None, true, false, None, false, true, false, false,
+        lhs, 0, None, None, true, false, None, false, true, false, false,
     )
     .is_some()
     {
@@ -270,12 +250,7 @@ pub fn _invalid_assignment_with(toks: &[Token]) -> bool {
 }
 
 /// Port of checker/structure.py::_semicolons_dropped
-pub fn _semicolons_dropped(_text: &str) -> bool {
-    todo!("checker/structure.py::_semicolons_dropped (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_semicolons_dropped
-pub fn _semicolons_dropped_with(text: &str, profile: &Profile) -> bool {
+pub fn _semicolons_dropped(text: &str, profile: &Profile) -> bool {
     if !text.contains(';') {
         return false;
     }
@@ -287,14 +262,9 @@ pub fn _semicolons_dropped_with(text: &str, profile: &Profile) -> bool {
 }
 
 /// Port of checker/structure.py::_pass1_scan
-pub fn _pass1_scan(_text: &str, _operands: &BTreeSet<String>) -> Option<(String, String)> {
-    todo!("checker/structure.py::_pass1_scan (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_pass1_scan
-pub fn _pass1_scan_with(
+pub fn _pass1_scan(
     text: &str,
-    operands: &BTreeSet<String>,
+    operands: Option<&BTreeSet<String>>,
     profile: &Profile,
 ) -> Option<(String, String)> {
     static EMPTY_COND: LazyLock<pyre::Regex> =
@@ -303,7 +273,7 @@ pub fn _pass1_scan_with(
         LazyLock::new(|| pyre::Regex::new(r"\s*(?:SELECT|IF|ELSEIF)\b", pyre::I));
     let verdict = |kind: &str| Some(("pass1".to_owned(), kind.to_owned()));
     let cond = condition_part(text);
-    let drop = _semicolons_dropped_with(text, profile);
+    let drop = _semicolons_dropped(text, profile);
     let functions = profile.functions();
     let scan = |ts: &[Token], i: usize, assign: bool, cond: bool| {
         scan_expr_dependency(
@@ -321,7 +291,7 @@ pub fn _pass1_scan_with(
         )
     };
     if let Some(cond) = cond {
-        let mut ctoks = parser::tokenize_for_parser(&cond, 0).ok()?;
+        let mut ctoks = lexer::tokenize(&cond, 0).ok()?;
         ctoks.retain(|t| t.kind != "EOF" && !(drop && t.kind == "OP" && t.text == ";"));
         if ctoks.is_empty() {
             return if text == pystr::rstrip(text) && EMPTY_COND.search(text).is_none() {
@@ -344,7 +314,7 @@ pub fn _pass1_scan_with(
             false,
         );
     }
-    let mut toks = match parser::tokenize_for_parser(text, 0) {
+    let mut toks = match lexer::tokenize(text, 0) {
         Ok(toks) => toks,
         Err(e) => {
             let head_text = pystr::slice(text, None, Some(i64::try_from(e.col).ok()?));
@@ -360,7 +330,7 @@ pub fn _pass1_scan_with(
             if e.message != "unterminated string" || c != Some('"') {
                 return None;
             }
-            let mut head = parser::tokenize_for_parser(head_text, 0).ok()?;
+            let mut head = lexer::tokenize(head_text, 0).ok()?;
             head.retain(|t| t.kind != "EOF");
             if head.first().is_some_and(|t| {
                 t.kind == "OP" && t.text != ";" && _LEADING_OPS.contains(&t.text.as_str())
@@ -370,7 +340,7 @@ pub fn _pass1_scan_with(
             if head.len() < 2
                 || head[0].kind != "IDENT"
                 || head[1].kind != "IDENT"
-                || !operands.contains(&head[0].upper)
+                || !operands.is_none_or(|names| names.contains(&head[0].upper))
                 || _BINARY_WORDS.contains(&head[1].upper.as_str())
                 || functions.contains(&head[0].upper)
                 || profile.instructions().contains(&head[0].upper)
@@ -384,7 +354,7 @@ pub fn _pass1_scan_with(
     };
     toks.retain(|t| t.kind != "EOF" && !(drop && t.kind == "OP" && t.text == ";"));
     let first = toks.first()?;
-    if _logical_bad_target_with(&toks, operands, functions) {
+    if _logical_bad_target(&toks, operands, functions) {
         return verdict("invalid_assignment");
     }
     let mut i = 1;
@@ -396,7 +366,7 @@ pub fn _pass1_scan_with(
         if u == "NOT" {
             return scan(&toks, 1, false, false);
         }
-        if functions.contains(u) && !operands.contains(u) {
+        if functions.contains(u) && !operands.is_none_or(|names| names.contains(u)) {
             if toks.get(i).is_some_and(|t| t.kind == "OP" && t.text == "(") {
                 return scan_expr_dependency(
                     &toks,
@@ -412,13 +382,12 @@ pub fn _pass1_scan_with(
                     true,
                 );
             }
-            // part6 still omits the functions argument.
-            if super::part6::_bare_function_needs_paren(u) {
+            if super::part6::_bare_function_needs_paren(u, &super::part6::functions_for(profile)) {
                 return verdict("expects_paren");
             }
             return None;
         }
-        if !operands.contains(u) {
+        if !operands.is_none_or(|names| names.contains(u)) {
             return None;
         }
         if toks.get(i).is_some_and(|t| t.kind == "OP" && t.text == "(") {
@@ -445,12 +414,12 @@ pub fn _pass1_scan_with(
             i = j + 1;
         }
     } else if matches!(first.kind.as_str(), "NUMBER" | "STRING") {
-        if _invalid_assignment_with(&toks) {
+        if _invalid_assignment(&toks) {
             return verdict("invalid_assignment");
         }
     } else if first.kind == "OP" && first.text == "-" && toks.len() > 1 && toks[1].kind == "NUMBER"
     {
-        if _invalid_assignment_with(&toks) {
+        if _invalid_assignment(&toks) {
             return verdict("invalid_assignment");
         }
         i = 2;
@@ -481,7 +450,9 @@ pub fn _pass1_scan_with(
                 return verdict("invalid_assignment");
             }
             if lhs.first().is_some_and(|t| {
-                t.kind == "IDENT" && operands.contains(&t.upper) && !predefined(&t.upper)
+                t.kind == "IDENT"
+                    && operands.is_none_or(|names| names.contains(&t.upper))
+                    && !predefined(&t.upper)
             }) {
                 return result;
             }
@@ -515,7 +486,7 @@ pub fn _pass1_scan_with(
     } else if first.kind == "OP" && toks.len() > 1 && _LEADING_OPS.contains(&first.text.as_str()) {
         return verdict("fallback");
     } else if first.kind == "OP" && toks.len() > 1 && matches!(first.text.as_str(), "+" | "-") {
-        let signed = _signed_target_with(&toks, operands, functions, profile);
+        let signed = _signed_target(&toks, operands, functions, profile);
         if signed.as_deref() == Some("bad") {
             return verdict("invalid_assignment");
         }
@@ -544,7 +515,7 @@ pub fn _pass1_scan_with(
         return verdict("fallback");
     }
     if nxt.kind == "OP" && _BINARY_OPS.contains(&nxt.text.as_str()) || nxt.kind == "IDENT" {
-        if first.kind == "IDENT" && nxt.kind == "OP" && _invalid_assignment_with(&toks) {
+        if first.kind == "IDENT" && nxt.kind == "OP" && _invalid_assignment(&toks) {
             return verdict("invalid_assignment");
         }
         let result = scan(&toks, i + 1, false, false);
@@ -552,7 +523,7 @@ pub fn _pass1_scan_with(
             stage == "pass1" && ["incomplete", "no_matching", "fallback"].contains(&kind.as_str())
         }) {
             let eq = if nxt.kind == "IDENT" {
-                _logical_assign_eq_with(&toks, i64::try_from(i).ok()?)
+                _logical_assign_eq(&toks, i64::try_from(i).ok()?)
             } else {
                 None
             };
@@ -570,14 +541,7 @@ pub fn _pass1_scan_with(
 }
 
 /// Port of checker/structure.py::_assigns_user_const
-pub fn _assigns_user_const(_stmt: &Assignment, _program: &Program) -> bool {
-    // Context::enclosing_sub requires the original statement/program Rc identities.
-    // Use _assigns_user_const_with rather than manufacturing replacement identities.
-    todo!("checker/structure.py::_assigns_user_const")
-}
-
-/// Port of checker/structure.py::_assigns_user_const
-pub fn _assigns_user_const_with(stmt: &StmtRef, program: &ProgramRef) -> bool {
+pub fn _assigns_user_const(stmt: &StmtRef, program: &ProgramRef) -> bool {
     let Stmt::Assignment(a) = stmt.as_ref() else {
         return false;
     };
@@ -603,16 +567,9 @@ pub fn _assigns_user_const_with(stmt: &StmtRef, program: &ProgramRef) -> bool {
 pub const _LOGICAL_WORDS: &[&str] = &["AND", "OR", "XOR", "IMP", "EQV"];
 
 /// Port of checker/structure.py::_signed_target
-pub fn _signed_target() -> Option<String> {
-    todo!(
-        "checker/structure.py::_signed_target (omitted: toks: untyped, operands: untyped, functions: untyped, profile: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_signed_target
-pub fn _signed_target_with(
+pub fn _signed_target(
     toks: &[Token],
-    operands: &BTreeSet<String>,
+    operands: Option<&BTreeSet<String>>,
     functions: &Table<Function>,
     profile: &Profile,
 ) -> Option<String> {
@@ -635,7 +592,7 @@ pub fn _signed_target_with(
         || toks.iter().any(|t| {
             t.kind == "STRING"
                 || (t.kind == "IDENT"
-                    && !operands.contains(&t.upper)
+                    && !operands.is_none_or(|names| names.contains(&t.upper))
                     && !functions.contains(&t.upper)
                     && !_BINARY_WORDS.contains(&t.upper.as_str()))
         })
@@ -648,7 +605,9 @@ pub fn _signed_target_with(
         && first.kind == "IDENT"
         && seg[1].text == "("
         && seg[seg.len() - 1].text == ")";
-    if first.kind == "IDENT" && functions.contains(&first.upper) && !operands.contains(&first.upper)
+    if first.kind == "IDENT"
+        && functions.contains(&first.upper)
+        && !operands.is_none_or(|names| names.contains(&first.upper))
     {
         return indexed.then(|| "bad".into());
     }
@@ -669,16 +628,9 @@ pub fn _signed_target_with(
 }
 
 /// Port of checker/structure.py::_logical_bad_target
-pub fn _logical_bad_target() -> bool {
-    todo!(
-        "checker/structure.py::_logical_bad_target (omitted: toks: untyped, operands: untyped, functions: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_logical_bad_target
-pub fn _logical_bad_target_with(
+pub fn _logical_bad_target(
     toks: &[Token],
-    operands: &BTreeSet<String>,
+    operands: Option<&BTreeSet<String>>,
     functions: &Table<Function>,
 ) -> bool {
     let (mut depth, mut last_logical, mut eq) = (0, None, None);
@@ -708,7 +660,7 @@ pub fn _logical_bad_target_with(
         t.kind == "IDENT"
             && !_BINARY_WORDS.contains(&t.upper.as_str())
             && t.upper != "NOT"
-            && !operands.contains(&t.upper)
+            && !operands.is_none_or(|names| names.contains(&t.upper))
             && !functions.contains(&t.upper)
     }) {
         return false;
@@ -749,7 +701,9 @@ pub fn _logical_bad_target_with(
     if first.upper == "NOT" {
         return true;
     }
-    if functions.contains(&first.upper) && !operands.contains(&first.upper) {
+    if functions.contains(&first.upper)
+        && !operands.is_none_or(|names| names.contains(&first.upper))
+    {
         return seg.len() > 1 && seg[1].text == "(";
     }
     let mut d = 0;
@@ -770,12 +724,7 @@ pub fn _logical_bad_target_with(
 }
 
 /// Port of checker/structure.py::_logical_assign_eq
-pub fn _logical_assign_eq(_i: i64) -> Option<i64> {
-    todo!("checker/structure.py::_logical_assign_eq (omitted: toks: untyped)")
-}
-
-/// Port of checker/structure.py::_logical_assign_eq
-pub fn _logical_assign_eq_with(toks: &[Token], i: i64) -> Option<i64> {
+pub fn _logical_assign_eq(toks: &[Token], i: i64) -> Option<i64> {
     let i = usize::try_from(i).ok()?;
     if !_LOGICAL_WORDS.contains(&toks.get(i)?.upper.as_str()) {
         return None;
@@ -804,7 +753,7 @@ pub fn _logical_assign_eq_with(toks: &[Token], i: i64) -> Option<i64> {
 
 /// Port of checker/structure.py::_known_first_token
 pub fn _known_first_token(text: &str, operands: &BTreeSet<String>) -> bool {
-    let Ok(toks) = parser::tokenize_for_parser(text, 0) else {
+    let Ok(toks) = lexer::tokenize(text, 0) else {
         return false;
     };
     toks.iter().find(|t| t.kind != "EOF").is_some_and(|t| {
@@ -821,13 +770,8 @@ pub fn _logical_led_string(text: &str) -> bool {
 }
 
 /// Port of checker/structure.py::_logical_assign_state
-pub fn _logical_assign_state(_stmt: &Unparsed, _program: &Program) {
-    todo!("checker/structure.py::_logical_assign_state (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_logical_assign_state
 #[allow(clippy::items_after_statements)]
-pub fn _logical_assign_state_with(
+pub fn _logical_assign_state(
     stmt: &StmtRef,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -877,7 +821,7 @@ pub fn _logical_assign_state_with(
     for st in &program.statements {
         match st.as_ref() {
             Stmt::Declaration(d) => {
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     dims.insert(pystr::upper(&v.name), v.dims.len());
                     if v.type_.as_ref().is_some_and(|t| {
                         !t.is_empty() && !variable_types.contains(&pystr::upper(t).as_str())
@@ -1040,34 +984,21 @@ pub fn _logical_assign_state_with(
 }
 
 /// Port of checker/structure.py::_logical_assign_accepted
-pub fn _logical_assign_accepted(_stmt: &Unparsed, _program: &Program) -> bool {
-    todo!("checker/structure.py::_logical_assign_accepted (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_logical_assign_accepted
-pub fn _logical_assign_accepted_with(
+pub fn _logical_assign_accepted(
     stmt: &StmtRef,
     program: &ProgramRef,
     profile: &'static Profile,
 ) -> bool {
-    _logical_assign_state_with(stmt, program, profile).0 == "ok"
+    _logical_assign_state(stmt, program, profile).0 == "ok"
 }
 
 /// Port of checker/structure.py::_logical_assign_undefined_messages
 pub fn _logical_assign_undefined_messages(
-    _stmt: &Unparsed,
-    _program: &Program,
-) -> Option<Vec<String>> {
-    todo!("checker/structure.py::_logical_assign_undefined_messages (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_logical_assign_undefined_messages
-pub fn _logical_assign_undefined_messages_with(
     stmt: &StmtRef,
     program: &ProgramRef,
     profile: &'static Profile,
 ) -> Option<Vec<String>> {
-    let (state, undefined, base_undefined) = _logical_assign_state_with(stmt, program, profile);
+    let (state, undefined, base_undefined) = _logical_assign_state(stmt, program, profile);
     let Stmt::Unparsed(u) = stmt.as_ref() else {
         return None;
     };
@@ -1082,7 +1013,7 @@ pub fn _logical_assign_undefined_messages_with(
                 .collect(),
         );
     }
-    let toks = parser::tokenize_for_parser(&u.base.text, 0).ok()?;
+    let toks = lexer::tokenize(&u.base.text, 0).ok()?;
     let names: BTreeSet<_> = undefined.iter().map(|n| pystr::upper(n)).collect();
     if toks
         .iter()
@@ -1099,12 +1030,7 @@ pub fn _logical_assign_undefined_messages_with(
 }
 
 /// Port of checker/structure.py::_unparsed_string_messages
-pub fn _unparsed_string_messages(_stmt: &Unparsed, _program: &Program) -> Vec<String> {
-    todo!("checker/structure.py::_unparsed_string_messages (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_unparsed_string_messages
-pub fn _unparsed_string_messages_with(
+pub fn _unparsed_string_messages(
     stmt: &Unparsed,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -1131,12 +1057,7 @@ pub fn _unparsed_string_messages_with(
 }
 
 /// Port of checker/structure.py::string_reached
-pub fn string_reached(_text: &str, _operands: &BTreeSet<String>) -> Option<String> {
-    todo!("checker/structure.py::string_reached (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::string_reached
-pub fn string_reached_with(
+pub fn string_reached(
     text: &str,
     operands: &BTreeSet<String>,
     profile: &Profile,
@@ -1144,13 +1065,13 @@ pub fn string_reached_with(
     if profile.single_pass {
         return None;
     }
-    let e = parser::tokenize_for_parser(text, 0).err()?;
+    let e = lexer::tokenize(text, 0).err()?;
     let col = i64::try_from(e.col).ok()?;
     if e.message != "unterminated string" || pystr::char_at(text, col) != Some('"') {
         return None;
     }
     let head_text = pystr::slice(text, None, Some(col));
-    let mut head = parser::tokenize_for_parser(head_text, 0).ok()?;
+    let mut head = lexer::tokenize(head_text, 0).ok()?;
     head.retain(|t| t.kind != "EOF");
     let first = head.first()?;
     if first.kind == "IDENT"
@@ -1222,7 +1143,11 @@ pub fn string_reached_with(
             };
         }
     }
-    let probe = _pass1_scan_with(&(head_text.to_owned() + " __crbunk__"), operands, profile);
+    let probe = _pass1_scan(
+        &(head_text.to_owned() + " __crbunk__"),
+        Some(operands),
+        profile,
+    );
     if probe.is_some_and(|p| p.0 == "pass2") {
         Some("reached".into())
     } else {
@@ -1235,26 +1160,20 @@ pub fn string_reached_with(
 pub struct Everything {}
 
 impl Everything {
-    /// Port of checker/structure.py::_Everything::__contains__
-    pub fn __contains__(&self) -> bool {
-        true
-    }
-
     /// Port of checker/structure.py::_Everything.__contains__
     #[allow(non_snake_case)]
-    pub fn __contains___with<T>(&self, _item: T) -> bool {
+    pub fn __contains__<T>(&self, _item: T) -> bool {
         true
     }
 }
 
-// Retains all Python arguments for the part6 integration. The existing dependency
-// omits tokens/functions and still panics; do not duplicate its implementation here.
+// Convert profile function records to the scanner map, retaining their order.
 #[allow(clippy::too_many_arguments)]
 fn scan_expr_dependency(
-    _toks: &[Token],
+    toks: &[Token],
     i: usize,
-    operands: &BTreeSet<String>,
-    _functions: Option<&Table<Function>>,
+    operands: Option<&BTreeSet<String>>,
+    functions: Option<&Table<Function>>,
     assign: bool,
     start_operand: bool,
     unclosed: Option<&str>,
@@ -1263,9 +1182,17 @@ fn scan_expr_dependency(
     open_fallback: bool,
     symbol_unknown: bool,
 ) -> Option<(String, String)> {
+    let mut scan_functions = super::part6::ScanFunctions::new();
+    if let Some(functions) = functions {
+        for (name, record) in functions.iter() {
+            scan_functions.insert(name.to_owned(), record.clone());
+        }
+    }
     super::part6::_scan_expr(
+        toks,
         i64::try_from(i).ok()?,
         operands,
+        &scan_functions,
         assign,
         start_operand,
         unclosed,
@@ -1277,9 +1204,13 @@ fn scan_expr_dependency(
 }
 
 fn later_arg_unknown_dependency(
-    _args: &[Token],
-    operands: &BTreeSet<String>,
-    _functions: &Table<Function>,
+    args: &[Token],
+    operands: Option<&BTreeSet<String>>,
+    functions: &Table<Function>,
 ) -> bool {
-    super::part6::_later_arg_unknown(operands)
+    let mut scan_functions = super::part6::ScanFunctions::new();
+    for (name, record) in functions.iter() {
+        scan_functions.insert(name.to_owned(), record.clone());
+    }
+    super::part6::_later_arg_unknown(args, operands, &scan_functions)
 }

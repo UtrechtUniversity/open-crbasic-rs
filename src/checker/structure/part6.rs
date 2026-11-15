@@ -16,41 +16,10 @@ pub type ScanVerdict = Option<(String, String)>;
 pub type ScanFunctions = OrderedMap<String, Function>;
 pub type FunctionCallScan = (Vec<Token>, BTreeSet<String>, ScanFunctions, ScanVerdict);
 
-// TODO(integration): import these shared constants when structure/part5 and instr_rules/part1 expose them.
-const _BINARY_WORDS: &[&str] = &["MOD", "OR", "XOR", "AND", "IMP", "EQV"];
-const _START_ERROR_WORDS: &[&str] = &["MOD", "OR", "XOR", "AND", "IMP", "EQV", "IS", "TO"];
-const _BINARY_OPS: &[&str] = &[
-    "=", "<>", "<", ">", "<=", ">=", "+", "-", "*", "/", "^", "&", "\\", ">>", "<<",
-];
-const ZERO_PARAM_INSTRUCTIONS: &[&str] = &[
-    "BEGINPROG",
-    "ENDPROG",
-    "NEXTSCAN",
-    "NEXTSUBSCAN",
-    "EXITSCAN",
-    "CONTINUESCAN",
-    "EXITDO",
-    "EXITFOR",
-    "EXITSUB",
-    "ABORTSCAN",
-    "PRESERVEVARIABLES",
-    "PROCHIPRI",
-    "ENDPROCHIPRI",
-    "LEDOFF",
-    "CARDFLUSH",
-    "OPENINTERVAL",
-    "TABLEHIDE",
-    "RESTORE",
-    "PIPELINEMODE",
-    "ANGLEDEGREES",
-    "WEND",
-    "RESTART",
-    "DEBUGBREAK",
-    "ALLOWSPECIALCOMMS",
-    "PULSECOUNTRESET",
-];
+use super::part5::{_BINARY_OPS, _BINARY_WORDS, _START_ERROR_WORDS};
+use crate::checker::instr_rules::ZERO_PARAM_INSTRUCTIONS;
 
-fn functions_for(profile: &Profile) -> ScanFunctions {
+pub(crate) fn functions_for(profile: &Profile) -> ScanFunctions {
     let mut out = ScanFunctions::new();
     for (k, v) in profile.functions().iter() {
         out.insert(k.to_owned(), v.clone());
@@ -94,7 +63,7 @@ fn scan(
     operands: Option<&BTreeSet<String>>,
     functions: &ScanFunctions,
 ) -> ScanVerdict {
-    _scan_expr_with(
+    _scan_expr(
         toks, 0, operands, functions, true, false, None, false, true, false, false,
     )
 }
@@ -110,15 +79,10 @@ use crate::syntax::{
 };
 
 /// Port of checker/structure.py::_function_call_scan
-pub fn _function_call_scan(_stmt: &Unparsed, _program: &Program) {
-    todo!("checker/structure.py::_function_call_scan (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_function_call_scan
-pub fn _function_call_scan_with(
+pub fn _function_call_scan(
     stmt: &StmtRef,
-    program: &Program,
-    profile: &Profile,
+    program: &crate::syntax::ProgramRef,
+    profile: &'static Profile,
 ) -> Option<FunctionCallScan> {
     let mut functions = ScanFunctions::new();
     for st in &program.statements {
@@ -158,7 +122,7 @@ pub fn _function_call_scan_with(
     {
         return None;
     }
-    let operands = super::pass1_operands(program);
+    let operands = super::pass1_operands(program, profile);
     let mut merged = functions_for(profile);
     for (k, v) in functions.iter() {
         merged.insert(k.clone(), v.clone());
@@ -168,20 +132,15 @@ pub fn _function_call_scan_with(
 }
 
 /// Port of checker/structure.py::_function_symbol_finding
-pub fn _function_symbol_finding(_stmt: &Unparsed, _program: &Program) -> Option<String> {
-    todo!("checker/structure.py::_function_symbol_finding (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_function_symbol_finding
-pub fn _function_symbol_finding_with(
+pub fn _function_symbol_finding(
     stmt: &StmtRef,
-    program: &Program,
-    profile: &Profile,
+    program: &crate::syntax::ProgramRef,
+    profile: &'static Profile,
 ) -> Option<String> {
     if profile.single_pass {
         return None;
     }
-    let (toks, operands, functions, v) = _function_call_scan_with(stmt, program, profile)?;
+    let (toks, operands, functions, v) = _function_call_scan(stmt, program, profile)?;
     if !is_verdict(&v, "pass2", "symbol") {
         return None;
     }
@@ -195,18 +154,12 @@ pub fn _function_symbol_finding_with(
 }
 
 /// Port of checker/structure.py::_function_syntax_findings
-pub fn _function_syntax_findings(_stmt: &Unparsed, _program: &Program) -> Vec<String> {
-    todo!("checker/structure.py::_function_syntax_findings (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_function_syntax_findings
-pub fn _function_syntax_findings_with(
+pub fn _function_syntax_findings(
     stmt: &StmtRef,
-    program: &Program,
-    profile: &Profile,
+    program: &crate::syntax::ProgramRef,
+    profile: &'static Profile,
 ) -> Vec<String> {
-    let Some((toks, operands, functions, v)) = _function_call_scan_with(stmt, program, profile)
-    else {
+    let Some((toks, operands, functions, v)) = _function_call_scan(stmt, program, profile) else {
         return vec![];
     };
     if is_verdict(&v, "pass1", "expects_comma") && !profile.single_pass {
@@ -247,7 +200,7 @@ pub fn _function_syntax_findings_with(
         if after != 0 {
             return vec![
                 "Call argument required.".to_owned(),
-                super::_out_of_place(stmt.text(), stmt.at_eol()),
+                super::_out_of_place(profile, stmt.text(), stmt.at_eol()),
             ];
         }
         return vec![format!("Incomplete expression: {}.", stmt.text())];
@@ -272,20 +225,15 @@ pub fn _function_syntax_findings_with(
                 .map(|(_, t)| profile.unresolved_symbol_message.format(&t.text)),
         );
     }
-    messages.push(super::_no_matching(stmt.text(), stmt.at_eol()));
+    messages.push(super::_no_matching(profile, stmt.text(), stmt.at_eol()));
     messages
 }
 
 /// Port of checker/structure.py::_routine_arg_findings
-pub fn _routine_arg_findings(_stmt: &Unparsed, _program: &Program) -> Vec<String> {
-    todo!("checker/structure.py::_routine_arg_findings (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_routine_arg_findings
-pub fn _routine_arg_findings_with(
+pub fn _routine_arg_findings(
     stmt: &Unparsed,
-    program: &Program,
-    profile: &Profile,
+    program: &crate::syntax::ProgramRef,
+    profile: &'static Profile,
 ) -> Vec<String> {
     let Some(mut toks) = tokens(&stmt.base.text) else {
         return vec![];
@@ -352,7 +300,7 @@ pub fn _routine_arg_findings_with(
         return vec![];
     }
     let mut messages = vec![];
-    let operands = super::pass1_operands(program);
+    let operands = super::pass1_operands(program, profile);
     let functions = functions_for(profile);
     for (ts, text) in args {
         if ts.is_empty() {
@@ -372,14 +320,7 @@ pub fn _routine_arg_findings_with(
 }
 
 /// Port of checker/structure.py::_instruction_arg_findings
-pub fn _instruction_arg_findings(_text: &str, _operands: &BTreeSet<String>) {
-    todo!(
-        "checker/structure.py::_instruction_arg_findings (omitted: profile: untyped, variables: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_instruction_arg_findings
-pub fn _instruction_arg_findings_with(
+pub fn _instruction_arg_findings(
     text: &str,
     operands: &BTreeSet<String>,
     profile: &Profile,
@@ -415,7 +356,7 @@ pub fn _instruction_arg_findings_with(
         && toks[2].kind != "OP"
     {
         let cut = col(toks[1].col) + col(pystr::len(&toks[1].text));
-        return _instruction_arg_findings_with(
+        return _instruction_arg_findings(
             &format!(
                 "{},{}",
                 pystr::slice(text, None, Some(cut)),
@@ -616,12 +557,7 @@ pub fn _symbol_stage(code: Option<i64>) -> i64 {
 const _CONST_ONLY_CODES: &[i64] = &[1, 5, 20, 38];
 
 /// Port of checker/structure.py::_later_arg_unknown
-pub fn _later_arg_unknown(_operands: &BTreeSet<String>) -> bool {
-    todo!("checker/structure.py::_later_arg_unknown (omitted: args: untyped, functions: dict)")
-}
-
-/// Port of checker/structure.py::_later_arg_unknown
-pub fn _later_arg_unknown_with(
+pub fn _later_arg_unknown(
     args: &[Token],
     operands: Option<&BTreeSet<String>>,
     functions: &ScanFunctions,
@@ -662,23 +598,8 @@ const _SELF_CLOSING_FUNCTIONS: &[&str] = &[
 ];
 
 /// Port of checker/structure.py::_scan_expr
-pub fn _scan_expr(
-    _i: i64,
-    _operands: &BTreeSet<String>,
-    _assign: bool,
-    _start_operand: bool,
-    _unclosed: Option<&str>,
-    _cond: bool,
-    _to_ok: bool,
-    _open_fallback: bool,
-    _symbol_unknown: bool,
-) -> Option<(String, String)> {
-    todo!("checker/structure.py::_scan_expr (omitted: toks: untyped, functions: dict)")
-}
-
-/// Port of checker/structure.py::_scan_expr
 #[allow(clippy::if_not_else)]
-pub fn _scan_expr_with(
+pub fn _scan_expr(
     toks: &[Token],
     i: i64,
     operands: Option<&BTreeSet<String>>,
@@ -734,7 +655,7 @@ pub fn _scan_expr_with(
                     return None;
                 } else if functions.contains_key(u) && !contains(operands, u) {
                     if !opens {
-                        if _bare_function_needs_paren_with(u, functions) {
+                        if _bare_function_needs_paren(u, functions) {
                             return verdict("pass1", "expects_paren");
                         }
                         expect_operand = false;
@@ -895,61 +816,44 @@ pub fn _scan_expr_with(
 }
 
 /// Port of checker/structure.py::_bare_function_needs_paren
-pub fn _bare_function_needs_paren(_name: &str) -> bool {
-    todo!("checker/structure.py::_bare_function_needs_paren (omitted: functions: dict)")
-}
-
-/// Port of checker/structure.py::_bare_function_needs_paren
-pub fn _bare_function_needs_paren_with(name: &str, functions: &ScanFunctions) -> bool {
+pub fn _bare_function_needs_paren(name: &str, functions: &ScanFunctions) -> bool {
     functions
         .get(name)
         .is_some_and(|record| record.nargs.is_some_and(|n| n > 0 || record.argspec != 0))
 }
 
 /// Port of checker/structure.py::_mentions_then
-pub fn _mentions_then() -> bool {
-    todo!("checker/structure.py::_mentions_then (omitted: node: untyped)")
-}
-
-/// Port of checker/structure.py::_mentions_then
-pub fn _mentions_then_with(node: Option<&Expr>) -> bool {
+pub fn _mentions_then(node: Option<&Expr>) -> bool {
     let Some(node) = node else {
         return false;
     };
     if let Expr::Name(n) = node {
         return pystr::upper(&n.name) == "THEN";
     }
-    node.children().iter().any(|n| _mentions_then_with(Some(n)))
+    node.children().iter().any(|n| _mentions_then(Some(n)))
 }
 
 /// Port of checker/structure.py::_check_if_pass1
-pub fn _check_if_pass1(_operands: &BTreeSet<String>, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/structure.py::_check_if_pass1 (omitted: stmt: untyped, profile: untyped, program: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_check_if_pass1
-pub fn _check_if_pass1_with(
+pub fn _check_if_pass1(
     stmt: &Stmt,
     operands: &BTreeSet<String>,
-    profile: &Profile,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    program: Option<&Program>,
+    program: Option<&crate::syntax::ProgramRef>,
 ) {
     let cond = match stmt {
         Stmt::If(s) => s.cond.as_deref(),
         Stmt::ElseIf(s) => s.cond.as_deref(),
         _ => None,
     };
-    if _mentions_then_with(cond) && super::condition_part(stmt.text()).is_some() {
-        let v = super::_pass1_scan(stmt.text(), operands);
+    if _mentions_then(cond) && super::condition_part(stmt.text()).is_some() {
+        let v = super::_pass1_scan(stmt.text(), Some(operands), profile);
         if let Some((stage, kind)) = v
             && stage == "pass1"
         {
             diags.error_basic(
                 stmt.line(),
-                &_pass1_message_with(profile, stmt, &kind, None),
+                &_pass1_message(profile, stmt, &kind, None),
                 stmt.file(),
             );
         }
@@ -971,7 +875,7 @@ pub fn _check_if_pass1_with(
         {
             diags.error_basic(
                 sub.line(),
-                &super::_out_of_place(sub.text(), sub.at_eol()),
+                &super::_out_of_place(profile, sub.text(), sub.at_eol()),
                 sub.file(),
             );
         }
@@ -986,23 +890,23 @@ pub fn _check_if_pass1_with(
             && super::_is_generic_unparsed(s)
         {
             if let Some(program) = program {
-                let messages = _routine_arg_findings_with(s, program, profile);
+                let messages = _routine_arg_findings(s, program, profile);
                 if !messages.is_empty() {
                     for message in messages {
                         diags.error_basic(sub.line(), &message, sub.file());
                     }
                     continue;
                 }
-                if super::_logical_assign_accepted(s, program) {
+                if super::_logical_assign_accepted(sub, program, profile) {
                     continue;
                 }
             }
-            if let Some((stage, kind)) = super::_pass1_scan(sub.text(), operands)
+            if let Some((stage, kind)) = super::_pass1_scan(sub.text(), Some(operands), profile)
                 && stage == "pass1"
             {
                 diags.error_basic(
                     sub.line(),
-                    &_pass1_message_with(profile, sub, &kind, None),
+                    &_pass1_message(profile, sub, &kind, None),
                     sub.file(),
                 );
             }
@@ -1013,18 +917,13 @@ pub fn _check_if_pass1_with(
 const _CALLED_BLOCK_KEYWORDS: &[&str] = &[
     "CASE", "DO", "FOR", "FUNCTION", "SCAN", "SELECT", "SUB", "SUBSCAN", "WHILE",
 ];
-static _FOR_TO_RE: LazyLock<pyre::Regex> =
+pub(crate) static _FOR_TO_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"^\s*For\s(?:.*?)=(?:.*?)\sTo\s(.*)$", pyre::I | pyre::S));
 static _FOR_STEP_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"\sStep\s", pyre::I));
 
 /// Port of checker/structure.py::_for_header_incomplete
-pub fn _for_header_incomplete(_text: &str) -> Option<(String, bool)> {
-    todo!("checker/structure.py::_for_header_incomplete (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_for_header_incomplete
-pub fn _for_header_incomplete_with(text: &str, profile: &Profile) -> Option<(String, bool)> {
+pub fn _for_header_incomplete(text: &str, profile: &Profile) -> Option<(String, bool)> {
     let m = _FOR_TO_RE.match_(text)?;
     let init = _FOR_INIT_RE.match_(text);
     let mut parts = vec![];
@@ -1042,8 +941,8 @@ pub fn _for_header_incomplete_with(text: &str, profile: &Profile) -> Option<(Str
         let toks = tokens(part)?;
         if !toks.is_empty()
             && is_verdict(
-                &_scan_expr_with(
-                    &_merge_members_with(&toks),
+                &_scan_expr(
+                    &_merge_members(&toks),
                     0,
                     None,
                     &functions,
@@ -1065,16 +964,11 @@ pub fn _for_header_incomplete_with(text: &str, profile: &Profile) -> Option<(Str
     None
 }
 
-static _FOR_INIT_RE: LazyLock<pyre::Regex> =
+pub(crate) static _FOR_INIT_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"^\s*For\s(?:.*?)=(.*?)\sTo\s", pyre::I | pyre::S));
 
 /// Port of checker/structure.py::_merge_members
-pub fn _merge_members() {
-    todo!("checker/structure.py::_merge_members (omitted: toks: list)")
-}
-
-/// Port of checker/structure.py::_merge_members
-pub fn _merge_members_with(toks: &[Token]) -> Vec<Token> {
+pub fn _merge_members(toks: &[Token]) -> Vec<Token> {
     let mut out = vec![];
     let mut i = 0;
     while i < toks.len() {
@@ -1115,12 +1009,7 @@ pub fn _merge_members_with(toks: &[Token]) -> Vec<Token> {
 }
 
 /// Port of checker/structure.py::_for_header_parts
-pub fn _for_header_parts(_text: &str) {
-    todo!("checker/structure.py::_for_header_parts (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_for_header_parts
-pub fn _for_header_parts_with(text: &str, profile: &Profile) -> Vec<(String, String)> {
+pub fn _for_header_parts(text: &str, profile: &Profile) -> Vec<(String, String)> {
     let mut out = vec![];
     let Some(m) = _FOR_TO_RE.match_(text) else {
         return out;
@@ -1157,8 +1046,8 @@ pub fn _for_header_parts_with(text: &str, profile: &Profile) -> Vec<(String, Str
             }
             continue;
         }
-        let v = _scan_expr_with(
-            &_merge_members_with(&toks),
+        let v = _scan_expr(
+            &_merge_members(&toks),
             0,
             None,
             &functions,
@@ -1181,13 +1070,8 @@ pub fn _for_header_parts_with(text: &str, profile: &Profile) -> Vec<(String, Str
 }
 
 /// Port of checker/structure.py::_for_header_findings
-pub fn _for_header_findings(_text: &str) -> Vec<String> {
-    todo!("checker/structure.py::_for_header_findings (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_for_header_findings
-pub fn _for_header_findings_with(text: &str, profile: &Profile) -> Vec<String> {
-    _for_header_parts_with(text, profile)
+pub fn _for_header_findings(text: &str, profile: &Profile) -> Vec<String> {
+    _for_header_parts(text, profile)
         .iter()
         .map(|(kind, part)| _for_header_message(kind, part))
         .collect()
@@ -1218,15 +1102,6 @@ pub fn _block_keyword_call(stmt: &Stmt) -> bool {
 
 /// Port of checker/structure.py::_unclosed_call_message
 pub fn _unclosed_call_message(
-    _text: &str,
-    _at_eol: bool,
-    _operands: &BTreeSet<String>,
-) -> Option<String> {
-    todo!("checker/structure.py::_unclosed_call_message (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_unclosed_call_message
-pub fn _unclosed_call_message_with(
     profile: &Profile,
     text: &str,
     at_eol: bool,
@@ -1262,7 +1137,7 @@ pub fn _unclosed_call_message_with(
     let nargs = record.as_ref()?.nargs.filter(|n| *n != 0)?;
     if toks.last()?.text == "," {
         return if *count <= nargs {
-            Some(super::_out_of_place(text, at_eol))
+            Some(super::_out_of_place(profile, text, at_eol))
         } else {
             None
         };
@@ -1295,12 +1170,7 @@ pub fn _assigns_const_index(
 }
 
 /// Port of checker/structure.py::_pass1_message
-pub fn _pass1_message(_stmt: &Stmt, _kind: &str, _operands: Option<BTreeSet<String>>) -> String {
-    todo!("checker/structure.py::_pass1_message (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_pass1_message
-pub fn _pass1_message_with(
+pub fn _pass1_message(
     profile: &Profile,
     stmt: &Stmt,
     kind: &str,
@@ -1309,7 +1179,7 @@ pub fn _pass1_message_with(
     let mut text = super::condition_part(stmt.text());
     if kind == "no_matching"
         && let Some(operands) = operands
-        && let Some(refined) = _unclosed_call_message_with(
+        && let Some(refined) = _unclosed_call_message(
             profile,
             text.as_deref().unwrap_or(stmt.text()),
             stmt.at_eol(),
@@ -1323,7 +1193,7 @@ pub fn _pass1_message_with(
         && let Some(operands) = operands
         && let Some(inline) = super::inline_if_condition(stmt.text())
         && !inline.is_empty()
-        && let Some(refined) = _unclosed_call_message_with(profile, &inline, false, operands)
+        && let Some(refined) = _unclosed_call_message(profile, &inline, false, operands)
     {
         return refined;
     }
@@ -1340,7 +1210,7 @@ pub fn _pass1_message_with(
     }
     let text = text.expect("text assigned above");
     match kind {
-        "fallback" => super::_out_of_place(&text, stmt.at_eol()),
+        "fallback" => super::_out_of_place(profile, &text, stmt.at_eol()),
         "incomplete" => format!("Incomplete expression: {text}."),
         "no_matching" => format!("No Matching, or out of place ) in expression: {text}."),
         "expects_comma" => format!("Expression expects , : {text}."),
@@ -1443,7 +1313,7 @@ mod tests {
                         symbol_unknown,
                         everything,
                     ) = config;
-                    let got = _scan_expr_with(
+                    let got = _scan_expr(
                         &tokens(text).unwrap(),
                         0,
                         if everything { None } else { Some(&operands) },
@@ -1489,18 +1359,14 @@ mod tests {
         for name in ["cr6", "cr1000x", "cr300", "cr350"] {
             let profile = crate::profiles::get(name).unwrap();
             for (text, parts, incomplete, findings) in &cases {
+                assert_eq!(&_for_header_parts(text, profile), parts, "{name}: {text:?}");
                 assert_eq!(
-                    &_for_header_parts_with(text, profile),
-                    parts,
-                    "{name}: {text:?}"
-                );
-                assert_eq!(
-                    &_for_header_incomplete_with(text, profile),
+                    &_for_header_incomplete(text, profile),
                     incomplete,
                     "{name}: {text:?}"
                 );
                 assert_eq!(
-                    &_for_header_findings_with(text, profile),
+                    &_for_header_findings(text, profile),
                     findings,
                     "{name}: {text:?}"
                 );

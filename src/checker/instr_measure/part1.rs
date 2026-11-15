@@ -1290,7 +1290,7 @@ pub fn _structure_members_with(program: &Program, type_name: &str) -> OrderedMap
             && let Stmt::Declaration(decl) = candidate.as_ref()
             && decl.kind == "STRUCTUREMEMBER"
         {
-            for var in &decl.vars {
+            for var in decl.vars.borrow().iter() {
                 members.insert(pystr::upper(&var.name), var.as_ref().clone());
             }
         }
@@ -1562,7 +1562,11 @@ pub fn _check_gps_nmea_with(
                 if let Stmt::Declaration(d) = st.as_ref()
                     && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
                 {
-                    d.vars.iter().find(|v| pystr::upper(&v.name) == arg_name)
+                    d.vars
+                        .borrow()
+                        .iter()
+                        .find(|v| pystr::upper(&v.name) == arg_name)
+                        .cloned()
                 } else {
                     None
                 }

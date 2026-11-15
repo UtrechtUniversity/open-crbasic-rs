@@ -708,7 +708,7 @@ pub fn _var_words_with(program: &Program, env: &Env, kinds: &[&str]) -> Vec<(i64
         if !kinds.contains(&decl.kind.as_str()) {
             continue;
         }
-        for v in &decl.vars {
+        for v in decl.vars.borrow().iter() {
             let t = pystr::upper(v.type_.as_deref().unwrap_or("FLOAT"));
             if !matches!(
                 t.as_str(),
@@ -801,7 +801,7 @@ pub fn string_length_oom_line_with(program: &Program, diags: &Diagnostics) -> Op
     for st in &program.statements {
         match st.as_ref() {
             Stmt::Declaration(decl) => {
-                for v in &decl.vars {
+                for v in decl.vars.borrow().iter() {
                     if tagged.contains(&rc_id(v)) {
                         let has_eq = matches!(
                             v.string_size.as_deref(),
@@ -1103,7 +1103,7 @@ mod tests {
                 ..StmtBase::default()
             },
             kind: "DIM".to_string(),
-            vars: vec![v.clone()],
+            vars: vec![v.clone()].into(),
         }));
         let prog = Program {
             name: "test.cr6".to_string(),
@@ -1139,7 +1139,7 @@ mod tests {
                 ..StmtBase::default()
             },
             kind: "PUBLIC".to_string(),
-            vars: vec![v_str.clone()],
+            vars: vec![v_str.clone()].into(),
         }));
         let prog_str = Program {
             name: "test.cr6".to_string(),

@@ -275,7 +275,7 @@ pub fn _build_dims_state(ctx: &crate::checker::context::Context) -> DimsState {
     for stmt in &ctx.program.statements {
         match &**stmt {
             Stmt::Declaration(d) => {
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     let count = i64::try_from(v.dims.len()).unwrap_or(i64::MAX)
                         + i64::from(pystr::upper(v.type_.as_deref().unwrap_or("")) == "STRING");
                     declare(&mut var_dims, &v.name, count);
@@ -778,8 +778,59 @@ pub fn _build_known_names(ctx: &crate::checker::context::Context) -> KnownNames 
             }
         }
 
-        // TODO(integrator-2): wire `structure::_check_alias_dims` and
-        // `structure::_alias_string_slots` here once `p3-s*` signatures are merged.
+        let env = ctx.env();
+        for (pos, st) in program.statements.iter().enumerate() {
+            let Stmt::Instruction(inst) = st.as_ref() else {
+                continue;
+            };
+            if pystr::upper(&inst.keyword) != "ALIAS"
+                || !inst
+                    .args
+                    .iter()
+                    .skip(1)
+                    .flatten()
+                    .any(|a| matches!(a.as_ref(), Expr::Index(_)))
+            {
+                continue;
+            }
+            let prefix = crate::syntax::Program::new("", program.statements[..=pos].to_vec());
+            let prefix = Rc::new(prefix);
+            let view = crate::checker::context::of(&prefix, Some(profile), Some(env.clone()))
+                .scoped_view(st, false);
+            let view_ctx = crate::checker::context::of(&view, Some(profile), Some(env.clone()));
+            let mut scratch = Diagnostics::default();
+            let mut registered = BTreeSet::new();
+            crate::checker::structure::_check_alias_dims(
+                inst,
+                &mut scratch,
+                env,
+                view_ctx.declared_dim0_sizes(),
+                view_ctx.declared_all_dims(),
+                &mut registered,
+                &mut OrderedMap::new(),
+                None,
+                Some(profile),
+                Some(&crate::checker::structure::_alias_string_slots(&view, env)),
+                false,
+            );
+            if scratch
+                .items
+                .iter()
+                .any(|d| d.message == "Alias is illegally dimensioned.")
+            {
+                failed.extend(
+                    inst.args
+                        .iter()
+                        .skip(1)
+                        .flatten()
+                        .filter_map(|a| match a.as_ref() {
+                            Expr::Index(a) => Some(pystr::upper(&a.name)),
+                            _ => None,
+                        })
+                        .filter(|n| !registered.contains(n)),
+                );
+            }
+        }
         for name in &failed {
             if !valid.contains(name) && !program.consts.contains_key(name) {
                 known.remove(name);
@@ -833,7 +884,7 @@ pub fn _unclosed_structure_variables(program: &Program) -> BTreeSet<String> {
             if let Stmt::Declaration(d) = &**st
                 && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
             {
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     if v.type_.as_deref().unwrap_or("") == ot.as_str() {
                         unclosed.insert(pystr::upper(&v.name));
                     }
@@ -1652,7 +1703,8 @@ mod tests {
                 name: "v".to_owned(),
                 type_: Some("MYT".to_owned()),
                 ..VarDecl::default()
-            })],
+            })]
+            .into(),
             ..Declaration::default()
         }));
         let prog = Program::new("", vec![st_open, decl]);

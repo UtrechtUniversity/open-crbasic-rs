@@ -1205,7 +1205,7 @@ impl Parser {
                 Ok(Some(Stmt::Declaration(Declaration {
                     base: StmtBase::new(line, file),
                     kind: "STRUCTUREMEMBER".to_string(),
-                    vars,
+                    vars: vars.into(),
                 })))
             })
         } else {
@@ -1418,7 +1418,7 @@ fn _long_value_fallback(_expr: &Expr, _env: &consteval::Env) -> Option<i64> {
 fn _collect_declared_names(stmt: &Stmt, out: &mut std::collections::HashSet<String>) {
     match stmt {
         Stmt::Declaration(d) => {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 out.insert(pystr::upper(&v.name));
             }
         }

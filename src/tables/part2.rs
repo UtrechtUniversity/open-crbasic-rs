@@ -2002,7 +2002,7 @@ mod tests {
         for s in &prog.statements {
             match s.as_ref() {
                 Stmt::Declaration(d) => {
-                    for v in &d.vars {
+                    for v in d.vars.borrow().iter() {
                         var_info.insert(pystr::upper(&v.name), p1_make_var_info(v, &env));
                         publics.push(Rc::clone(v));
                     }
@@ -2228,7 +2228,7 @@ mod tests {
         for s in &prog_pub.statements {
             match s.as_ref() {
                 Stmt::Declaration(d) => {
-                    for v in &d.vars {
+                    for v in d.vars.borrow().iter() {
                         vi.insert(pystr::upper(&v.name), p1_make_var_info(v, &env));
                         publics.push(Rc::clone(v));
                     }

@@ -607,7 +607,7 @@ pub fn _scan_program(program: &Program) -> Scanned {
                 let m = &stmts[i];
                 match m.as_ref() {
                     Stmt::Declaration(d) => {
-                        st.members.extend(d.vars.iter().cloned());
+                        st.members.extend(d.vars.borrow().iter().cloned());
                     }
                     Stmt::Instruction(m_inst)
                         if _kw(m) == "UNITS"
@@ -646,9 +646,9 @@ pub fn _scan_program(program: &Program) -> Scanned {
         if let Stmt::Declaration(d) = s.as_ref()
             && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
         {
-            all_vars.extend(d.vars.iter().cloned());
+            all_vars.extend(d.vars.borrow().iter().cloned());
             if d.kind == "PUBLIC" {
-                publics.extend(d.vars.iter().cloned());
+                publics.extend(d.vars.borrow().iter().cloned());
             }
             i += 1;
             continue;

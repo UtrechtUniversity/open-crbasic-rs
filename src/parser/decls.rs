@@ -558,7 +558,7 @@ impl Parser {
             return Ok(Stmt::Declaration(Declaration {
                 base: StmtBase::new(line, file),
                 kind,
-                vars: Vec::new(),
+                vars: Vec::new().into(),
             }));
         }
         let mut vars_: Vec<Rc<VarDecl>> = Vec::new();
@@ -597,7 +597,7 @@ impl Parser {
         Ok(Stmt::Declaration(Declaration {
             base: StmtBase::new(line, file),
             kind,
-            vars: vars_,
+            vars: vars_.into(),
         }))
     }
 

@@ -48,6 +48,7 @@ pub fn check_units_targets(program: &Program, _profile: &Profile, diags: &mut Di
             {
                 allowed.extend(
                     decl.vars
+                        .borrow()
                         .iter()
                         .filter(|v| v.type_.as_ref().is_none_or(|ty| !struct_types.contains(ty)))
                         .map(|v| pystr::upper(&v.name)),
@@ -939,7 +940,7 @@ const _MENU_ITEMS: &[&str] = &[
     "DISPLAYLINE",
 ];
 
-const _TABLE_OUTPUT: &[&str] = &[
+pub(crate) const _TABLE_OUTPUT: &[&str] = &[
     "TOTALIZE",
     "AVERAGE",
     "MAXIMUM",
@@ -1168,7 +1169,7 @@ pub fn _is_struct_typed(program: &Program, name: &str) -> bool {
         let Stmt::Declaration(d) = st.as_ref() else {
             return false;
         };
-        d.vars.iter().any(|v| {
+        d.vars.borrow().iter().any(|v| {
             pystr::upper(&v.name) == target
                 && v.type_
                     .as_deref()
@@ -1228,7 +1229,7 @@ pub fn _alias_sources_with(
     let mut declared = OrderedMap::new();
     for st in &program.statements {
         if let Stmt::Declaration(d) = st.as_ref() {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 declared.insert(pystr::upper(&v.name), v.name.clone());
             }
         }
@@ -1742,7 +1743,8 @@ mod tests {
                             ..VarDecl::default()
                         }
                         .into(),
-                    ],
+                    ]
+                    .into(),
                     ..Declaration::default()
                 })),
             ],
@@ -1852,7 +1854,8 @@ mod tests {
                             ..VarDecl::default()
                         }
                         .into(),
-                    ],
+                    ]
+                    .into(),
                     ..Declaration::default()
                 })),
                 make_inst(

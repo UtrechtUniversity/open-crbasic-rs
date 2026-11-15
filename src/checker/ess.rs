@@ -64,7 +64,7 @@ pub fn check_with_env(program: &Program, profile: &Profile, diags: &mut Diagnost
             Stmt::Declaration(decl)
                 if matches!(decl.kind.as_str(), "PUBLIC" | "DIM" | "STATIC") =>
             {
-                for v in &decl.vars {
+                for v in decl.vars.borrow().iter() {
                     let mut total: Option<i64> = Some(1);
                     for d in &v.dims {
                         let n = _const_int_with_env(Some(d.as_ref()), env);
@@ -191,7 +191,8 @@ mod tests {
                     dims,
                     string_size: size,
                     ..Default::default()
-                })],
+                })]
+                .into(),
             }))
         };
         let ess_stmt = Rc::new(Stmt::Instruction(Instruction {

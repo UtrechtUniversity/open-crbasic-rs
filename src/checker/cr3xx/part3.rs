@@ -205,7 +205,6 @@ pub fn check_unknown_line_words_with(
     let mut first_done = false;
     let mut new_items: Vec<DiagRef> = Vec::with_capacity(diags.items.len());
     let mut changed = false;
-    let everything = BTreeSet::new();
 
     for orig_d in &diags.items {
         let mut d = orig_d.clone();
@@ -299,7 +298,7 @@ pub fn check_unknown_line_words_with(
                         .iter()
                         .any(|e| e.severity == "error" && e.line != 0 && e.line < d.line))
             {
-                structure::_pass1_scan(bare, &everything)
+                structure::_pass1_scan(bare, None, profile)
                     .filter(|(a, b)| a == "pass1" && (b == "missing_expr" || b == "fallback"))
             } else {
                 None
@@ -540,7 +539,10 @@ pub fn check_unknown_line_words_with(
                     && !after_fw.starts_with('(')
                     && !after_fw.starts_with('.')
                     && !decl_vars.contains(&fw_upper)
-                    && structure::_bare_function_needs_paren(&fw_upper)
+                    && structure::_bare_function_needs_paren(
+                        &fw_upper,
+                        &structure::part6::functions_for(profile),
+                    )
             });
 
             let mut cond_text =
@@ -612,7 +614,7 @@ pub fn check_unknown_line_words_with(
                     }
                     if let Some(ref inl) = inline {
                         scan_text = format!("If {inl}Then");
-                        let inline_scan = structure::_pass1_scan(&scan_text, &everything);
+                        let inline_scan = structure::_pass1_scan(&scan_text, None, profile);
                         if inline_scan.as_ref().is_some_and(|(a, b)| {
                             a == "pass1"
                                 && matches!(b.as_str(), "incomplete" | "no_matching" | "fallback")
@@ -626,7 +628,7 @@ pub fn check_unknown_line_words_with(
                         || RE_LOGICAL_ASSIGN_LEAD.match_(&stmt.base.text).is_some()
                         || RE_LOGICAL_ASSIGN_ANY.search(&stmt.base.text).is_some();
                     let verdict = if should_scan {
-                        structure::_pass1_scan(&scan_text, &everything)
+                        structure::_pass1_scan(&scan_text, None, profile)
                     } else {
                         None
                     };
@@ -708,6 +710,7 @@ pub fn check_unknown_line_words_with(
                         && stmt.reason != "lex error: unterminated string"
                     {
                         if let Some(refined) = structure::_unclosed_call_message(
+                            profile,
                             &stmt.base.text,
                             stmt.base.at_eol.get(),
                             decl_vars,
@@ -723,7 +726,7 @@ pub fn check_unknown_line_words_with(
                     if let Some(ref cond_s) = cond {
                         if head == Some("No Matching, or out of place ) in expression: ") {
                             if let Some(refined) =
-                                structure::_unclosed_call_message(cond_s, false, decl_vars)
+                                structure::_unclosed_call_message(profile, cond_s, false, decl_vars)
                             {
                                 if refined.starts_with("Expression expects ,") {
                                     head = Some("Expression expects , : ");
@@ -1335,19 +1338,17 @@ pub fn fix_then_operand_with(program: &Program, profile: &Profile, diags: &mut D
     if !p3_is_cr3xx(profile) {
         return;
     }
-    let everything = BTreeSet::new();
     for stmt in &program.statements {
         let cond = match &**stmt {
             Stmt::If(i) => i.cond.as_deref(),
             Stmt::ElseIf(e) => e.cond.as_deref(),
             _ => continue,
         };
-        let _ = cond;
-        if !structure::_mentions_then() {
+        if !structure::_mentions_then(cond) {
             continue;
         }
         let base = stmt.base();
-        let Some((va, vb)) = structure::_pass1_scan(&base.text, &everything) else {
+        let Some((va, vb)) = structure::_pass1_scan(&base.text, None, profile) else {
             continue;
         };
         if va != "pass1" {
@@ -1372,7 +1373,7 @@ pub fn fix_then_operand_with(program: &Program, profile: &Profile, diags: &mut D
             Stmt::ElseIf(e) => e.base.at_eol.set(false),
             _ => {}
         }
-        let message = structure::_pass1_message(&cloned, &vb, None);
+        let message = structure::_pass1_message(profile, &cloned, &vb, None);
         diags.items[hits[0]] = Rc::new(diags.items[hits[0]].replace(|r| r.message = message));
         for &i in hits[1..].iter().rev() {
             diags.items.remove(i);

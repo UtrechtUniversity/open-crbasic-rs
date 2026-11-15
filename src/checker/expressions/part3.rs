@@ -836,7 +836,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
             if let Stmt::Declaration(d) = &**st
                 && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
             {
-                for var in &d.vars {
+                for var in d.vars.borrow().iter() {
                     let key = pystr::upper(&var.name);
                     if !first_variables.contains_key(&key) {
                         first_variables.insert(key, (st.file().to_owned(), st.line()));
@@ -1289,7 +1289,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
         ) {
             diags.error(
                 stmt.line(),
-                &pending_wiring::structure_out_of_place(profile, stmt.text(), stmt.at_eol()),
+                &crate::checker::structure::_out_of_place(profile, stmt.text(), stmt.at_eol()),
                 stmt.file(),
                 ShowFile::Cr3xx,
                 0,
@@ -1699,10 +1699,6 @@ mod pending_wiring {
         _declared: &BTreeSet<String>,
     ) -> Option<String> {
         todo!("wire part4::_function_target_message_with (omits profile on port)")
-    }
-
-    pub fn structure_out_of_place(_profile: &Profile, _text: &str, _at_eol: bool) -> String {
-        todo!("wire structure::_out_of_place_with (omits profile on port)")
     }
 }
 

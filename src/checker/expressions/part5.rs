@@ -232,8 +232,7 @@ pub fn check_function_call_counts_with(
                 diags.error_basic(stmt.line(), "Call argument required.", stmt.file());
             }
             if whole {
-                // TODO(integrator-2): pass profile to structure::_out_of_place
-                super::super::structure::_out_of_place(echo, stmt.at_eol())
+                super::super::structure::_out_of_place(profile, echo, stmt.at_eol())
             } else {
                 format!("Invalid, or out of place expression: {echo}.")
             }
@@ -878,7 +877,7 @@ pub fn check_splitstr_element_reps_with(
     let mut strings = BTreeSet::new();
     for st in &program.statements {
         if let Stmt::Declaration(decl) = &**st {
-            for v in &decl.vars {
+            for v in decl.vars.borrow().iter() {
                 if v.type_.as_deref().map(pystr::upper).as_deref() == Some("STRING") && !v.paren_dim
                 {
                     strings.insert(pystr::upper(&v.name));

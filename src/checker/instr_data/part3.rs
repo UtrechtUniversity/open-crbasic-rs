@@ -415,18 +415,16 @@ pub fn _check_stage2a_with(
                 {
                     diags.error_basic(inst.base.node.line, &message, &inst.base.node.file);
                 }
-                let name = program
-                    .statements
-                    .iter()
-                    .find_map(|d| match d.as_ref() {
-                        Stmt::Declaration(decl) => decl
-                            .vars
-                            .iter()
-                            .find(|v| pystr::upper(&v.name) == source_upper)
-                            .map(|v| v.name.as_str()),
-                        _ => None,
-                    })
-                    .unwrap_or(source_name);
+                let name = program.statements.iter().find_map(|d| match d.as_ref() {
+                    Stmt::Declaration(decl) => decl
+                        .vars
+                        .borrow()
+                        .iter()
+                        .find(|v| pystr::upper(&v.name) == source_upper)
+                        .map(|v| v.name.clone()),
+                    _ => None,
+                });
+                let name = name.as_deref().unwrap_or(source_name);
                 if source_type.as_deref() != Some("UINT1")
                     && match source {
                         Some(Expr::Index(ix)) => ix
@@ -976,7 +974,7 @@ pub fn check_odd_pair_reps_with(
     let mut types: OrderedMap<String, String> = OrderedMap::new();
     for st in &program.statements {
         if let Stmt::Declaration(decl) = st.as_ref() {
-            for v in &decl.vars {
+            for v in decl.vars.borrow().iter() {
                 types.insert(
                     pystr::upper(&v.name),
                     v.type_.clone().unwrap_or_else(|| "FLOAT".to_owned()),

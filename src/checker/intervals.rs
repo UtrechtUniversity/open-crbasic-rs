@@ -471,7 +471,11 @@ pub fn _timer_shadowed_with<S: std::hash::BuildHasher>(
                 return true;
             }
             Stmt::Declaration(d)
-                if d.kind == "DIM" && d.vars.iter().any(|v| pystr::upper(&v.name) == "TIMER") =>
+                if d.kind == "DIM"
+                    && d.vars
+                        .borrow()
+                        .iter()
+                        .any(|v| pystr::upper(&v.name) == "TIMER") =>
             {
                 return true;
             }

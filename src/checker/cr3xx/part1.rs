@@ -973,7 +973,7 @@ pub fn _destination_types_with(
     let mut declared: HashSet<String> = HashSet::new();
     for st in &program.statements {
         if let Stmt::Declaration(decl) = &**st {
-            for v in &decl.vars {
+            for v in decl.vars.borrow().iter() {
                 declared.insert(pystr::upper(&v.name));
             }
         }

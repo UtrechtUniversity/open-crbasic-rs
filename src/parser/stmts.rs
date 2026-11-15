@@ -698,7 +698,7 @@ impl Parser {
             return Ok(Stmt::Declaration(Declaration {
                 base: StmtBase::new(line, file),
                 kind: "STRUCTUREMEMBER".to_string(),
-                vars: vec![var],
+                vars: vec![var].into(),
             }));
         }
         if let Expr::Name(ref nm) = *target {

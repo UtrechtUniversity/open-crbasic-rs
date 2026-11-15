@@ -996,7 +996,7 @@ pub fn check_iif_types(program: &ProgramRef, profile: &'static Profile, diags: &
                     }
                     diags.error_basic(
                         base.node.line,
-                        &crate::checker::structure::_out_of_place_with(
+                        &crate::checker::structure::_out_of_place(
                             profile,
                             &base.text,
                             base.at_eol.get(),

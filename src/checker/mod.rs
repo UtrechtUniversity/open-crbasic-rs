@@ -327,7 +327,7 @@ pub fn _resolve(
     diags: &mut Diagnostics,
     program: &Program,
     flat: &Program,
-    profile: &Profile,
+    profile: &'static Profile,
     stop_at: Option<i64>,
     table_stop_pos: Option<i64>,
 ) {
@@ -439,10 +439,7 @@ pub fn _resolve(
     let argument_error_first: BTreeSet<(String, i64)> = _run_pass_capture(
         "structure::pipeline_argument_error_first_locations",
         "",
-        || {
-            structure::pipeline_argument_error_first_locations(program);
-            BTreeSet::new()
-        },
+        || structure::pipeline_argument_error_first_locations(program, profile),
     )
     .unwrap_or_default();
     let mut ordinary_pipe = Vec::new();
@@ -625,7 +622,7 @@ pub fn _check_with_context(
         expressions::set_arity_context(program, Some(ctx.declared_variable_names().clone()));
     });
     _run_pass("structure::check_pass1", "pass1", || {
-        structure::check_pass1(program, diags);
+        structure::check_pass1(program, profile, diags, Some(env));
     });
     _run_pass("expressions::check_consts", "pass1", || {
         expressions::check_consts(program, diags);
@@ -670,7 +667,7 @@ pub fn _check_with_context(
         instr_rules::check_return_placement(program, profile, diags);
     });
     _run_pass("structure::check_missing_param_followup", "pass1", || {
-        structure::check_missing_param_followup(program, diags);
+        structure::check_missing_param_followup(program, profile, diags);
     });
     _run_pass("instr_rules::check_too_many", "pass1", || {
         instr_rules::check_too_many(ctx.flat(), profile, diags);
@@ -802,7 +799,13 @@ pub fn _check_with_context(
 
     let mut stop_at: Option<i64> = None;
     let mut flat = program.clone();
-    let links = structure::CallLinks::default();
+    let mut links = structure::CallLinks::default();
+    for stmt in &ctx.flat().statements {
+        let key = (stmt.file().to_owned(), stmt.line());
+        if let Some(pos) = ctx.positions().get(&key) {
+            links.positions.insert(key, *pos);
+        }
+    }
     if !diags.has_errors() || profile.single_pass {
         _run_aside(
             "instr_rules::check_spi_open_order",
@@ -826,18 +829,18 @@ pub fn _check_with_context(
                 "leading",
                 diags,
                 |aside| {
-                    structure::check_block_closers(program, aside);
+                    structure::check_block_closers(program, profile, aside);
                 },
             );
         } else {
             _run_pass("structure::check_block_closers", "tier_b", || {
-                structure::check_block_closers(program, diags);
+                structure::check_block_closers(program, profile, diags);
             });
         }
 
         flat = ctx.flat().clone();
-        let _stop_line = _run_pass_capture("structure::check_pass2", "tier_b_generic", || {
-            structure::check_pass2(&flat, diags, Some(&links));
+        let stop_line = _run_pass_capture("structure::check_pass2", "tier_b_generic", || {
+            structure::check_pass2(&flat, profile, diags, Some(env.clone()), Some(&mut links))
         });
         if !profile.single_pass {
             let early_scan: Vec<DiagRef> = diags
@@ -850,11 +853,15 @@ pub fn _check_with_context(
             diags.items.retain(|d| d.phase != "early_scan");
         }
 
-        let mut stops: Vec<(String, i64)> = Vec::new();
+        let mut stops: Vec<(String, i64)> = if stop_line.flatten().is_some() {
+            links.cutoff.clone().into_iter().collect()
+        } else {
+            Vec::new()
+        };
         let unreached_off: BTreeSet<(String, i64)> = BTreeSet::new();
         if let Some(Some(stray_stop)) =
             _run_pass_capture("structure::check_stray_controls", "tier_b", || {
-                structure::check_stray_controls(program, diags)
+                structure::check_stray_controls(program, profile, diags)
             })
         {
             stops.push(stray_stop);
@@ -864,7 +871,7 @@ pub fn _check_with_context(
             "pipe",
             diags,
             |aside| {
-                structure::check_pipeline_task_placement(program, aside);
+                structure::check_pipeline_task_placement(program, profile, aside);
             },
         );
         _run_aside(
@@ -872,7 +879,7 @@ pub fn _check_with_context(
             "pipe",
             diags,
             |aside| {
-                structure::check_slow_sequence_blocks(program, aside);
+                structure::check_slow_sequence_blocks(program, profile, aside);
             },
         );
         if let Some(Some(menu_stop)) = _run_pass_capture(
@@ -1219,12 +1226,12 @@ pub fn _check_with_context(
 
     if profile.single_pass {
         _run_pass("structure::commit_deferred_sub_error", "tier_b", || {
-            structure::commit_deferred_sub_error(structure::CallLinks::default(), diags);
+            structure::commit_deferred_sub_error(&links, profile, diags);
         });
     }
     if profile.single_pass && !diags.has_errors() {
         _run_pass("structure::check_data_table_placement", "tier_b", || {
-            structure::check_data_table_placement(program, diags);
+            structure::check_data_table_placement(program, profile, diags);
         });
     }
 
@@ -1362,8 +1369,7 @@ pub fn _check_with_context(
             warnings::check_early(program, profile, diags);
         });
         let stop = _run_pass_capture("structure::check_scan_placement_late", "late_scan", || {
-            structure::check_scan_placement_late(program, diags);
-            None::<(String, i64)>
+            structure::check_scan_placement_late(program, profile, diags)
         })
         .flatten();
         let ref_lines: Vec<i64> = Vec::new();
@@ -1475,7 +1481,7 @@ pub fn _check_with_context(
             "tier_c_apply",
             diags,
             |aside| {
-                structure::check_apply_restart_sequence(program, aside);
+                structure::check_apply_restart_sequence(program, profile, aside);
             },
         );
         _run_pass("instr_rules::check_samplefieldcal", "tier_c_tail", || {
@@ -1544,7 +1550,7 @@ pub fn _check_with_context(
     _resolve(diags, program, &flat, profile, stop_at, table_stop_pos);
 
     _run_pass("structure::finalize_call_links", "link", || {
-        structure::finalize_call_links(links, diags, pass1_errors);
+        structure::finalize_call_links(&links, profile, diags, pass1_errors);
     });
 
     _run_pass(

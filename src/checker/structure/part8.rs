@@ -11,7 +11,7 @@
 )]
 
 use super::part7::{_illegal_dim_message, _split_top};
-use super::part9::_alias_name_lead_with;
+use super::part9::_alias_name_lead;
 use crate::checker::expressions::part1::{
     _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names_with, _variable_refs, KnownView,
 };
@@ -84,21 +84,6 @@ pub fn _group_items(text: &str, open_at: i64) -> Option<Vec<String>> {
 
 /// Port of checker/structure.py::_report_decl_expr
 pub fn _report_decl_expr(
-    _echo: &str,
-    _known: &BTreeSet<String>,
-    _variables: &BTreeSet<String>,
-    _stmt: &Stmt,
-    _diags: &mut Diagnostics,
-    _allow_variable: bool,
-    _indexed_constants: &BTreeSet<String>,
-) -> bool {
-    todo!(
-        "checker/structure.py::_report_decl_expr (omitted: expr: untyped, profile: untyped, tag: object)"
-    )
-}
-
-/// Port of checker/structure.py::_report_decl_expr
-pub fn _report_decl_expr_with(
     expr: Option<&Expr>,
     echo: &str,
     known: &KnownView<'_>,
@@ -183,18 +168,6 @@ pub fn _report_decl_expr_with(
 
 /// Port of checker/structure.py::_report_juxtaposed_dim
 pub fn _report_juxtaposed_dim(
-    _expr: &Juxtaposed,
-    _echo: &str,
-    _known: &BTreeSet<String>,
-    _variables: &BTreeSet<String>,
-    _stmt: &Stmt,
-    _diags: &mut Diagnostics,
-) -> bool {
-    todo!("checker/structure.py::_report_juxtaposed_dim (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_report_juxtaposed_dim
-pub fn _report_juxtaposed_dim_with(
     expr: &Juxtaposed,
     echo: &str,
     known: &KnownView<'_>,
@@ -212,7 +185,7 @@ pub fn _report_juxtaposed_dim_with(
                 stmt.file(),
             );
         }
-        _report_decl_expr_with(
+        _report_decl_expr(
             Some(&expr),
             echo,
             known,
@@ -275,25 +248,16 @@ static BLANK_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"\s*
 
 /// Port of checker/structure.py::_check_member_types
 pub fn _check_member_types(
-    _stmt: &Declaration,
-    _structs_seen: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/structure.py::_check_member_types (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_check_member_types
-pub fn _check_member_types_with(
     stmt: &Declaration,
     structs_seen: &BTreeSet<String>,
     profile: &Profile,
     diags: &mut Diagnostics,
 ) {
     let segments = _split_top(&stmt.base.text, ",");
-    if segments.len() != stmt.vars.len() {
+    if segments.len() != stmt.vars.borrow().len() {
         return;
     }
-    for (v, seg) in stmt.vars.iter().zip(segments) {
+    for (v, seg) in stmt.vars.borrow().iter().zip(segments) {
         if let Some(ty) = &v.type_
             && !ty.is_empty()
             && !_VARIABLE_TYPES.contains(&ty.as_str())
@@ -315,16 +279,6 @@ pub fn _check_member_types_with(
 
 /// Port of checker/structure.py::_check_header_types
 pub fn _check_header_types(
-    text: &str,
-    _stmt: &SubDef,
-    _structs_seen: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-) -> bool {
-    todo!("checker/structure.py::_check_header_types (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_check_header_types
-pub fn _check_header_types_with(
     text: &str,
     stmt: &SubDef,
     structs_seen: &BTreeSet<String>,
@@ -352,13 +306,8 @@ pub fn _check_header_types_with(
 }
 
 /// Port of checker/structure.py::_check_init_bounds
-pub fn _check_init_bounds(_stmt: &Declaration, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::_check_init_bounds (omitted: env: consteval.Env)")
-}
-
-/// Port of checker/structure.py::_check_init_bounds
-pub fn _check_init_bounds_with(stmt: &Declaration, env: &Env, diags: &mut Diagnostics) {
-    for v in &stmt.vars {
+pub fn _check_init_bounds(stmt: &Declaration, env: &Env, diags: &mut Diagnostics) {
+    for v in stmt.vars.borrow().iter() {
         let Some(init) = &v.init else {
             continue;
         };
@@ -425,21 +374,6 @@ pub fn _adjacent_literals(text: &str) -> bool {
 
 /// Port of checker/structure.py::_check_decl_exprs
 pub fn _check_decl_exprs(
-    _stmt: &Declaration,
-    _known: &BTreeSet<String>,
-    _variables: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-    _struct_types: &BTreeSet<String>,
-    _stop_at: Option<i64>,
-    _indexed_constants: &BTreeSet<String>,
-) -> Option<i64> {
-    todo!(
-        "checker/structure.py::_check_decl_exprs (omitted: profile: untyped, length_scope: tuple[set[str], set[str]] | None)"
-    )
-}
-
-/// Port of checker/structure.py::_check_decl_exprs
-pub fn _check_decl_exprs_with(
     stmt: &Declaration,
     known: &KnownView<'_>,
     variables: &BTreeSet<String>,
@@ -459,19 +393,19 @@ pub fn _check_decl_exprs_with(
         body = pystr::slice(body, Some(i64::try_from(first).unwrap()), None);
     }
     let mut segments = _split_top(body, ",");
-    while segments.len() > stmt.vars.len()
+    while segments.len() > stmt.vars.borrow().len()
         && segments.last().is_some_and(|s| pystr::strip(s).is_empty())
     {
         segments.pop();
     }
-    if segments.len() != stmt.vars.len() {
+    if segments.len() != stmt.vars.borrow().len() {
         return None;
     }
     let mut unsupported = false;
     let mut empty_eq = false;
     let mut unsupported_at: Option<usize> = None;
     let statement = Stmt::Declaration(stmt.clone());
-    for (index, (v, seg)) in stmt.vars.iter().zip(&segments).enumerate() {
+    for (index, (v, seg)) in stmt.vars.borrow().iter().zip(&segments).enumerate() {
         if unsupported_at.is_some() {
             break;
         }
@@ -487,7 +421,7 @@ pub fn _check_decl_exprs_with(
         {
             after_name = pystr::slice(after_name, Some(i64::try_from(junk.end0()).unwrap()), None);
         }
-        if index == stmt.vars.len() - 1
+        if index == stmt.vars.borrow().len() - 1
             && !profile.single_pass
             && let Some(blank) = BLANK_RE.fullmatch(after_name)
         {
@@ -520,7 +454,7 @@ pub fn _check_decl_exprs_with(
                     &format!("Variable illegal in Parameter: {echo}."),
                     &stmt.base.node.file,
                 );
-                if let Some(next) = stmt.vars.get(index + 2) {
+                if let Some(next) = stmt.vars.borrow().get(index + 2) {
                     diags.error_basic(
                         stmt.base.node.line,
                         &format!("Too many parameters:  {}.", next.name),
@@ -573,7 +507,7 @@ pub fn _check_decl_exprs_with(
                 &stmt.base.node.file,
             );
             if profile.single_pass {
-                if let Some(next) = stmt.vars.get(index + 2) {
+                if let Some(next) = stmt.vars.borrow().get(index + 2) {
                     diags.error_basic(
                         stmt.base.node.line,
                         &format!("Too many parameters:  {}.", next.name),
@@ -588,7 +522,7 @@ pub fn _check_decl_exprs_with(
             && stop_at.is_none_or(|stop| i64::try_from(index).unwrap() < stop)
             && let Some(m) = size_match
         {
-            length_bad = _report_decl_expr_with(
+            length_bad = _report_decl_expr(
                 v.string_size.as_deref(),
                 m.group(1).unwrap(),
                 &KnownView::from_set(length_known),
@@ -642,7 +576,7 @@ pub fn _check_decl_exprs_with(
                 let mut bad_dim = false;
                 for (d, text) in dims.iter().zip(items) {
                     bad_dim |= if let Expr::Juxtaposed(d) = d.as_ref() {
-                        _report_juxtaposed_dim_with(
+                        _report_juxtaposed_dim(
                             d,
                             pystr::lstrip(&text),
                             known,
@@ -652,7 +586,7 @@ pub fn _check_decl_exprs_with(
                             diags,
                         )
                     } else {
-                        _report_decl_expr_with(
+                        _report_decl_expr(
                             Some(d),
                             pystr::lstrip(&text),
                             known,
@@ -667,7 +601,7 @@ pub fn _check_decl_exprs_with(
                     };
                 }
                 if bad_dim && profile.single_pass {
-                    if let Some(next) = stmt.vars.get(index + 2) {
+                    if let Some(next) = stmt.vars.borrow().get(index + 2) {
                         diags.error_basic(
                             stmt.base.node.line,
                             &format!("Too many parameters:  {}.", next.name),
@@ -679,7 +613,7 @@ pub fn _check_decl_exprs_with(
             }
         }
         if length_bad && profile.single_pass {
-            if let Some(next) = stmt.vars.get(index + 2) {
+            if let Some(next) = stmt.vars.borrow().get(index + 2) {
                 diags.error_basic(
                     stmt.base.node.line,
                     &format!("Too many parameters:  {}.", next.name),
@@ -728,7 +662,7 @@ pub fn _check_decl_exprs_with(
             let mut live = variables.clone();
             live.extend(["STATUS".to_owned(), "SETTINGS".to_owned()]);
             for (e, text) in init.iter().zip(items) {
-                bad |= _report_decl_expr_with(
+                bad |= _report_decl_expr(
                     e.as_deref(),
                     pystr::lstrip(&text),
                     known,
@@ -748,7 +682,7 @@ pub fn _check_decl_exprs_with(
                     &stmt.base.node.file,
                 );
                 if profile.single_pass {
-                    if let Some(next) = stmt.vars.get(index + 2) {
+                    if let Some(next) = stmt.vars.borrow().get(index + 2) {
                         diags.error_basic(
                             stmt.base.node.line,
                             &format!("Too many parameters:  {}.", next.name),
@@ -761,7 +695,7 @@ pub fn _check_decl_exprs_with(
         }
     }
     if let Some(index) = unsupported_at {
-        if let Some(next) = stmt.vars.get(index + 2) {
+        if let Some(next) = stmt.vars.borrow().get(index + 2) {
             diags.error_basic(
                 stmt.base.node.line,
                 &format!("Too many parameters:  {}.", next.name),
@@ -775,18 +709,6 @@ pub fn _check_decl_exprs_with(
 
 /// Port of checker/structure.py::_check_alias_index_names
 pub fn _check_alias_index_names(
-    _stmt: &Instruction,
-    _known: &BTreeSet<String>,
-    _variables: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-    _check_variables: bool,
-    _indexed_constants: &BTreeSet<String>,
-) -> bool {
-    todo!("checker/structure.py::_check_alias_index_names (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_check_alias_index_names
-pub fn _check_alias_index_names_with(
     stmt: &Instruction,
     known: &KnownView<'_>,
     variables: &BTreeSet<String>,
@@ -864,7 +786,7 @@ pub fn _check_alias_index_names_with(
             && (!_undefined_names_with(a.as_deref(), known).is_empty()
                 || (check_variables && !_variable_refs(a.as_deref(), variables).is_empty()))
         {
-            bad |= _report_decl_expr_with(
+            bad |= _report_decl_expr(
                 a.as_deref(),
                 &text,
                 known,
@@ -904,12 +826,7 @@ pub fn _alias_flat_offset(index: Vec<i64>, dims: Vec<i64>) -> i64 {
 }
 
 /// Port of checker/structure.py::_alias_string_slots
-pub fn _alias_string_slots(_program: &Program) {
-    todo!("checker/structure.py::_alias_string_slots (omitted: env: consteval.Env)")
-}
-
-/// Port of checker/structure.py::_alias_string_slots
-pub fn _alias_string_slots_with(
+pub fn _alias_string_slots(
     program: &Program,
     env: &Env,
 ) -> OrderedMap<String, (Option<i64>, usize)> {
@@ -921,7 +838,7 @@ pub fn _alias_string_slots_with(
         if !matches!(stmt.kind.as_str(), "PUBLIC" | "DIM" | "STATIC") {
             continue;
         }
-        for v in &stmt.vars {
+        for v in stmt.vars.borrow().iter() {
             out.remove(&pystr::upper(&v.name));
             if pystr::upper(v.type_.as_deref().unwrap_or("")) != "STRING"
                 || v.paren_dim
@@ -946,20 +863,6 @@ pub fn _alias_string_slots_with(
 
 /// Port of checker/structure.py::_alias_parameter_declaration
 pub fn _alias_parameter_declaration(
-    _routine: &SubDef,
-    _declared: &OrderedMap<String, String>,
-    _known: &BTreeSet<String>,
-    _forward: &BTreeSet<String>,
-    _diags: Option<&mut Diagnostics>,
-    _structs_seen: &BTreeSet<String>,
-) {
-    todo!(
-        "checker/structure.py::_alias_parameter_declaration (omitted: env: consteval.Env, profile: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_alias_parameter_declaration
-pub fn _alias_parameter_declaration_with(
     routine: &SubDef,
     env: &Env,
     declared: &OrderedMap<String, String>,
@@ -992,7 +895,7 @@ pub fn _alias_parameter_declaration_with(
         .as_ref()
         .is_some_and(|segments| segments.len() == routine.params.len());
     if !split && let Some(diags) = diags.as_deref_mut() {
-        _check_header_types_with(&routine.base.text, routine, structs_seen, profile, diags);
+        _check_header_types(&routine.base.text, routine, structs_seen, profile, diags);
     }
     let one = Rc::new(Expr::Number(Number {
         node: Node::new(routine.base.node.line, ""),
@@ -1020,7 +923,7 @@ pub fn _alias_parameter_declaration_with(
             .filter(|texts| texts.len() == param.dim_exprs.len());
         let mut stop =
             if let (Some(diags), true, Some(segment)) = (diags.as_deref_mut(), split, segment) {
-                _check_header_types_with(segment, routine, structs_seen, profile, diags)
+                _check_header_types(segment, routine, structs_seen, profile, diags)
             } else {
                 false
             };
@@ -1060,7 +963,7 @@ pub fn _alias_parameter_declaration_with(
                             .collect::<Vec<_>>()
                             .join(" ")
                     };
-                    _report_juxtaposed_dim_with(
+                    _report_juxtaposed_dim(
                         d,
                         &echo,
                         &KnownView::from_set(&header_known),
@@ -1102,7 +1005,7 @@ pub fn _alias_parameter_declaration_with(
                     if let Some(diags) = diags.as_deref_mut() {
                         diags.error_basic(
                             routine.base.node.line,
-                            &_illegal_dim_message(&statement),
+                            &_illegal_dim_message(&statement, None),
                             &routine.base.node.file,
                         );
                     }
@@ -1114,7 +1017,7 @@ pub fn _alias_parameter_declaration_with(
                     let reported = if let (true, Some(diags), Some(texts)) =
                         (size.is_none(), diags.as_deref_mut(), texts.as_ref())
                     {
-                        _report_decl_expr_with(
+                        _report_decl_expr(
                             Some(d),
                             pystr::lstrip(&texts[pos]),
                             &KnownView::from_set(&header_known),
@@ -1145,7 +1048,7 @@ pub fn _alias_parameter_declaration_with(
             && let Some(size_text) = _STRING_SIZE_RE.search(segment.unwrap_or(""))
             && let Some(diags) = diags.as_deref_mut()
         {
-            _report_decl_expr_with(
+            _report_decl_expr(
                 param.string_size.as_deref(),
                 pystr::strip(size_text.group(1).unwrap()),
                 &KnownView::from_set(&header_known),
@@ -1207,7 +1110,7 @@ pub fn _alias_parameter_declaration_with(
             .iter()
             .rposition(|&c| c == ')');
         let after = after.map_or(0, |at| at + 1);
-        _check_header_types_with(
+        _check_header_types(
             pystr::slice(
                 &routine.base.text,
                 Some(i64::try_from(after).unwrap()),
@@ -1223,7 +1126,7 @@ pub fn _alias_parameter_declaration_with(
         Declaration {
             base: StmtBase::new(routine.base.node.line, &routine.base.node.file),
             kind: "DIM".to_owned(),
-            vars: view,
+            vars: view.into(),
         },
         failed,
     )
@@ -1231,22 +1134,13 @@ pub fn _alias_parameter_declaration_with(
 
 /// Port of checker/structure.py::_alias_name_collisions
 pub fn _alias_name_collisions(
-    _stmt: &Instruction,
-    _declared: &OrderedMap<String, String>,
-    _in_routine: bool,
-) -> OrderedMap<usize, String> {
-    todo!("checker/structure.py::_alias_name_collisions (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_alias_name_collisions
-pub fn _alias_name_collisions_with(
     stmt: &Instruction,
     declared: &OrderedMap<String, String>,
     profile: Option<&Profile>,
     in_routine: bool,
 ) -> OrderedMap<usize, String> {
     let mut out = OrderedMap::new();
-    let lead = _alias_name_lead_with(stmt);
+    let lead = _alias_name_lead(stmt);
     let junk = stmt.alias_item_junk.as_deref().unwrap_or(&[]);
     for (k, a) in stmt.args.iter().skip(1).enumerate() {
         let Some(Expr::Name(a)) = a.as_deref() else {
@@ -1303,13 +1197,13 @@ mod tests {
             let stmt = Stmt::Declaration(Declaration {
                 base: StmtBase::new(7, "é.crb"),
                 kind: "DIM".to_owned(),
-                vars: Vec::new(),
+                vars: Vec::new().into(),
             });
             let expr = Expr::Name(crate::syntax::Name {
                 node: Node::new(7, ""),
                 name: "Nope".to_owned(),
             });
-            assert!(_report_decl_expr_with(
+            assert!(_report_decl_expr(
                 Some(&expr),
                 " Nope ",
                 &KnownView::from_set(&BTreeSet::new()),
@@ -1343,7 +1237,7 @@ mod tests {
                 ..SubDef::default()
             };
             let mut diags = Diagnostics::new();
-            assert!(_check_header_types_with(
+            assert!(_check_header_types(
                 "Sub F As UInt4 As Floatx",
                 &header,
                 &BTreeSet::new(),
@@ -1369,7 +1263,7 @@ mod tests {
             let expr = crate::parser::partial_expression("K(1)", profile).unwrap();
             let constants = BTreeSet::from(["K".to_owned()]);
             let mut diags = Diagnostics::new();
-            assert!(_report_decl_expr_with(
+            assert!(_report_decl_expr(
                 Some(&expr),
                 "K(1)",
                 &KnownView::from_set(&constants),
@@ -1399,11 +1293,12 @@ mod tests {
                     dims: vec![Rc::clone(&number)],
                     init: Some(vec![Some(number)]),
                     ..VarDecl::default()
-                })],
+                })]
+                .into(),
                 ..Declaration::default()
             };
             let raised = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                _check_init_bounds_with(&stmt, &env, &mut Diagnostics::new());
+                _check_init_bounds(&stmt, &env, &mut Diagnostics::new());
             }));
             assert!(raised.is_err());
         }
@@ -1429,11 +1324,12 @@ mod tests {
                     dims: vec![Rc::clone(&number)],
                     init: Some(vec![Some(Rc::clone(&number)), Some(number)]),
                     ..VarDecl::default()
-                })],
+                })]
+                .into(),
                 ..Declaration::default()
             };
             let mut diags = Diagnostics::new();
-            _check_init_bounds_with(&stmt, &env, &mut diags);
+            _check_init_bounds(&stmt, &env, &mut diags);
             assert_eq!(diags.items.len(), warnings);
         }
         let (program, _) = crate::parser::parse_text(
@@ -1445,7 +1341,7 @@ mod tests {
         let mut diags = Diagnostics::new();
         for stmt in &program.statements {
             if let Stmt::Declaration(stmt) = stmt.as_ref() {
-                _check_init_bounds_with(stmt, &env, &mut diags);
+                _check_init_bounds(stmt, &env, &mut diags);
             }
         }
         assert_eq!(diags.items.len(), 2);
@@ -1461,7 +1357,7 @@ mod tests {
             None,
             Some(profile),
         );
-        let slots = _alias_string_slots_with(&program, &env);
+        let slots = _alias_string_slots(&program, &env);
         assert_eq!(
             slots
                 .iter()

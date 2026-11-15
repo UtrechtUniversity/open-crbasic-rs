@@ -98,6 +98,12 @@ impl<T: RcSer> RcSer for Vec<T> {
     }
 }
 
+impl<T: RcSer> RcSer for RefCell<T> {
+    fn ser<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.borrow().ser(s)
+    }
+}
+
 struct RcWrap<'a, T>(&'a T);
 
 impl<T: RcSer> Serialize for RcWrap<'_, T> {
@@ -615,7 +621,7 @@ pub struct Declaration {
     pub base: StmtBase,
     pub kind: String,
     #[serde(serialize_with = "ser_rc")]
-    pub vars: Vec<Rc<VarDecl>>,
+    pub vars: RefCell<Vec<Rc<VarDecl>>>,
 }
 
 /// Python `ConstDecl`. `type_` is serialized as `"type_"` (the enum tag owns `"type"`).
@@ -1530,7 +1536,8 @@ mod tests {
                 type_: Some("FLOAT".into()),
                 dim0_span: Some((9, 10)),
                 ..VarDecl::new("X")
-            })],
+            })]
+            .into(),
         });
         assert_eq!(
             json_of(&decl),

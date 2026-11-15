@@ -58,24 +58,9 @@ fn const_to_i64(v: &ConstValue) -> Option<i64> {
     }
 }
 
-/// Port of `checker/structure.py::_check_alias_dims`.
-pub fn _check_alias_dims(
-    _stmt: &Instruction,
-    _diags: &mut Diagnostics,
-    _dim0_sizes: &OrderedMap<String, i64>,
-    _all_dims: &OrderedMap<String, Vec<i64>>,
-    _seen_alias_names: &BTreeSet<String>,
-    _collisions: Option<OrderedMap<usize, String>>,
-    _register_collisions: bool,
-) {
-    todo!(
-        "checker/structure.py::_check_alias_dims (omitted: env: consteval.Env, seen_alias_sources: dict[str, set[tuple]], profile: untyped, string_slots: dict[str, tuple[int | None, int]] | None)"
-    )
-}
-
-/// Port of `checker/structure.py::_check_alias_dims`.
+/// Port of checker/structure.py::_check_alias_dims
 #[allow(clippy::too_many_arguments)]
-pub fn _check_alias_dims_with(
+pub fn _check_alias_dims(
     stmt: &Instruction,
     diags: &mut Diagnostics,
     env: &consteval::Env,
@@ -203,7 +188,7 @@ pub fn _check_alias_dims_with(
     }
 
     let sizes = if total.is_some() {
-        _alias_name_sizes_with(stmt, env)
+        _alias_name_sizes(stmt, env)
     } else {
         None
     };
@@ -262,7 +247,7 @@ pub fn _check_alias_dims_with(
         err(diags, line, msg, file);
     }
 
-    let lead = _alias_name_lead_with(stmt);
+    let lead = _alias_name_lead(stmt);
     for (k, rhs_opt) in stmt.args.iter().skip(1).enumerate() {
         let Some(rhs) = rhs_opt.as_deref() else {
             continue;
@@ -338,13 +323,8 @@ pub fn _check_alias_dims_with(
     }
 }
 
-/// Port of `checker/structure.py::_alias_name_sizes`.
-pub fn _alias_name_sizes(_stmt: &Instruction) -> Option<Vec<i64>> {
-    todo!("checker/structure.py::_alias_name_sizes (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/structure.py::_alias_name_sizes`.
-pub fn _alias_name_sizes_with(stmt: &Instruction, env: &consteval::Env) -> Option<Vec<i64>> {
+/// Port of checker/structure.py::_alias_name_sizes
+pub fn _alias_name_sizes(stmt: &Instruction, env: &consteval::Env) -> Option<Vec<i64>> {
     let names = &stmt.args[1..];
     let junk = stmt.alias_item_junk.as_ref()?;
     if names.is_empty() || junk.iter().any(|&j| j) || junk.len() != names.len() {
@@ -365,7 +345,7 @@ pub fn _alias_name_sizes_with(stmt: &Instruction, env: &consteval::Env) -> Optio
     Some(out)
 }
 
-/// Port of `checker/structure.py::_alias_dim_ok`.
+/// Port of checker/structure.py::_alias_dim_ok
 pub fn _alias_dim_ok(
     stmt: &Instruction,
     diags: &mut Diagnostics,
@@ -387,13 +367,8 @@ pub fn _alias_dim_ok(
     true
 }
 
-/// Port of `checker/structure.py::_alias_name_lead`.
-pub fn _alias_name_lead(stmt: &Instruction) {
-    let _ = _alias_name_lead_with(stmt);
-}
-
-/// Port of `checker/structure.py::_alias_name_lead`.
-pub fn _alias_name_lead_with(stmt: &Instruction) -> Vec<(String, String)> {
+/// Port of checker/structure.py::_alias_name_lead
+pub fn _alias_name_lead(stmt: &Instruction) -> Vec<(String, String)> {
     let text = stmt.base.text.as_str();
     let Some(eq) = text.find('=') else {
         return Vec::new();
@@ -430,19 +405,14 @@ pub fn _alias_name_lead_with(stmt: &Instruction) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Port of `checker/structure.py::_after_keyword`.
+/// Port of checker/structure.py::_after_keyword
 pub fn _after_keyword(stmt: &Unparsed) -> String {
     let stripped = pystr::lstrip(&stmt.base.text);
     pystr::strip(pystr::slice(stripped, Some(5), None)).to_string()
 }
 
-/// Port of `checker/structure.py::_junk_init_findings`.
-pub fn _junk_init_findings(_stmt: &Unparsed) -> Vec<String> {
-    todo!("checker/structure.py::_junk_init_findings (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structure.py::_junk_init_findings`.
-pub fn _junk_init_findings_with(stmt: &Unparsed, profile: &Profile) -> Vec<String> {
+/// Port of checker/structure.py::_junk_init_findings
+pub fn _junk_init_findings(stmt: &Unparsed, profile: &Profile) -> Vec<String> {
     let head = _JUNK_INIT_HEAD.match_(&stmt.base.text);
     let mut out = Vec::new();
     if stmt.reason.starts_with(_CONST_BAD_VALUE) {
@@ -493,15 +463,8 @@ pub fn _junk_init_findings_with(stmt: &Unparsed, profile: &Profile) -> Vec<Strin
     out
 }
 
-/// Port of `checker/structure.py::_const_undefined_names`.
-pub fn _const_undefined_names(_text: &str) -> Vec<String> {
-    todo!(
-        "checker/structure.py::_const_undefined_names (omitted: program: untyped, profile: untyped)"
-    )
-}
-
-/// Port of `checker/structure.py::_const_undefined_names`.
-pub fn _const_undefined_names_with(
+/// Port of checker/structure.py::_const_undefined_names
+pub fn _const_undefined_names(
     text: &str,
     program: &ProgramRef,
     profile: &'static Profile,
@@ -529,18 +492,8 @@ pub fn _const_undefined_names_with(
     out
 }
 
-/// Port of `checker/structure.py::_check_unparsed_pass1`.
+/// Port of checker/structure.py::_check_unparsed_pass1
 pub fn _check_unparsed_pass1(
-    _stmt: &Unparsed,
-    _diags: &mut Diagnostics,
-    _program: &Program,
-    _profile: &Profile,
-) {
-    todo!("checker/structure.py::_check_unparsed_pass1 (needs ProgramRef and &'static Profile)")
-}
-
-/// Port of `checker/structure.py::_check_unparsed_pass1`.
-pub fn _check_unparsed_pass1_with(
     stmt: &Unparsed,
     diags: &mut Diagnostics,
     program: &ProgramRef,
@@ -631,7 +584,7 @@ pub fn _check_unparsed_pass1_with(
             text = rest;
             generic_prefix = "Incomplete expression: ";
         }
-        let names = _const_undefined_names_with(text, program, profile);
+        let names = _const_undefined_names(text, program, profile);
         if !names.is_empty() && _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name) {
             let msg = profile.unresolved_symbol_message.format(text);
             err(diags, line, &msg, file);
@@ -744,9 +697,9 @@ mod tests {
     }
 
     #[test]
-    fn test_alias_name_lead_with() {
+    fn test_alias_name_lead() {
         let stmt = make_alias_instr("Alias a =  b,  c(2)", vec![], vec![]);
-        let lead = _alias_name_lead_with(&stmt);
+        let lead = _alias_name_lead(&stmt);
         assert_eq!(
             lead,
             vec![
@@ -757,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alias_name_sizes_with() {
+    fn test_alias_name_sizes() {
         let cr6 = profiles::get("cr6").unwrap();
         let env = consteval::Env::new(cr6);
         let stmt = make_alias_instr(
@@ -795,7 +748,7 @@ mod tests {
             ],
             vec![false, false],
         );
-        assert_eq!(_alias_name_sizes_with(&stmt, &env), Some(vec![1, 3]));
+        assert_eq!(_alias_name_sizes(&stmt, &env), Some(vec![1, 3]));
     }
 
     #[test]
@@ -803,18 +756,18 @@ mod tests {
         let cr6 = profiles::get("cr6").unwrap();
         let u = make_unparsed("# 1", "unknown", true);
         assert_eq!(
-            _junk_init_findings_with(&u, cr6),
+            _junk_init_findings(&u, cr6),
             vec!["Unknown instruction: # 1\n.".to_string()]
         );
     }
 
     #[test]
-    fn test_check_unparsed_pass1_with() {
+    fn test_check_unparsed_pass1() {
         let cr6 = profiles::get("cr6").unwrap();
         let prog = Rc::new(Program::default());
         let mut diags = Diagnostics::new();
         let u = make_unparsed("Units foo", _UNITS_WITHOUT_EQ, false);
-        _check_unparsed_pass1_with(&u, &mut diags, &prog, cr6);
+        _check_unparsed_pass1(&u, &mut diags, &prog, cr6);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].message, "Need '=' in units definition: foo.");
     }

@@ -1210,7 +1210,7 @@ pub fn _build_measurement_aliases_with(
         let mut declared_names: OrderedMap<String, String> = OrderedMap::new();
         for decl_stmt in &ctx.scoped_view(st, false).statements {
             if let Stmt::Declaration(decl) = decl_stmt.as_ref() {
-                for v in &decl.vars {
+                for v in decl.vars.borrow().iter() {
                     declared_names.insert(pystr::upper(&v.name), v.name.clone());
                 }
             }
@@ -1814,7 +1814,8 @@ mod tests {
                 dims: dims.into_iter().map(num_i).collect(),
                 type_: ty.map(ToString::to_string),
                 ..Default::default()
-            })],
+            })]
+            .into(),
         }))
     }
 

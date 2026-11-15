@@ -18,9 +18,9 @@ use super::part1::{
     _ALIAS_NOTHING_AFTER_EQ, _ALIAS_WITHOUT_EQ, _BENIGN_REASONS, _CONST_BAD_NAME, _CONST_BAD_VALUE,
     _CONST_LEAD, _CONST_LEAD_NAME, _CONST_WITHOUT_EQ, _DO_LOOP_PARAM, _EXTRA_CLOSE_PAREN,
     _FOR_MISSING, _INVALID_AS_CLAUSE, _KNOWN_PARSER_GAP_REASONS, _MAX_ARRAY_DIMS, _MAX_DIM_VALUE,
-    _UNCLOSED_DIM_PREFIX, _UNCLOSED_PAREN_EXPR, _UNITS_WITHOUT_EQ, _assignment_head_with,
+    _UNCLOSED_DIM_PREFIX, _UNCLOSED_PAREN_EXPR, _UNITS_WITHOUT_EQ, _assignment_head,
 };
-use super::part2::{_leftover_message_with, _out_of_place_with};
+use super::part2::{_leftover_message, _out_of_place};
 use super::part4::_leftover_first_name_known;
 use super::part8::{_group_end, _group_items};
 use crate::checker::expressions::part1::{
@@ -48,12 +48,7 @@ use std::cell::RefCell;
 use std::sync::LazyLock;
 
 /// Port of checker/structure.py::check_missing_param_followup
-pub fn check_missing_param_followup(_program: &Program, diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_missing_param_followup (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::check_missing_param_followup
-pub fn check_missing_param_followup_with(
+pub fn check_missing_param_followup(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -71,10 +66,9 @@ pub fn check_missing_param_followup_with(
         if i64::try_from(stmt.args.len()).expect("argument count fits i64") >= required {
             continue;
         }
-        // instr_rules does not yet expose _TOLERANT_CODES.
         if params
             .get(stmt.args.len())
-            .is_some_and(|code| [4, 16, 17, 36, 37, 45, 46].contains(code))
+            .is_some_and(|code| instr_rules::_TOLERANT_CODES.contains(code))
         {
             continue;
         }
@@ -140,11 +134,11 @@ pub fn check_missing_param_followup_with(
                 "",
             );
         } else if nxt.reason == _EXTRA_CLOSE_PAREN
-            && !_assignment_head_with(&nxt.base.text, program, profile)
+            && !_assignment_head(&nxt.base.text, program, profile)
         {
             diags.error(
                 node.line,
-                &_out_of_place_with(profile, &nxt.base.text, nxt.base.at_eol.get()),
+                &_out_of_place(profile, &nxt.base.text, nxt.base.at_eol.get()),
                 &node.file,
                 ShowFile::Bool(false),
                 0,
@@ -162,11 +156,7 @@ pub fn check_missing_param_followup_with(
                 "",
             );
         } else {
-            diags.error_basic(
-                node.line,
-                &_leftover_message_with(profile, &pair[1]),
-                &node.file,
-            );
+            diags.error_basic(node.line, &_leftover_message(profile, &pair[1]), &node.file);
         }
     }
 }
@@ -218,16 +208,6 @@ pub fn _check_call_args(stmt: &Call, sub: &SubDef, diags: &mut Diagnostics) {
 
 /// Port of checker/structure.py::_report_call_arg_names
 pub fn _report_call_arg_names(
-    stmt: &Call,
-    _known: &BTreeSet<String>,
-    diags: &mut Diagnostics,
-    _is_function: bool,
-) {
-    todo!("checker/structure.py::_report_call_arg_names (omitted: profile: untyped, ds: untyped)")
-}
-
-/// Port of checker/structure.py::_report_call_arg_names
-pub fn _report_call_arg_names_with(
     stmt_ref: &StmtRef,
     known: &KnownNames,
     profile: &Profile,
@@ -514,12 +494,7 @@ pub fn _call_link_name(text: &str) -> String {
 }
 
 /// Port of checker/structure.py::_bare_sub_link_name
-pub fn _bare_sub_link_name(text: &str) -> Option<String> {
-    todo!("checker/structure.py::_bare_sub_link_name (omitted: subs: set)")
-}
-
-/// Port of checker/structure.py::_bare_sub_link_name
-pub fn _bare_sub_link_name_with(text: &str, subs: &BTreeSet<String>) -> Option<String> {
+pub fn _bare_sub_link_name(text: &str, subs: &BTreeSet<String>) -> Option<String> {
     static HEAD: LazyLock<pyre::Regex> =
         LazyLock::new(|| pyre::Regex::new(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?=[^\s(=])", 0));
     static SPACE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"\s+", 0));
@@ -539,17 +514,6 @@ pub fn _bare_sub_link_name_with(text: &str, subs: &BTreeSet<String>) -> Option<S
 
 /// Port of checker/structure.py::_unlinked_call
 pub fn _unlinked_call(
-    _link: &str,
-    diags: &mut Diagnostics,
-    _before_beginprog: bool,
-) -> Option<i64> {
-    todo!(
-        "checker/structure.py::_unlinked_call (omitted: stmt: untyped, profile: untyped, ctx: _LinkContext)"
-    )
-}
-
-/// Port of checker/structure.py::_unlinked_call
-pub fn _unlinked_call_with(
     stmt: &Stmt,
     link: &str,
     profile: &Profile,
@@ -612,12 +576,7 @@ const _LINK_TOLERATED: &[&str] = &[
 ];
 
 /// Port of checker/structure.py::_link_step_runs
-pub fn _link_step_runs(diags: &mut Diagnostics, _pass1_errors: bool) -> bool {
-    todo!("checker/structure.py::_link_step_runs (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_link_step_runs
-pub fn _link_step_runs_with(profile: &Profile, diags: &Diagnostics, pass1_errors: bool) -> bool {
+pub fn _link_step_runs(profile: &Profile, diags: &Diagnostics, pass1_errors: bool) -> bool {
     if profile.single_pass {
         return !diags.items.iter().any(|d| {
             d.severity == "error" && !_LINK_TOLERATED.iter().any(|p| d.message.starts_with(p))
@@ -627,20 +586,11 @@ pub fn _link_step_runs_with(profile: &Profile, diags: &Diagnostics, pass1_errors
 }
 
 /// Port of checker/structure.py::commit_deferred_sub_error
-pub fn commit_deferred_sub_error(_links: CallLinks, diags: &mut Diagnostics) {
-    todo!("checker/structure.py::commit_deferred_sub_error (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::commit_deferred_sub_error
-pub fn commit_deferred_sub_error_with(
-    links: &CallLinks,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
+pub fn commit_deferred_sub_error(links: &CallLinks, profile: &Profile, diags: &mut Diagnostics) {
     let Some((line, file, message)) = &links.first else {
         return;
     };
-    if !_link_step_runs_with(profile, diags, false) {
+    if !_link_step_runs(profile, diags, false) {
         return;
     }
     let cutoff = links.positions.get(&(file.clone(), *line));
@@ -654,12 +604,7 @@ pub fn commit_deferred_sub_error_with(
 }
 
 /// Port of checker/structure.py::finalize_call_links
-pub fn finalize_call_links(_links: CallLinks, diags: &mut Diagnostics, _pass1_errors: bool) {
-    todo!("checker/structure.py::finalize_call_links (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::finalize_call_links
-pub fn finalize_call_links_with(
+pub fn finalize_call_links(
     links: &CallLinks,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -670,7 +615,7 @@ pub fn finalize_call_links_with(
         .iter()
         .filter(|n| !links.registered.contains(&pystr::upper(n)))
         .collect();
-    if unresolved.is_empty() || !_link_step_runs_with(profile, diags, pass1_errors) {
+    if unresolved.is_empty() || !_link_step_runs(profile, diags, pass1_errors) {
         return;
     }
     for name in unresolved.into_iter().rev() {
@@ -680,21 +625,6 @@ pub fn finalize_call_links_with(
 
 /// Port of checker/structure.py::_check_call_pass2
 pub fn _check_call_pass2(
-    stmt: &Call,
-    _subs: &BTreeSet<String>,
-    diags: &mut Diagnostics,
-    _before_bp: bool,
-    _in_body_block: bool,
-    _known: Option<BTreeSet<String>>,
-    _link_ctx: Option<&mut LinkContext>,
-) -> Option<i64> {
-    todo!(
-        "checker/structure.py::_check_call_pass2 (omitted: profile: untyped, sub_params: dict | None, ds: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::_check_call_pass2
-pub fn _check_call_pass2_with(
     stmt_ref: &StmtRef,
     subs: &BTreeSet<String>,
     profile: &Profile,
@@ -723,15 +653,15 @@ pub fn _check_call_pass2_with(
         }
         if !ctx.subs.contains(&pystr::upper(&link)) {
             if let Some(known) = known {
-                _report_call_arg_names_with(stmt_ref, known, profile, diags, false, ds);
+                _report_call_arg_names(stmt_ref, known, profile, diags, false, ds);
             }
-            return _unlinked_call_with(stmt_ref, &link, profile, diags, before_beginprog, ctx);
+            return _unlinked_call(stmt_ref, &link, profile, diags, before_beginprog, ctx);
         }
     }
     if let Some(sub) = sub_params.and_then(|p| p.get(&name)) {
         let before = diags.items.len();
         if let Some(known) = known {
-            _report_call_arg_names_with(
+            _report_call_arg_names(
                 stmt_ref,
                 known,
                 profile,
@@ -760,7 +690,7 @@ pub fn _check_call_pass2_with(
             && let Some(known) = known
             && (stmt.tail_expr.is_some() || stmt.juxtaposed.is_some())
         {
-            _report_call_arg_names_with(stmt_ref, known, profile, diags, true, ds);
+            _report_call_arg_names(stmt_ref, known, profile, diags, true, ds);
         }
         if before_beginprog {
             diags.error_basic(
@@ -780,11 +710,7 @@ pub fn _check_call_pass2_with(
                 &node.file,
             );
         }
-        diags.error_basic(
-            node.line,
-            &_out_of_place_with(profile, text, at_eol),
-            &node.file,
-        );
+        diags.error_basic(node.line, &_out_of_place(profile, text, at_eol), &node.file);
         return None;
     }
     static DOTTED: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"[A-Za-z_]\w*\.", 0));
@@ -811,7 +737,7 @@ pub fn _check_call_pass2_with(
     }
     diags.error(
         node.line,
-        &_out_of_place_with(profile, text, at_eol),
+        &_out_of_place(profile, text, at_eol),
         &node.file,
         ShowFile::Cr3xx,
         0,
@@ -830,12 +756,7 @@ pub fn _check_call_pass2_with(
 }
 
 /// Port of checker/structure.py::_over_indexed_target
-pub fn _over_indexed_target(_target: &Index) -> bool {
-    todo!("checker/structure.py::_over_indexed_target (omitted: ds: untyped)")
-}
-
-/// Port of checker/structure.py::_over_indexed_target
-pub fn _over_indexed_target_with(target: &Index, ds: Option<&DimsState>) -> bool {
+pub fn _over_indexed_target(target: &Index, ds: Option<&DimsState>) -> bool {
     let Some(counts) = ds.and_then(|d| d.dim_counts.as_ref()) else {
         return false;
     };
@@ -848,17 +769,6 @@ pub fn _over_indexed_target_with(target: &Index, ds: Option<&DimsState>) -> bool
 
 /// Port of checker/structure.py::_check_assignment_pass2
 pub fn _check_assignment_pass2(
-    stmt: &Assignment,
-    _known: &BTreeSet<String>,
-    diags: &mut Diagnostics,
-    _before_bp: bool,
-    _in_body_block: bool,
-) -> Option<i64> {
-    todo!("checker/structure.py::_check_assignment_pass2 (omitted: profile: untyped, ds: untyped)")
-}
-
-/// Port of checker/structure.py::_check_assignment_pass2
-pub fn _check_assignment_pass2_with(
     stmt_ref: &StmtRef,
     known: &KnownNames,
     diags: &mut Diagnostics,
@@ -906,13 +816,9 @@ pub fn _check_assignment_pass2_with(
                     Some(stmt_id(stmt_ref)),
                     &[],
                 ))
-                || _over_indexed_target_with(target, ds))
+                || _over_indexed_target(target, ds))
         {
-            diags.error_basic(
-                node.line,
-                &_out_of_place_with(profile, text, at_eol),
-                &node.file,
-            );
+            diags.error_basic(node.line, &_out_of_place(profile, text, at_eol), &node.file);
         } else {
             let plain_target = target_names
                 .iter()
@@ -1010,12 +916,7 @@ pub fn _first_dim_text(stmt_text: &str, v: &VarDecl) -> String {
 }
 
 /// Port of checker/structure.py::_report_numeric_sub_name
-pub fn _report_numeric_sub_name(stmt: &SubDef, diags: &mut Diagnostics) {
-    todo!("checker/structure.py::_report_numeric_sub_name (omitted: value: object)")
-}
-
-/// Port of checker/structure.py::_report_numeric_sub_name
-pub fn _report_numeric_sub_name_with(
+pub fn _report_numeric_sub_name(
     stmt: &SubDef,
     value: Option<&ConstValue>,
     diags: &mut Diagnostics,
@@ -1072,9 +973,18 @@ pub fn _bad_const_type(stmt: &ConstDecl) -> Option<String> {
 
 /// Port of checker/structure.py::_local_const_conflicts
 pub fn _local_const_conflicts(stmt: &Stmt, declared: &OrderedMap<String, String>) -> Vec<String> {
+    let declaration_vars = match stmt {
+        Stmt::Declaration(d) => Some(d.vars.borrow()),
+        _ => None,
+    };
     let names: Vec<&str> = match stmt {
         Stmt::SubDef(s) => s.params.iter().map(|p| p.name.as_str()).collect(),
-        Stmt::Declaration(s) if s.kind == "DIM" => s.vars.iter().map(|v| v.name.as_str()).collect(),
+        Stmt::Declaration(s) if s.kind == "DIM" => declaration_vars
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|v| v.name.as_str())
+            .collect(),
         Stmt::ConstDecl(s) => vec![&s.name],
         _ => return Vec::new(),
     };
@@ -1092,15 +1002,6 @@ pub fn _local_const_conflicts(stmt: &Stmt, declared: &OrderedMap<String, String>
 /// Port of checker/structure.py::_check_duplicate_declaration
 pub fn _check_duplicate_declaration(
     stmt: &Stmt,
-    declared: &OrderedMap<String, String>,
-    diags: &mut Diagnostics,
-) -> Option<i64> {
-    todo!("checker/structure.py::_check_duplicate_declaration (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::_check_duplicate_declaration
-pub fn _check_duplicate_declaration_with(
-    stmt: &Stmt,
     declared: &mut OrderedMap<String, String>,
     diags: &mut Diagnostics,
     profile: Option<&Profile>,
@@ -1108,7 +1009,7 @@ pub fn _check_duplicate_declaration_with(
     let node = &stmt.base().node;
     match stmt {
         Stmt::Declaration(decl) if ["PUBLIC", "DIM"].contains(&decl.kind.as_str()) => {
-            for (index, v) in decl.vars.iter().enumerate() {
+            for (index, v) in decl.vars.borrow().iter().enumerate() {
                 let name = pystr::upper(&v.name);
                 if let Some(profile) = profile
                     && profile.functions().contains(&name)
@@ -1117,7 +1018,7 @@ pub fn _check_duplicate_declaration_with(
                         stmt, &v.name, profile, diags,
                     );
                     if profile.single_pass {
-                        if let Some(v) = decl.vars.get(index + 2) {
+                        if let Some(v) = decl.vars.borrow().get(index + 2) {
                             diags.error_basic(
                                 node.line,
                                 &format!("Too many parameters:  {}.", v.name),
@@ -1137,7 +1038,7 @@ pub fn _check_duplicate_declaration_with(
                     };
                     diags.error_basic(node.line, &message, &node.file);
                     if profile.is_some_and(|p| p.single_pass) {
-                        if let Some(v) = decl.vars.get(index + 2) {
+                        if let Some(v) = decl.vars.borrow().get(index + 2) {
                             diags.error_basic(
                                 node.line,
                                 &format!("Too many parameters:  {}.", v.name),
@@ -1155,7 +1056,7 @@ pub fn _check_duplicate_declaration_with(
                     )
                     && profile.single_pass
                 {
-                    if let Some(v) = decl.vars.get(index + 2) {
+                    if let Some(v) = decl.vars.borrow().get(index + 2) {
                         diags.error_basic(
                             node.line,
                             &format!("Too many parameters:  {}.", v.name),
@@ -1271,16 +1172,12 @@ pub fn _check_duplicate_declaration_with(
 }
 
 /// Port of checker/structure.py::_illegal_dim_message
-pub fn _illegal_dim_message(stmt: &Stmt) -> String {
-    _illegal_dim_message_with(stmt, None)
-}
-
-/// Port of checker/structure.py::_illegal_dim_message
-pub fn _illegal_dim_message_with(stmt: &Stmt, v: Option<&VarDecl>) -> String {
+pub fn _illegal_dim_message(stmt: &Stmt, v: Option<&VarDecl>) -> String {
     let text = stmt.text();
     if let (Stmt::Declaration(decl), Some(v)) = (stmt, v)
         && decl
             .vars
+            .borrow()
             .iter()
             .take_while(|u| !std::ptr::eq(u.as_ref(), v))
             .any(|u| u.init.is_some())
@@ -1299,22 +1196,17 @@ pub fn _illegal_dim_message_with(stmt: &Stmt, v: Option<&VarDecl>) -> String {
 }
 
 /// Port of checker/structure.py::_check_array_dims
-pub fn _check_array_dims(stmt: &Declaration, diags: &mut Diagnostics) -> Option<i64> {
-    todo!("checker/structure.py::_check_array_dims (omitted: env: consteval.Env, profile: untyped)")
-}
-
-/// Port of checker/structure.py::_check_array_dims
-pub fn _check_array_dims_with(
+pub fn _check_array_dims(
     stmt: &Declaration,
     diags: &mut Diagnostics,
     env: &Env,
     profile: Option<&Profile>,
 ) -> Option<i64> {
-    for (index, v) in stmt.vars.iter().enumerate() {
+    for (index, v) in stmt.vars.borrow().iter().enumerate() {
         let before = diags.items.len();
-        _check_var_dims_with(stmt, v, diags, env);
+        _check_var_dims(stmt, v, diags, env);
         if diags.items.len() > before && profile.is_some_and(|p| p.single_pass) {
-            if let Some(v) = stmt.vars.get(index + 2) {
+            if let Some(v) = stmt.vars.borrow().get(index + 2) {
                 diags.error_basic(
                     stmt.base.node.line,
                     &format!("Too many parameters:  {}.", v.name),
@@ -1328,12 +1220,7 @@ pub fn _check_array_dims_with(
 }
 
 /// Port of checker/structure.py::_check_var_dims
-pub fn _check_var_dims(stmt: &Declaration, diags: &mut Diagnostics) {
-    todo!("checker/structure.py::_check_var_dims (omitted: v: untyped, env: consteval.Env)")
-}
-
-/// Port of checker/structure.py::_check_var_dims
-pub fn _check_var_dims_with(stmt: &Declaration, v: &VarDecl, diags: &mut Diagnostics, env: &Env) {
+pub fn _check_var_dims(stmt: &Declaration, v: &VarDecl, diags: &mut Diagnostics, env: &Env) {
     let node = &stmt.base.node;
     if i64::try_from(v.dims.len()).expect("dimension count fits i64") > _MAX_ARRAY_DIMS {
         diags.error_basic(
@@ -1370,7 +1257,7 @@ pub fn _check_var_dims_with(stmt: &Declaration, v: &VarDecl, diags: &mut Diagnos
         if matches!(d.as_ref(), Expr::String(_)) {
             diags.error_basic(
                 node.line,
-                &_illegal_dim_message_with(&Stmt::Declaration(stmt.clone()), Some(v)),
+                &_illegal_dim_message(&Stmt::Declaration(stmt.clone()), Some(v)),
                 &node.file,
             );
             continue;
@@ -1389,7 +1276,7 @@ pub fn _check_var_dims_with(stmt: &Declaration, v: &VarDecl, diags: &mut Diagnos
         if illegal {
             diags.error_basic(
                 node.line,
-                &_illegal_dim_message_with(&Stmt::Declaration(stmt.clone()), Some(v)),
+                &_illegal_dim_message(&Stmt::Declaration(stmt.clone()), Some(v)),
                 &node.file,
             );
         }
@@ -1603,7 +1490,7 @@ mod tests {
                     let Stmt::Declaration(s) = stmt.as_ref() else {
                         panic!("{row}");
                     };
-                    _check_array_dims_with(s, &mut diags, &Env::new(profile), Some(profile))
+                    _check_array_dims(s, &mut diags, &Env::new(profile), Some(profile))
                 }
                 "assign" => {
                     let known = KnownNames::new(
@@ -1612,7 +1499,7 @@ mod tests {
                         false,
                         BTreeSet::new(),
                     );
-                    _check_assignment_pass2_with(
+                    _check_assignment_pass2(
                         stmt,
                         &known,
                         &mut diags,
@@ -1629,7 +1516,7 @@ mod tests {
                         false,
                         BTreeSet::new(),
                     );
-                    _report_call_arg_names_with(
+                    _report_call_arg_names(
                         if kind == "declared_args" {
                             program.statements.last().unwrap()
                         } else {
@@ -1647,7 +1534,7 @@ mod tests {
                     let mut declared = OrderedMap::new();
                     let mut result = None;
                     for s in &program.statements {
-                        result = _check_duplicate_declaration_with(
+                        result = _check_duplicate_declaration(
                             s,
                             &mut declared,
                             &mut diags,
@@ -1666,7 +1553,7 @@ mod tests {
                         has_routines: !sub_params.is_empty(),
                         ..LinkContext::default()
                     };
-                    _check_call_pass2_with(
+                    _check_call_pass2(
                         program.statements.last().unwrap(),
                         &ctx.subs,
                         profile,
@@ -1740,7 +1627,7 @@ mod tests {
                     assert_eq!(_call_link_name(text), row[2].as_str().unwrap());
                     let subs = BTreeSet::from(["S1".to_owned(), "S12".to_owned()]);
                     assert_eq!(
-                        serde_json::to_value(_bare_sub_link_name_with(text, &subs)).unwrap(),
+                        serde_json::to_value(_bare_sub_link_name(text, &subs)).unwrap(),
                         row[3],
                         "{row}"
                     );
@@ -1771,7 +1658,7 @@ mod tests {
                         _ => unreachable!(),
                     };
                     let mut diags = Diagnostics::new();
-                    _report_numeric_sub_name_with(
+                    _report_numeric_sub_name(
                         &SubDef {
                             name: "N".to_owned(),
                             ..SubDef::default()

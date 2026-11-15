@@ -139,7 +139,7 @@ fn stmt_exprs(stmt: &Stmt) -> Vec<ExprRef> {
     let mut out = Vec::new();
     match stmt {
         Stmt::Declaration(d) => {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 out.extend(v.dims.iter().cloned());
                 if let Some(ss) = &v.string_size {
                     out.push(ss.clone());
@@ -339,7 +339,7 @@ pub fn _declared_names_in_statements(statements: &[StmtRef]) -> BTreeSet<String>
     for stmt in statements {
         match &**stmt {
             Stmt::Declaration(d) => {
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     names.insert(pystr::upper(&v.name));
                 }
             }
@@ -402,7 +402,7 @@ pub fn _declared_all_dims(statements: &[StmtRef], env: &Env) -> OrderedMap<Strin
         if !matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC") {
             continue;
         }
-        for v in &d.vars {
+        for v in d.vars.borrow().iter() {
             if v.dims.is_empty() {
                 dims.insert(pystr::upper(&v.name), vec![1]);
                 continue;
@@ -759,7 +759,7 @@ impl Context {
                 if let Stmt::Declaration(d) = &**st
                     && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
                 {
-                    for v in &d.vars {
+                    for v in d.vars.borrow().iter() {
                         let name = pystr::upper(&v.name);
                         let mut kind = pystr::upper(v.type_.as_deref().unwrap_or("FLOAT"));
                         if v.paren_dim {
@@ -838,7 +838,7 @@ impl Context {
             for stmt in &self.program.statements {
                 match &**stmt {
                     Stmt::Declaration(d) => {
-                        for v in &d.vars {
+                        for v in d.vars.borrow().iter() {
                             names.insert(pystr::upper(&v.name));
                         }
                     }
@@ -952,7 +952,7 @@ impl Context {
                     out.insert(stmt_id(st), later);
                     seen.insert(pystr::upper(&c.name));
                 } else if let Stmt::Declaration(d) = &**st {
-                    for v in &d.vars {
+                    for v in d.vars.borrow().iter() {
                         seen.insert(pystr::upper(&v.name));
                     }
                 }
@@ -971,7 +971,7 @@ impl Context {
                     if let Stmt::Declaration(d) = &**st
                         && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
                     {
-                        for v in &d.vars {
+                        for v in d.vars.borrow().iter() {
                             let kind = if v.paren_dim {
                                 "FLOAT".to_string()
                             } else {
@@ -1049,7 +1049,7 @@ impl Context {
                 if !matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC") {
                     continue;
                 }
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     if v.dims.is_empty() {
                         sizes.insert(pystr::upper(&v.name), 1);
                         continue;
@@ -1091,7 +1091,7 @@ impl Context {
                     if let Stmt::Declaration(d) = &**stmt
                         && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
                     {
-                        for v in &d.vars {
+                        for v in d.vars.borrow().iter() {
                             let name = pystr::upper(&v.name);
                             let is_str = pystr::upper(v.type_.as_deref().unwrap_or("")) == "STRING";
                             if is_str {
@@ -1187,7 +1187,7 @@ impl Context {
             if let Stmt::Declaration(d) = &**st
                 && matches!(d.kind.as_str(), "PUBLIC" | "DIM")
             {
-                for v in &d.vars {
+                for v in d.vars.borrow().iter() {
                     let name = pystr::upper(&v.name);
                     let kind = if v.paren_dim {
                         "FLOAT".to_string()
@@ -1351,7 +1351,7 @@ impl Context {
                     } else if let Stmt::Declaration(d) = &**st
                         && d.kind == "DIM"
                     {
-                        for v in &d.vars {
+                        for v in d.vars.borrow().iter() {
                             local_names.insert(pystr::upper(&v.name));
                         }
                     } else {
@@ -1719,7 +1719,8 @@ mod tests {
                 }))],
                 type_: Some("LONG".to_string()),
                 ..VarDecl::new("Arr")
-            })],
+            })]
+            .into(),
         }));
         let end = make_instr(2, "ENDPROG");
         let prog = make_program(vec![decl, end.clone()]);

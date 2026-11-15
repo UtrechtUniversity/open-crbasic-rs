@@ -1153,10 +1153,10 @@ pub fn check_function_arity_with(
                     continue;
                 }
                 if _multi_indexed_struct(assign.target.as_deref(), &struct_vars) {
-                    // TODO(integrator-2): wire `structure::part2::_out_of_place_with(profile, ...)` once ported.
                     diags.error_basic(
                         assign.base.node.line,
                         &structure::part2::_out_of_place(
+                            profile,
                             &assign.base.text,
                             assign.base.at_eol.get(),
                         ),

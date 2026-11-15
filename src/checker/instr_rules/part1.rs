@@ -167,7 +167,7 @@ pub fn unterminated_string_shape(
         return Some("assignment".into());
     }
     if let Some(operands) = operands
-        && let Some(reached) = structure::string_reached_with(text, &operands, profile)
+        && let Some(reached) = structure::string_reached(text, &operands, profile)
     {
         return Some(
             if reached == "reached" {
@@ -287,7 +287,7 @@ pub fn _check_unterminated_string_param(
 ) {
     let ctx = context::of(program, None, None);
     let subs = ctx.declared_subs();
-    let operands = structure::pass1_operands_with(program, profile);
+    let operands = structure::pass1_operands(program, profile);
     let functions = user_functions(program);
     for stmt in &program.statements {
         let shape =
@@ -318,14 +318,14 @@ pub fn _check_unterminated_string_param(
                 let message = if s == "function_tail" {
                     format!("Incomplete expression: {}.", stmt.text())
                 } else {
-                    structure::_out_of_place_with(profile, stmt.text(), stmt.at_eol())
+                    structure::_out_of_place(profile, stmt.text(), stmt.at_eol())
                 };
                 diags.error_basic(stmt.line(), &message, stmt.file());
             }
             Some("many") => {
                 diags.error_basic(
                     stmt.line(),
-                    &structure::_no_matching_with(profile, stmt.text(), stmt.at_eol()),
+                    &structure::_no_matching(profile, stmt.text(), stmt.at_eol()),
                     stmt.file(),
                 );
             }
@@ -333,7 +333,7 @@ pub fn _check_unterminated_string_param(
                 diags.error_basic(stmt.line(), "String without end quote", stmt.file());
                 diags.error_basic(
                     stmt.line(),
-                    &structure::_out_of_place_with(profile, stmt.text(), stmt.at_eol()),
+                    &structure::_out_of_place(profile, stmt.text(), stmt.at_eol()),
                     stmt.file(),
                 );
             }

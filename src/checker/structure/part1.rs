@@ -63,12 +63,7 @@ static ASSIGNMENT_CALLS: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"([A-Za-z_]\w*)\s*\(", 0));
 
 /// Port of checker/structure.py::_assignment_head
-pub fn _assignment_head(_text: &str) -> bool {
-    todo!("checker/structure.py::_assignment_head (omitted: program: untyped, profile: untyped)")
-}
-
-/// Port of checker/structure.py::_assignment_head
-pub fn _assignment_head_with(text: &str, program: &ProgramRef, profile: &'static Profile) -> bool {
+pub fn _assignment_head(text: &str, program: &ProgramRef, profile: &'static Profile) -> bool {
     let Some(head) = _ASSIGNMENT_HEAD.match_(text) else {
         return false;
     };
@@ -147,12 +142,7 @@ pub struct TableState {
 }
 
 /// Port of checker/structure.py::_track_tables
-pub fn _track_tables(_stmt: &Stmt, _kw: &str) {
-    todo!("checker/structure.py::_track_tables (omitted: state: dict)")
-}
-
-/// Port of checker/structure.py::_track_tables
-pub fn _track_tables_with(stmt: &Stmt, kw: &str, state: &mut TableState) {
+pub fn _track_tables(stmt: &Stmt, kw: &str, state: &mut TableState) {
     if kw == "DATATABLE" {
         state.open = match stmt.args().first().and_then(Option::as_deref) {
             Some(Expr::Name(n)) => Some(pystr::upper(&n.name)),
@@ -167,12 +157,7 @@ pub fn _track_tables_with(stmt: &Stmt, kw: &str, state: &mut TableState) {
 }
 
 /// Port of checker/structure.py::_calltable_known
-pub fn _calltable_known(_stmt: &Stmt) {
-    todo!("checker/structure.py::_calltable_known (omitted: state: dict)")
-}
-
-/// Port of checker/structure.py::_calltable_known
-pub fn _calltable_known_with(stmt: &Stmt, state: &TableState) -> bool {
+pub fn _calltable_known(stmt: &Stmt, state: &TableState) -> bool {
     matches!(stmt, Stmt::Instruction(_))
         && matches!(stmt.args().first().and_then(Option::as_deref), Some(Expr::Name(n)) if state.closed.contains(&pystr::upper(&n.name)))
 }
@@ -180,12 +165,7 @@ pub fn _calltable_known_with(stmt: &Stmt, state: &TableState) -> bool {
 pub const NESTED_SCAN: &str = "Scan without NextScan or nested Scans.";
 
 /// Port of checker/structure.py::_scan_counts_for_table_placement
-pub fn _scan_counts_for_table_placement(stmt: &Stmt) -> bool {
-    _scan_counts_for_table_placement_with(stmt, None)
-}
-
-/// Port of checker/structure.py::_scan_counts_for_table_placement
-pub fn _scan_counts_for_table_placement_with(stmt: &Stmt, env: Option<&Env>) -> bool {
+pub fn _scan_counts_for_table_placement(stmt: &Stmt, env: Option<&Env>) -> bool {
     if let Some(Expr::Number(n)) = stmt.args().first().and_then(Option::as_deref)
         && match &n.value {
             NumberValue::Int(i) => *i == 0,
@@ -205,17 +185,6 @@ pub fn _scan_counts_for_table_placement_with(stmt: &Stmt, env: Option<&Env>) -> 
 
 /// Port of checker/structure.py::_check_calltable_outside_scan
 pub fn _check_calltable_outside_scan(
-    stmt: &Instruction,
-    program: &Program,
-    diags: &mut Diagnostics,
-    in_sub: bool,
-    zero_scan: bool,
-) {
-    _check_calltable_outside_scan_with(stmt, program, diags, in_sub, zero_scan, None);
-}
-
-/// Port of checker/structure.py::_check_calltable_outside_scan
-pub fn _check_calltable_outside_scan_with(
     stmt: &Instruction,
     program: &Program,
     diags: &mut Diagnostics,
@@ -308,28 +277,13 @@ pub fn _check_calltable_outside_scan_with(
 }
 
 /// Port of checker/structure.py::_accept_known
-pub fn _accept_known(_stmt: &Stmt) {
-    todo!("checker/structure.py::_accept_known (omitted: state: dict)")
-}
-
-/// Port of checker/structure.py::_accept_known
-pub fn _accept_known_with(stmt: &Stmt, state: &TableState) -> bool {
+pub fn _accept_known(stmt: &Stmt, state: &TableState) -> bool {
     matches!(stmt, Stmt::Instruction(_))
         && matches!(stmt.args().get(2).and_then(Option::as_deref), Some(Expr::Name(n)) if state.closed.contains(&pystr::upper(&n.name)))
 }
 
 /// Port of checker/structure.py::_check_accept_table
 pub fn _check_accept_table(
-    _stmt: &Instruction,
-    _program: &Program,
-    _diags: &mut Diagnostics,
-    _outside: bool,
-) {
-    todo!("checker/structure.py::_check_accept_table (omitted: env: untyped)")
-}
-
-/// Port of checker/structure.py::_check_accept_table
-pub fn _check_accept_table_with(
     stmt: &Instruction,
     program: &Program,
     diags: &mut Diagnostics,
@@ -403,17 +357,15 @@ pub fn _check_accept_table_with(
 /// Port of checker/structure.py::_ends_sub
 pub fn _ends_sub(stmt: &Stmt, kw: &str) -> bool {
     matches!(kw, "ENDSUB" | "ENDFUNCTION")
-        || (kw == "END" && matches!(_block_word().as_deref(), Some("SUB" | "FUNCTION")))
-    // TODO: _block_word's existing signature omits stmt.args().
+        || (kw == "END"
+            && matches!(
+                _block_word(stmt.args()).as_deref(),
+                Some("SUB" | "FUNCTION")
+            ))
 }
 
 /// Port of checker/structure.py::first_misplaced_sub
-pub fn first_misplaced_sub(program: &Program) {
-    let _ = first_misplaced_sub_with(program);
-}
-
-/// Port of checker/structure.py::first_misplaced_sub
-pub fn first_misplaced_sub_with(program: &Program) -> Option<(StmtRef, Vec<String>)> {
+pub fn first_misplaced_sub(program: &Program) -> Option<(StmtRef, Vec<String>)> {
     let mut global_variables = BTreeSet::new();
     let mut in_routine = false;
     for stmt in &program.statements {
@@ -423,7 +375,7 @@ pub fn first_misplaced_sub_with(program: &Program) -> Option<(StmtRef, Vec<Strin
         } else if _ends_sub(stmt, &kw) {
             in_routine = false;
         } else if !in_routine && let Stmt::Declaration(decl) = stmt.as_ref() {
-            global_variables.extend(decl.vars.iter().map(|v| pystr::upper(&v.name)));
+            global_variables.extend(decl.vars.borrow().iter().map(|v| pystr::upper(&v.name)));
         }
     }
     let (mut open_sub, mut in_table, mut before_sequence) = (false, false, false);
@@ -519,7 +471,9 @@ pub fn first_misplaced_sub_with(program: &Program) -> Option<(StmtRef, Vec<Strin
         } else if kw == "SCAN" {
             active_scans += 1;
             before_sequence = false;
-        } else if kw == "NEXTSCAN" || (kw == "NEXT" && _block_word().as_deref() == Some("SCAN")) {
+        } else if kw == "NEXTSCAN"
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() == Some("SCAN"))
+        {
             active_scans = (active_scans - 1).max(0);
         } else if kw == "DATATABLE" {
             in_table = true;
@@ -530,13 +484,13 @@ pub fn first_misplaced_sub_with(program: &Program) -> Option<(StmtRef, Vec<Strin
         {
             conditional_depth += 1;
         } else if matches!(kw.as_str(), "ENDSELECT" | "ENDIF")
-            || (kw == "END" && matches!(_block_word().as_deref(), Some("SELECT" | "IF")))
+            || (kw == "END" && matches!(_block_word(stmt.args()).as_deref(), Some("SELECT" | "IF")))
         {
             conditional_depth = (conditional_depth - 1).max(0);
         } else if matches!(kw.as_str(), "FOR" | "DO" | "WHILE") {
             for_do_depth += 1;
         } else if matches!(kw.as_str(), "LOOP" | "WEND")
-            || (kw == "NEXT" && _block_word().as_deref() != Some("SCAN"))
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() != Some("SCAN"))
         {
             for_do_depth = (for_do_depth - 1).max(0);
         }
@@ -545,16 +499,7 @@ pub fn first_misplaced_sub_with(program: &Program) -> Option<(StmtRef, Vec<Strin
 }
 
 /// Port of checker/structure.py::check_apply_restart_sequence
-pub fn check_apply_restart_sequence(program: &Program, diags: &mut Diagnostics) {
-    check_apply_restart_sequence_with(program, &crate::profiles::PROFILES[0], diags);
-}
-
-/// Port of checker/structure.py::check_apply_restart_sequence
-pub fn check_apply_restart_sequence_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
+pub fn check_apply_restart_sequence(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
     let (mut declared, mut open_sub, mut in_table, mut before_sequence) =
         (false, false, false, false);
     let (mut conditional_depth, mut active_scans, mut for_do_depth) = (0_i64, 0_i64, 0_i64);
@@ -602,7 +547,9 @@ pub fn check_apply_restart_sequence_with(
         } else if kw == "SCAN" {
             active_scans += 1;
             before_sequence = false;
-        } else if kw == "NEXTSCAN" || (kw == "NEXT" && _block_word().as_deref() == Some("SCAN")) {
+        } else if kw == "NEXTSCAN"
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() == Some("SCAN"))
+        {
             active_scans = (active_scans - 1).max(0);
         } else if kw == "DATATABLE" {
             in_table = true;
@@ -613,13 +560,13 @@ pub fn check_apply_restart_sequence_with(
         {
             conditional_depth += 1;
         } else if matches!(kw.as_str(), "ENDSELECT" | "ENDIF")
-            || (kw == "END" && matches!(_block_word().as_deref(), Some("SELECT" | "IF")))
+            || (kw == "END" && matches!(_block_word(stmt.args()).as_deref(), Some("SELECT" | "IF")))
         {
             conditional_depth = (conditional_depth - 1).max(0);
         } else if matches!(kw.as_str(), "FOR" | "DO" | "WHILE") {
             for_do_depth += 1;
         } else if matches!(kw.as_str(), "LOOP" | "WEND")
-            || (kw == "NEXT" && _block_word().as_deref() != Some("SCAN"))
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() != Some("SCAN"))
         {
             for_do_depth = (for_do_depth - 1).max(0);
         }
@@ -627,12 +574,7 @@ pub fn check_apply_restart_sequence_with(
 }
 
 /// Port of checker/structure.py::first_misplaced_data_table
-pub fn first_misplaced_data_table(_program: &Program) -> Option<StmtRef> {
-    todo!("checker/structure.py::first_misplaced_data_table (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::first_misplaced_data_table
-pub fn first_misplaced_data_table_with(program: &Program, profile: &Profile) -> Option<StmtRef> {
+pub fn first_misplaced_data_table(program: &Program, profile: &Profile) -> Option<StmtRef> {
     let (mut prescan, mut in_table, mut in_apply, mut in_routine) = (false, false, false, false);
     let (mut scans, mut blocks) = (0_i64, 0_i64);
     let mut slow_block_error = false;
@@ -669,7 +611,9 @@ pub fn first_misplaced_data_table_with(program: &Program, profile: &Profile) -> 
         } else if kw == "SCAN" {
             scans += 1;
             prescan = false;
-        } else if kw == "NEXTSCAN" || (kw == "NEXT" && _block_word().as_deref() == Some("SCAN")) {
+        } else if kw == "NEXTSCAN"
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() == Some("SCAN"))
+        {
             scans = (scans - 1).max(0);
         } else if kw == "SELECT"
             || (kw == "IF" && !matches!(stmt.as_ref(), Stmt::If(s) if s.inline.is_some()))
@@ -677,8 +621,8 @@ pub fn first_misplaced_data_table_with(program: &Program, profile: &Profile) -> 
         {
             blocks += 1;
         } else if matches!(kw.as_str(), "ENDIF" | "ENDSELECT" | "LOOP" | "WEND")
-            || (kw == "END" && matches!(_block_word().as_deref(), Some("IF" | "SELECT")))
-            || (kw == "NEXT" && _block_word().as_deref() != Some("SCAN"))
+            || (kw == "END" && matches!(_block_word(stmt.args()).as_deref(), Some("IF" | "SELECT")))
+            || (kw == "NEXT" && _block_word(stmt.args()).as_deref() != Some("SCAN"))
         {
             blocks = (blocks - 1).max(0);
         }
@@ -687,17 +631,8 @@ pub fn first_misplaced_data_table_with(program: &Program, profile: &Profile) -> 
 }
 
 /// Port of checker/structure.py::check_data_table_placement
-pub fn check_data_table_placement(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_data_table_placement (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::check_data_table_placement
-pub fn check_data_table_placement_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
-    if let Some(stmt) = first_misplaced_data_table_with(program, profile) {
+pub fn check_data_table_placement(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
+    if let Some(stmt) = first_misplaced_data_table(program, profile) {
         diags.error_basic(
             stmt.base().node.line,
             "DataTable is declared in the middle of an executing sequence",
@@ -707,12 +642,7 @@ pub fn check_data_table_placement_with(
 }
 
 /// Port of checker/structure.py::pipeline_task_errors
-pub fn pipeline_task_errors(_program: &Program) {
-    todo!("checker/structure.py::pipeline_task_errors (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::pipeline_task_errors
-pub fn pipeline_task_errors_with(
+pub fn pipeline_task_errors(
     program: &Program,
     profile: &'static Profile,
 ) -> Vec<(StmtRef, String)> {
@@ -780,7 +710,7 @@ pub fn pipeline_task_errors_with(
         let kw = _keyword(stmt);
         let args = stmt.args();
         let word = if matches!(kw.as_str(), "END" | "NEXT") {
-            _block_word()
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -928,30 +858,18 @@ pub fn pipeline_task_errors_with(
 }
 
 /// Port of checker/structure.py::check_pipeline_task_placement
-pub fn check_pipeline_task_placement(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_pipeline_task_placement (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::check_pipeline_task_placement
-pub fn check_pipeline_task_placement_with(
+pub fn check_pipeline_task_placement(
     program: &Program,
     profile: &'static Profile,
     diags: &mut Diagnostics,
 ) {
-    for (stmt, message) in pipeline_task_errors_with(program, profile) {
+    for (stmt, message) in pipeline_task_errors(program, profile) {
         diags.error_basic(stmt.base().node.line, &message, &stmt.base().node.file);
     }
 }
 
 /// Port of checker/structure.py::pipeline_argument_error_first_locations
-pub fn pipeline_argument_error_first_locations(_program: &Program) {
-    todo!(
-        "checker/structure.py::pipeline_argument_error_first_locations (omitted: profile: untyped)"
-    )
-}
-
-/// Port of checker/structure.py::pipeline_argument_error_first_locations
-pub fn pipeline_argument_error_first_locations_with(
+pub fn pipeline_argument_error_first_locations(
     program: &Program,
     profile: &'static Profile,
 ) -> BTreeSet<(String, i64)> {
@@ -960,7 +878,7 @@ pub fn pipeline_argument_error_first_locations_with(
         .get("argument_error_first")
         .and_then(crate::profiles::Json::as_array)
         .unwrap_or(&[]);
-    pipeline_task_errors_with(program, profile)
+    pipeline_task_errors(program, profile)
         .into_iter()
         .filter(|(stmt, _)| {
             first
@@ -972,16 +890,7 @@ pub fn pipeline_argument_error_first_locations_with(
 }
 
 /// Port of checker/structure.py::check_slow_sequence_blocks
-pub fn check_slow_sequence_blocks(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_slow_sequence_blocks (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::check_slow_sequence_blocks
-pub fn check_slow_sequence_blocks_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
+pub fn check_slow_sequence_blocks(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
     if profile.single_pass {
         return;
     }
@@ -989,7 +898,7 @@ pub fn check_slow_sequence_blocks_with(
     for stmt in &program.statements {
         let kw = _keyword(stmt);
         let word = if matches!(kw.as_str(), "END" | "NEXT") {
-            _block_word()
+            _block_word(stmt.args())
         } else {
             None
         };
@@ -1024,28 +933,13 @@ pub fn check_slow_sequence_blocks_with(
 }
 
 /// Port of checker/structure.py::check_scan_placement_late
-pub fn check_scan_placement_late(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/structure.py::check_scan_placement_late (omitted: profile: untyped)")
-}
-
-/// Port of checker/structure.py::check_scan_placement_late
-pub fn check_scan_placement_late_with(
-    program: &Program,
+pub fn check_scan_placement_late(
+    program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
 ) -> Option<(String, i64)> {
     let n_before = diags.items.len();
-    // The dependency is still a unit-returning stub. This adapter must be removed once
-    // part2 provides _scan_placement_walk_with(program, profile, diags) -> Option<(String, i64)>.
-    fn walk(
-        program: &Program,
-        profile: &Profile,
-        diags: &mut Diagnostics,
-    ) -> Option<(String, i64)> {
-        _scan_placement_walk(program, diags);
-        todo!("wire part2::_scan_placement_walk_with with profile and stop-location result")
-    }
-    let stop = walk(program, profile, diags)?;
+    let stop = super::part2::_scan_placement_walk(program, profile, diags)?;
     let Some(at) = program
         .statements
         .iter()
@@ -1114,7 +1008,7 @@ mod tests {
             ("X = Len(S)", true),
         ] {
             assert_eq!(
-                _assignment_head_with(text, &program, profile),
+                _assignment_head(text, &program, profile),
                 expected,
                 "{text}"
             );
@@ -1127,14 +1021,14 @@ mod tests {
         let call = instruction("CallTable", vec![Some(name("mixed"))]);
         let accept = instruction("AcceptDataRecords", vec![None, None, Some(name("mixed"))]);
         let mut state = TableState::default();
-        _track_tables_with(&table, "DATATABLE", &mut state);
+        _track_tables(&table, "DATATABLE", &mut state);
         assert_eq!(state.open.as_deref(), Some("MIXED"));
-        assert!(!_calltable_known_with(&call, &state));
-        _track_tables_with(&instruction("EndTable", Vec::new()), "ENDTABLE", &mut state);
+        assert!(!_calltable_known(&call, &state));
+        _track_tables(&instruction("EndTable", Vec::new()), "ENDTABLE", &mut state);
         assert_eq!(state.open, None);
         assert_eq!(state.closed, ["MIXED"]);
-        assert!(_calltable_known_with(&call, &state));
-        assert!(_accept_known_with(&accept, &state));
+        assert!(_calltable_known(&call, &state));
+        assert!(_accept_known(&accept, &state));
     }
 
     #[test]
@@ -1152,7 +1046,7 @@ mod tests {
                     ..Default::default()
                 })))],
             );
-            assert_eq!(_scan_counts_for_table_placement(&scan), expected);
+            assert_eq!(_scan_counts_for_table_placement(&scan, None), expected);
         }
     }
 }

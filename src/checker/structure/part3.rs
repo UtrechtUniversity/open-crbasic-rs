@@ -19,34 +19,8 @@ use crate::syntax::{
 };
 
 /// Port of checker/structure.py::check_pass1
-pub fn check_pass1(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/structure.py::check_pass1 (omitted: profile: untyped, env: consteval.Env | None)"
-    )
-}
-
-// Omitted arguments stay explicit at call sites until the owning parts expose full signatures.
-macro_rules! pending_call {
-    ($call:expr; $($omitted:expr),* $(,)?) => {{
-        $(let _ = &$omitted;)*
-        $call
-    }};
-}
-macro_rules! pending_result {
-    ($call:expr; $signature:literal; $($omitted:expr),* $(,)?) => {{
-        $(let _ = &$omitted;)*
-        $call;
-        missing_dependency_result($signature)
-    }};
-}
-
-fn missing_dependency_result<T>(signature: &str) -> T {
-    unimplemented!("{signature}")
-}
-
-/// Port of checker/structure.py::check_pass1
 #[allow(clippy::if_not_else, clippy::match_same_arms)]
-pub fn check_pass1_with(
+pub fn check_pass1(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -130,7 +104,13 @@ pub fn check_pass1_with(
                 None
             }
         })
-        .flat_map(|d| d.vars.iter().map(|v| pystr::upper(&v.name)))
+        .flat_map(|d| {
+            d.vars
+                .borrow()
+                .iter()
+                .map(|v| pystr::upper(&v.name))
+                .collect::<Vec<_>>()
+        })
         .collect();
     // `_CONTROL_KEYWORDS` is private in expressions/part2.rs.
     let control_keywords = [
@@ -187,9 +167,18 @@ pub fn check_pass1_with(
                 }
             }
         }
+        let declaration_vars = match stmt.as_ref() {
+            Stmt::Declaration(d) => Some(d.vars.borrow()),
+            _ => None,
+        };
         let names: Vec<&str> = match stmt.as_ref() {
             Stmt::ConstDecl(c) => vec![&c.name],
-            Stmt::Declaration(d) => d.vars.iter().map(|v| v.name.as_str()).collect(),
+            Stmt::Declaration(_) => declaration_vars
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|v| v.name.as_str())
+                .collect(),
             _ => vec![],
         };
         for name in names {
@@ -247,20 +236,24 @@ pub fn check_pass1_with(
                     .map(String::as_str)
                     == Some("CONST")
             {
-                pending_call!(super::_report_numeric_sub_name(sub, diags); program.consts.get(&pystr::upper(&sub.name)));
+                super::_report_numeric_sub_name(
+                    sub,
+                    program.consts.get(&pystr::upper(&sub.name)),
+                    diags,
+                );
             }
             if known.is_none() {
                 known = Some(ctx.known_names().clone());
-                operands = pending_call!(super::pass1_operands(program); profile);
+                operands = super::pass1_operands(program, profile);
             }
             if profile.single_pass && header_dims_failed {
                 alias_parameters = Some(Rc::new(Stmt::Declaration(Declaration {
                     base: StmtBase::new(line, file),
                     kind: "DIM".to_owned(),
-                    vars: vec![],
+                    vars: vec![].into(),
                 })));
                 if !in_sub {
-                    pending_call!(super::_check_header_types(text, sub, &structs_seen, diags); profile);
+                    super::_check_header_types(text, sub, &structs_seen, profile, diags);
                 }
             } else {
                 let forward = program
@@ -270,10 +263,16 @@ pub fn check_pass1_with(
                     .chain(decl_variables.iter().cloned())
                     .filter(|n| !declared_kinds.contains_key(n))
                     .collect();
-                let (parameters, failed): (Declaration, bool) = pending_result!(
-                    super::_alias_parameter_declaration(sub, &declared_kinds, &known.as_ref().unwrap().names, &forward,
-                        if in_sub { None } else { Some(&mut *diags) }, &structs_seen);
-                    "part8::_alias_parameter_declaration_with must return (Declaration, bool)"; env, profile);
+                let (parameters, failed): (Declaration, bool) = super::_alias_parameter_declaration(
+                    sub,
+                    env,
+                    &declared_kinds,
+                    &known.as_ref().unwrap().names,
+                    &forward,
+                    profile,
+                    if in_sub { None } else { Some(&mut *diags) },
+                    &structs_seen,
+                );
                 alias_parameters = Some(Rc::new(Stmt::Declaration(parameters)));
                 header_dims_failed |= failed;
             }
@@ -285,8 +284,7 @@ pub fn check_pass1_with(
             in_sub = true;
         } else if ["ENDSUB", "ENDFUNCTION"].contains(&kw.as_str())
             || (kw == "END"
-                && [Some("SUB"), Some("FUNCTION")]
-                    .contains(&pending_call!(super::_block_word(); args).as_deref()))
+                && [Some("SUB"), Some("FUNCTION")].contains(&super::_block_word(args).as_deref()))
         {
             in_sub = false;
             if let Some(global) = global_alias_state.take() {
@@ -318,11 +316,21 @@ pub fn check_pass1_with(
         let mut dup_diags = Diagnostics::new();
         if !in_sub && !in_struct {
             if profile.single_pass
-                && matches!(stmt.as_ref(), Stmt::Declaration(d) if ["PUBLIC", "DIM"].contains(&d.kind.as_str()) && !d.vars.is_empty())
+                && matches!(stmt.as_ref(), Stmt::Declaration(d) if ["PUBLIC", "DIM"].contains(&d.kind.as_str()) && !d.vars.borrow().is_empty())
             {
-                dup_at = pending_call!(super::_check_duplicate_declaration(stmt, &declared_kinds, &mut dup_diags); profile);
+                dup_at = super::_check_duplicate_declaration(
+                    stmt,
+                    &mut declared_kinds,
+                    &mut dup_diags,
+                    Some(profile),
+                );
             } else {
-                dup_at = pending_call!(super::_check_duplicate_declaration(stmt, &declared_kinds, diags); profile);
+                dup_at = super::_check_duplicate_declaration(
+                    stmt,
+                    &mut declared_kinds,
+                    diags,
+                    Some(profile),
+                );
             }
         } else if in_sub && !in_struct {
             symbols::check_local_name_collision_with_profile(stmt, profile, diags);
@@ -363,7 +371,12 @@ pub fn check_pass1_with(
                             _ => {}
                         }
                     } else {
-                        pending_call!(super::_check_duplicate_declaration(stmt, &declared_kinds, &mut dup); Option::<&Profile>::None);
+                        super::_check_duplicate_declaration(
+                            stmt,
+                            &mut declared_kinds,
+                            &mut dup,
+                            None,
+                        );
                     }
                     for item in dup.items {
                         if item.message.contains("is already declared as a CONST") {
@@ -381,14 +394,14 @@ pub fn check_pass1_with(
             && let Stmt::Declaration(d) = stmt.as_ref()
             && d.kind == "STRUCTUREMEMBER"
         {
-            struct_members.extend(d.vars.iter().map(|v| pystr::upper(&v.name)));
-            pending_call!(super::_check_member_types(d, &structs_seen, diags); profile);
+            struct_members.extend(d.vars.borrow().iter().map(|v| pystr::upper(&v.name)));
+            super::_check_member_types(d, &structs_seen, profile, diags);
             if known.is_none() {
                 known = Some(ctx.known_names().clone());
-                operands = pending_call!(super::pass1_operands(program); profile);
+                operands = super::pass1_operands(program, profile);
             }
-            if !d.vars.is_empty()
-                && d.vars.iter().any(|v| {
+            if !d.vars.borrow().is_empty()
+                && d.vars.borrow().iter().any(|v| {
                     v.init.as_ref().is_some_and(|i| !i.is_empty())
                         || !v.dims.is_empty()
                         || v.string_size.is_some()
@@ -401,7 +414,13 @@ pub fn check_pass1_with(
                         Stmt::Declaration(d) if d.kind != "STRUCTUREMEMBER" => Some(d),
                         _ => None,
                     })
-                    .flat_map(|d| d.vars.iter().map(|v| pystr::upper(&v.name)))
+                    .flat_map(|d| {
+                        d.vars
+                            .borrow()
+                            .iter()
+                            .map(|v| pystr::upper(&v.name))
+                            .collect::<Vec<_>>()
+                    })
                     .collect();
                 let member_only: BTreeSet<String> = program
                     .statements
@@ -410,7 +429,13 @@ pub fn check_pass1_with(
                         Stmt::Declaration(d) if d.kind == "STRUCTUREMEMBER" => Some(d),
                         _ => None,
                     })
-                    .flat_map(|d| d.vars.iter().map(|v| pystr::upper(&v.name)))
+                    .flat_map(|d| {
+                        d.vars
+                            .borrow()
+                            .iter()
+                            .map(|v| pystr::upper(&v.name))
+                            .collect::<Vec<_>>()
+                    })
                     .filter(|n| !top.contains(n) && !program.consts.contains_key(n))
                     .collect();
                 let here = known
@@ -420,7 +445,17 @@ pub fn check_pass1_with(
                     .difference(&member_only)
                     .cloned()
                     .collect();
-                pending_call!(super::_check_decl_exprs(d, &here, &decl_variables, diags, &struct_types, None, &BTreeSet::new()); profile, Option::<(BTreeSet<String>, BTreeSet<String>)>::None);
+                super::_check_decl_exprs(
+                    d,
+                    &expressions::part1::KnownView::from_set(&here),
+                    &decl_variables,
+                    profile,
+                    diags,
+                    &struct_types,
+                    None,
+                    &None,
+                    &BTreeSet::new(),
+                );
             }
         } else if (in_struct || in_sub) && kw == "READONLY" {
             if args.is_empty() {
@@ -441,7 +476,7 @@ pub fn check_pass1_with(
             }
         }
         if let Stmt::Declaration(d) = stmt.as_ref() {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 if let Some(size_missing) = v.size_missing {
                     let echo = pystr::slice(text, Some(size_missing + 1), None);
                     let message = if echo.is_empty() || pystr::lstrip(echo).starts_with(',') {
@@ -512,7 +547,7 @@ pub fn check_pass1_with(
             continue;
         }
         if profile.known_first_word_pass1 && FOR.match_(text).is_some() {
-            let found = pending_call!(super::_for_header_findings(text); profile);
+            let found = super::_for_header_findings(text, profile);
             if !found.is_empty() {
                 for message in found {
                     diags.error_basic(line, &message, file);
@@ -574,12 +609,12 @@ pub fn check_pass1_with(
         if let Stmt::Declaration(d) = stmt.as_ref()
             && ["PUBLIC", "DIM", "STATIC"].contains(&d.kind.as_str())
         {
-            if d.vars.is_empty() {
+            if d.vars.borrow().is_empty() {
                 suppress_line = Some(super::_check_declaration(d, diags));
             } else {
                 if known.is_none() {
                     known = Some(ctx.known_names().clone());
-                    operands = pending_call!(super::pass1_operands(program); profile);
+                    operands = super::pass1_operands(program, profile);
                 }
                 let mut length_scope: Option<(BTreeSet<String>, BTreeSet<String>)> = None;
                 let (params, later) = &scopes[&stmt_id(stmt)];
@@ -611,6 +646,7 @@ pub fn check_pass1_with(
                     .map(|(n, _)| n.clone())
                     .collect();
                 if d.vars
+                    .borrow()
                     .iter()
                     .any(|v| v.type_.as_deref() == Some("STRING") && v.string_size.is_some())
                 {
@@ -648,10 +684,24 @@ pub fn check_pass1_with(
                     let mut dims_diags = Diagnostics::new();
                     let mut names_diags = Diagnostics::new();
                     let earlier_errors = diags.items.iter().any(|d| d.severity == "error");
-                    let dim_at =
-                        pending_call!(super::_check_array_dims(d, &mut dims_diags); env, profile);
+                    let dim_at = super::_check_array_dims(d, &mut dims_diags, env, Some(profile));
                     let variables = decl_variables.union(params).cloned().collect();
-                    let name_at = pending_call!(super::_check_decl_exprs(d, &here.names, &variables, &mut names_diags, &struct_types, dim_at, &indexed_constants); profile, length_scope, here);
+                    let name_at = super::_check_decl_exprs(
+                        d,
+                        &expressions::part1::KnownView {
+                            names: &here.names,
+                            tables: &here.tables,
+                            out_of_scope: &here.out_of_scope,
+                            dotted_tables: here.dotted_tables,
+                        },
+                        &variables,
+                        profile,
+                        &mut names_diags,
+                        &struct_types,
+                        dim_at,
+                        &length_scope,
+                        &indexed_constants,
+                    );
                     let bad_at = name_at.or(dim_at);
                     let own_items = if name_at.is_some() {
                         names_diags.items
@@ -682,7 +732,7 @@ pub fn check_pass1_with(
                         && !in_struct
                         && !earlier_errors
                     {
-                        for (i, v) in d.vars.iter().enumerate() {
+                        for (i, v) in d.vars.borrow().iter().enumerate() {
                             let i = i64::try_from(i).expect("statement variable index fits i64");
                             if i <= stop
                                 || v.type_.as_ref().is_some_and(|t| struct_types.contains(t))
@@ -693,18 +743,16 @@ pub fn check_pass1_with(
                                 declared_kinds.remove(&pystr::upper(&v.name));
                             }
                         }
-                        // Python structure.py:1698 mutates this shared statement in place.
-                        if d.vars.iter().enumerate().any(|(i, v)| {
-                            i64::try_from(i).expect("statement variable index fits i64") > stop
-                                && !v.type_.as_ref().is_some_and(|t| struct_types.contains(t))
-                        }) {
-                            todo!(
-                                "Declaration.vars needs interior mutability for pass1 truncation after stop={stop}"
-                            );
-                        }
+                        let mut index = 0_i64;
+                        d.vars.borrow_mut().retain(|v| {
+                            let keep = index <= stop
+                                || v.type_.as_ref().is_some_and(|t| struct_types.contains(t));
+                            index += 1;
+                            keep
+                        });
                     }
                 } else {
-                    pending_call!(super::_check_array_dims(d, diags); env, profile);
+                    super::_check_array_dims(d, diags, env, Some(profile));
                     let variables = decl_variables
                         .iter()
                         .chain(seen.iter())
@@ -712,27 +760,42 @@ pub fn check_pass1_with(
                         .cloned()
                         .collect();
                     let indexed_constants = indexed_constants.difference(&seen).cloned().collect();
-                    pending_call!(super::_check_decl_exprs(d, &here.names, &variables, diags, &struct_types, None, &indexed_constants); profile, length_scope, here);
+                    super::_check_decl_exprs(
+                        d,
+                        &expressions::part1::KnownView {
+                            names: &here.names,
+                            tables: &here.tables,
+                            out_of_scope: &here.out_of_scope,
+                            dotted_tables: here.dotted_tables,
+                        },
+                        &variables,
+                        profile,
+                        diags,
+                        &struct_types,
+                        None,
+                        &length_scope,
+                        &indexed_constants,
+                    );
                 }
-                pending_call!(super::_check_init_bounds(d, diags); env);
+                super::_check_init_bounds(d, env, diags);
             }
         } else if fire_suppress {
         } else if let Stmt::Unparsed(u) = stmt.as_ref() {
-            if !pending_call!(super::_logical_assign_accepted(u, program); profile) {
-                let messages = pending_call!(super::_function_syntax_findings(u, program); profile);
+            if !super::_logical_assign_accepted(stmt, program, profile) {
+                let messages = super::_function_syntax_findings(stmt, program, profile);
                 if !messages.is_empty() {
                     for message in messages {
                         diags.error_basic(line, &message, file);
                     }
                 } else {
-                    let messages = pending_call!(super::_routine_arg_findings(u, program); profile);
+                    let messages = super::_routine_arg_findings(u, program, profile);
                     if !messages.is_empty() {
                         for message in messages {
                             diags.error_basic(line, &message, file);
                         }
                     } else {
-                        super::_check_unparsed_pass1_with(u, diags, program, profile);
-                        for message in super::_junk_init_findings_with(u, profile) {
+                        super::_check_unparsed_pass1(u, diags, program, profile);
+                        for message in super::_junk_init_findings(u, profile) {
                             if message == "Size of string missing."
                                 && profile.single_pass
                                 && diags.items.iter().any(|d| d.message == message)
@@ -744,10 +807,15 @@ pub fn check_pass1_with(
                         if profile.known_first_word_pass1 && super::_is_generic_unparsed(u) {
                             if known.is_none() {
                                 known = Some(ctx.known_names().clone());
-                                operands = pending_call!(super::pass1_operands(program); profile);
+                                operands = super::pass1_operands(program, profile);
                             }
-                            let findings: Vec<(i64, String, String)> = pending_result!(super::_instruction_arg_findings(text, &operands);
-                                "part6::_instruction_arg_findings_with must return Vec<(i64, String, String)>"; profile, ctx.declared_variable_names());
+                            let findings: Vec<(i64, String, String)> =
+                                super::_instruction_arg_findings(
+                                    text,
+                                    &operands,
+                                    profile,
+                                    ctx.declared_variable_names(),
+                                );
                             for (stage, kind, arg_text) in &findings {
                                 if *stage == 1 {
                                     let mut base = StmtBase::new(line, file);
@@ -756,7 +824,11 @@ pub fn check_pass1_with(
                                         base,
                                         ..Unparsed::default()
                                     });
-                                    diags.error_basic(line, &pending_call!(super::_pass1_message(&echo, kind, None); profile), file);
+                                    diags.error_basic(
+                                        line,
+                                        &super::_pass1_message(profile, &echo, kind, None),
+                                        file,
+                                    );
                                 } else if *stage == 3 || (*stage == 5 && findings[0].0 == 4) {
                                     diags.error_basic(line, kind, file);
                                 } else if *stage == 4 {
@@ -770,11 +842,10 @@ pub fn check_pass1_with(
                             let mut prefix = program.replaced();
                             prefix.statements = program.statements[..pos].to_vec();
                             let prefix = Rc::new(prefix);
-                            let earlier = pending_call!(super::pass1_operands(&prefix); profile);
-                            let scan_stmt =
-                                pending_call!(super::_inline_condition_stmt(stmt); profile);
+                            let earlier = super::pass1_operands(&prefix, profile);
+                            let scan_stmt = super::_inline_condition_stmt(stmt, profile);
                             let mut verdict = if findings.is_empty() {
-                                pending_call!(super::_pass1_scan(&scan_stmt.base().text, &earlier); profile)
+                                super::_pass1_scan(&scan_stmt.base().text, Some(&earlier), profile)
                             } else {
                                 None
                             };
@@ -807,11 +878,21 @@ pub fn check_pass1_with(
                             }
                             if let Some((stage, kind)) = verdict {
                                 if stage == "pass1" {
-                                    for message in pending_call!(super::_unparsed_string_messages(u, program); profile)
+                                    for message in
+                                        super::_unparsed_string_messages(u, program, profile)
                                     {
                                         diags.error_basic(line, &message, file);
                                     }
-                                    diags.error_basic(line, &pending_call!(super::_pass1_message(&scan_stmt, &kind, Some(earlier.clone())); profile), file);
+                                    diags.error_basic(
+                                        line,
+                                        &super::_pass1_message(
+                                            profile,
+                                            &scan_stmt,
+                                            &kind,
+                                            Some(&earlier),
+                                        ),
+                                        file,
+                                    );
                                 } else if stage == "pass2"
                                     && kind == "symbol"
                                     && SELECT.match_(text).is_some()
@@ -839,7 +920,7 @@ pub fn check_pass1_with(
             );
             diags.error_basic(
                 line,
-                &pending_call!(super::_pass1_message(stmt, "invalid_assignment", None); profile),
+                &super::_pass1_message(profile, stmt, "invalid_assignment", None),
                 file,
             );
         } else if let Stmt::Assignment(a) = stmt.as_ref()
@@ -856,7 +937,7 @@ pub fn check_pass1_with(
             diags.error_basic(line, &message, file);
             diags.error_basic(
                 line,
-                &pending_call!(super::_pass1_message(stmt, "invalid_assignment", None); profile),
+                &super::_pass1_message(profile, stmt, "invalid_assignment", None),
                 file,
             );
         } else if let Stmt::Assignment(a) = stmt.as_ref()
@@ -870,17 +951,17 @@ pub fn check_pass1_with(
                     && (profile.symbols().contains(&pystr::upper(&n.name))
                         || expressions::part1::_EXTRA_PREDEFINED_SYMBOLS
                             .contains(&pystr::upper(&n.name).as_str())
-                        || super::_assigns_user_const(a, program))))
+                        || super::_assigns_user_const(stmt, program))))
         {
             diags.error_basic(
                 line,
-                &pending_call!(super::_pass1_message(stmt, "invalid_assignment", None); profile),
+                &super::_pass1_message(profile, stmt, "invalid_assignment", None),
                 file,
             );
         } else if super::_assigns_const_index(stmt, &seen_consts, &predefined_constants) {
             diags.error_basic(
                 line,
-                &pending_call!(super::_pass1_message(stmt, "fallback", None); profile),
+                &super::_pass1_message(profile, stmt, "fallback", None),
                 file,
             );
         } else if let Stmt::Call(c) = stmt.as_ref()
@@ -891,14 +972,14 @@ pub fn check_pass1_with(
         {
             if known.is_none() {
                 known = Some(ctx.known_names().clone());
-                operands = pending_call!(super::pass1_operands(program); profile);
+                operands = super::pass1_operands(program, profile);
             }
             if operands.contains(&pystr::upper(&c.name))
                 && !ctx.declared_subs().contains(&pystr::upper(&c.name))
             {
                 diags.error_basic(
                     line,
-                    &pending_call!(super::_out_of_place(text, stmt.at_eol()); profile),
+                    &super::_out_of_place(profile, text, stmt.at_eol()),
                     file,
                 );
             }
@@ -907,7 +988,7 @@ pub fn check_pass1_with(
         {
             if known.is_none() {
                 known = Some(ctx.known_names().clone());
-                operands = pending_call!(super::pass1_operands(program); profile);
+                operands = super::pass1_operands(program, profile);
             }
             let src = i.args.first().and_then(Option::as_deref);
             let src_name = match src {
@@ -946,8 +1027,20 @@ pub fn check_pass1_with(
                     )
                     .filter(|n| !alias_parameter_names.contains(n))
                     .collect();
-                if !pending_call!(super::_check_alias_index_names(i, &here.names, &variables, diags, check_variables, &indexed_constants); profile, here)
-                {
+                if !super::_check_alias_index_names(
+                    i,
+                    &expressions::part1::KnownView {
+                        names: &here.names,
+                        tables: &here.tables,
+                        out_of_scope: &here.out_of_scope,
+                        dotted_tables: here.dotted_tables,
+                    },
+                    &variables,
+                    profile,
+                    diags,
+                    check_variables,
+                    &indexed_constants,
+                ) {
                     let mut view = program.replaced();
                     view.statements.clone_from(&alias_state.0);
                     if let Some(parameters) = &alias_parameters {
@@ -955,10 +1048,11 @@ pub fn check_pass1_with(
                     }
                     let view = Rc::new(view);
                     let view_ctx = context::of(&view, Some(profile), Some(env.clone()));
-                    let collisions = pending_call!(super::_alias_name_collisions(i, &declared_kinds, in_sub); profile);
-                    let string_slots: OrderedMap<String, (Option<i64>, usize)> = pending_result!(super::_alias_string_slots(&view);
-                        "part8::_alias_string_slots_with must return OrderedMap<String, (Option<i64>, usize)>"; env);
-                    super::_check_alias_dims_with(
+                    let collisions =
+                        super::_alias_name_collisions(i, &declared_kinds, Some(profile), in_sub);
+                    let string_slots: OrderedMap<String, (Option<i64>, usize)> =
+                        super::_alias_string_slots(&view, env);
+                    super::_check_alias_dims(
                         i,
                         diags,
                         env,
@@ -980,7 +1074,7 @@ pub fn check_pass1_with(
         {
             diags.error_basic(
                 u.base.node.line,
-                &super::_junk_init_findings_with(u, profile)[0],
+                &super::_junk_init_findings(u, profile)[0],
                 &u.base.node.file,
             );
         }
@@ -988,9 +1082,9 @@ pub fn check_pass1_with(
         {
             if known.is_none() {
                 known = Some(ctx.known_names().clone());
-                operands = pending_call!(super::pass1_operands(program); profile);
+                operands = super::pass1_operands(program, profile);
             }
-            pending_call!(super::_check_if_pass1(&operands, diags); stmt, profile, program);
+            super::_check_if_pass1(stmt, &operands, profile, diags, Some(program));
             if let Stmt::If(i) = stmt.as_ref() {
                 for sub in i
                     .inline
@@ -1011,7 +1105,7 @@ pub fn check_pass1_with(
                         let echo = replace_stmt(sub, |s| s.base().at_eol.set(false));
                         diags.error_basic(
                             sub.base().node.line,
-                            &pending_call!(super::_pass1_message(&echo, kind, None); profile),
+                            &super::_pass1_message(profile, &echo, kind, None),
                             &sub.base().node.file,
                         );
                     }
@@ -1027,7 +1121,7 @@ pub fn check_pass1_with(
                 .chain(i.inline_else.iter().flatten())
             {
                 let messages = if let Stmt::Unparsed(u) = sub.as_ref() {
-                    pending_call!(super::_routine_arg_findings(u, program); profile)
+                    super::_routine_arg_findings(u, program, profile)
                 } else {
                     vec![]
                 };
@@ -1041,7 +1135,7 @@ pub fn check_pass1_with(
                     let echo = replace_stmt(sub, |s| s.base().at_eol.set(false));
                     diags.error_basic(
                         sub_line,
-                        &pending_call!(super::_pass1_message(&echo, "fallback", None); profile),
+                        &super::_pass1_message(profile, &echo, "fallback", None),
                         sub_file,
                     );
                 } else if super::_block_keyword_call(sub) {
@@ -1062,7 +1156,11 @@ pub fn check_pass1_with(
                                 .contains(&pystr::upper(&n.name))))
                 {
                     let echo = replace_stmt(sub, |s| s.base().at_eol.set(false));
-                    diags.error_basic(sub_line, &pending_call!(super::_pass1_message(&echo, "invalid_assignment", None); profile), sub_file);
+                    diags.error_basic(
+                        sub_line,
+                        &super::_pass1_message(profile, &echo, "invalid_assignment", None),
+                        sub_file,
+                    );
                 }
             }
         }
@@ -1115,8 +1213,7 @@ pub fn check_pass1_with(
         } else if kw == "SCAN" {
             scan_depth += 1;
         } else if kw == "NEXTSCAN"
-            || (kw == "NEXT"
-                && pending_call!(super::_block_word(); args).as_deref() == Some("SCAN"))
+            || (kw == "NEXT" && super::_block_word(args).as_deref() == Some("SCAN"))
         {
             if scan_depth > 0 {
                 scan_depth -= 1;
@@ -1127,8 +1224,7 @@ pub fn check_pass1_with(
             cond_depth += 1;
             select_depth += i64::from(kw == "SELECT");
         } else if kw == "ENDSELECT"
-            || (kw == "END"
-                && pending_call!(super::_block_word(); args).as_deref() == Some("SELECT"))
+            || (kw == "END" && super::_block_word(args).as_deref() == Some("SELECT"))
         {
             cond_depth = 0.max(cond_depth - 1);
             if select_depth == 0 && !deferred {
@@ -1141,7 +1237,7 @@ pub fn check_pass1_with(
         {
             diags.error_basic(line, "Case outside Select.", file);
         } else if kw == "ENDIF"
-            || (kw == "END" && pending_call!(super::_block_word(); args).as_deref() == Some("IF"))
+            || (kw == "END" && super::_block_word(args).as_deref() == Some("IF"))
         {
             cond_depth = 0.max(cond_depth - 1);
         } else if kw == "DATATABLE" && !in_table {
@@ -1171,12 +1267,7 @@ pub static _DO_ALIASES: LazyLock<OrderedMap<&'static str, &'static str>> = LazyL
 });
 
 /// Port of checker/structure.py::_expr_resolves
-pub fn _expr_resolves(_e: Option<&Expr>, _declared: &BTreeSet<String>) -> bool {
-    todo!("checker/structure.py::_expr_resolves (omitted: functions: untyped)")
-}
-
-/// Port of checker/structure.py::_expr_resolves
-pub fn _expr_resolves_with(
+pub fn _expr_resolves(
     e: Option<&Expr>,
     declared: &BTreeSet<String>,
     functions: &BTreeSet<String>,
@@ -1184,29 +1275,24 @@ pub fn _expr_resolves_with(
     match e {
         None | Some(Expr::Number(_) | Expr::String(_)) => true,
         Some(Expr::Name(n)) => declared.contains(&pystr::upper(&n.name)),
-        Some(Expr::Unary(u)) => _expr_resolves_with(u.operand.as_deref(), declared, functions),
+        Some(Expr::Unary(u)) => _expr_resolves(u.operand.as_deref(), declared, functions),
         Some(Expr::Binary(b)) => {
-            _expr_resolves_with(b.left.as_deref(), declared, functions)
-                && _expr_resolves_with(b.right.as_deref(), declared, functions)
+            _expr_resolves(b.left.as_deref(), declared, functions)
+                && _expr_resolves(b.right.as_deref(), declared, functions)
         }
         Some(Expr::Index(i)) => {
             functions.contains(&pystr::upper(&i.name))
                 && !declared.contains(&pystr::upper(&i.name))
                 && i.args
                     .iter()
-                    .all(|a| _expr_resolves_with(a.as_deref(), declared, functions))
+                    .all(|a| _expr_resolves(a.as_deref(), declared, functions))
         }
         _ => false,
     }
 }
 
 /// Port of checker/structure.py::_slowsequence_resolves
-pub fn _slowsequence_resolves(stmt: &Stmt, declared: &BTreeSet<String>) -> bool {
-    _slowsequence_resolves_with(stmt, declared, &BTreeSet::new())
-}
-
-/// Port of checker/structure.py::_slowsequence_resolves
-pub fn _slowsequence_resolves_with(
+pub fn _slowsequence_resolves(
     stmt: &Stmt,
     declared: &BTreeSet<String>,
     functions: &BTreeSet<String>,
@@ -1216,25 +1302,13 @@ pub fn _slowsequence_resolves_with(
             .args
             .iter()
             .flatten()
-            .all(|a| _expr_resolves_with(Some(a.as_ref()), declared, functions)),
+            .all(|a| _expr_resolves(Some(a.as_ref()), declared, functions)),
         _ => true,
     }
 }
 
 /// Port of checker/structure.py::open_program_at_slowsequence
-pub fn open_program_at_slowsequence(program: &Program, profile: &Profile) -> ProgramRef {
-    // This legacy signature cannot return the caller's Rc on the unchanged path.
-    open_program_at_slowsequence_with(
-        &Rc::new(program.clone()),
-        crate::profiles::get(profile.name).expect("registered profile"),
-    )
-}
-
-/// Port of checker/structure.py::open_program_at_slowsequence
-pub fn open_program_at_slowsequence_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-) -> ProgramRef {
+pub fn open_program_at_slowsequence(program: &ProgramRef, profile: &'static Profile) -> ProgramRef {
     static SLOW: LazyLock<pyre::Regex> =
         LazyLock::new(|| pyre::Regex::new(r"\s*SlowSequence\b", pyre::I));
     let mut found = None;
@@ -1276,7 +1350,7 @@ pub fn open_program_at_slowsequence_with(
             .iter()
             .map(|(name, _)| name.to_owned())
             .collect();
-        if !_slowsequence_resolves_with(st, &declared, &functions) {
+        if !_slowsequence_resolves(st, &declared, &functions) {
             return program.clone();
         }
     }
@@ -1358,7 +1432,7 @@ mod tests {
         let functions = BTreeSet::from(["ABS".to_owned()]);
         for (expr, expected) in exprs.into_iter().zip(expected) {
             assert_eq!(
-                _expr_resolves_with(expr.as_deref(), &declared, &functions),
+                _expr_resolves(expr.as_deref(), &declared, &functions),
                 expected
             );
             let stmt = Stmt::Instruction(Instruction {
@@ -1367,17 +1441,18 @@ mod tests {
                 ..Instruction::default()
             });
             assert_eq!(
-                _slowsequence_resolves_with(&stmt, &declared, &functions),
+                _slowsequence_resolves(&stmt, &declared, &functions),
                 expected
             );
         }
-        assert!(!_expr_resolves_with(
+        assert!(!_expr_resolves(
             Some(&index("Abs", one)),
             &BTreeSet::from(["ABS".to_owned()]),
             &functions,
         ));
         assert!(_slowsequence_resolves(
             &Stmt::Unparsed(Unparsed::default()),
+            &BTreeSet::new(),
             &BTreeSet::new()
         ));
     }

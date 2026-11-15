@@ -52,7 +52,7 @@ pub fn structure_members(program: &Program) -> OrderedMap<String, OrderedMap<Str
             Stmt::Declaration(decl) if current.is_some() && decl.kind == "STRUCTUREMEMBER" => {
                 if let Some(ref cur) = current {
                     let mut map = result.get(cur).cloned().unwrap_or_default();
-                    for v in &decl.vars {
+                    for v in decl.vars.borrow().iter() {
                         let ty = v.type_.as_deref().unwrap_or("FLOAT");
                         map.insert(pystr::upper(&v.name), pystr::upper(ty));
                     }
@@ -84,7 +84,7 @@ pub fn variable_kinds(
         if decl.kind != "PUBLIC" && decl.kind != "DIM" && decl.kind != "STATIC" {
             continue;
         }
-        for v in &decl.vars {
+        for v in decl.vars.borrow().iter() {
             let mut kind = pystr::upper(v.type_.as_deref().unwrap_or("FLOAT"));
             if v.paren_dim {
                 kind = "FLOAT".to_string();
@@ -273,7 +273,7 @@ pub fn check_members_with_profile(
     let mut declared: BTreeSet<String> = BTreeSet::new();
     for st in &program.statements {
         if let Stmt::Declaration(d) = st.as_ref() {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 declared.insert(pystr::upper(&v.name));
             }
         }
@@ -494,9 +494,11 @@ pub fn check_struct_assignment_with_profile(
         for m in messages {
             let msg = match m {
                 Some(s) => s.to_string(),
-                None => {
-                    structure::part2::_out_of_place(&assign.base.text, assign.base.at_eol.get())
-                }
+                None => structure::part2::_out_of_place(
+                    profile,
+                    &assign.base.text,
+                    assign.base.at_eol.get(),
+                ),
             };
             diags.error(node.line, &msg, &node.file, ShowFile::Bool(true), 0, "", "");
         }

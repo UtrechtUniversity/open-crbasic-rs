@@ -1014,7 +1014,7 @@ pub fn check_pointer_deref_with(
                     diags.error_basic(stmt.line(), &format!("{orig}{POINTER_SUFFIX}"), stmt.file());
                     diags.error_basic(
                         stmt.line(),
-                        &structure::part2::_out_of_place(stmt.text(), stmt.at_eol()),
+                        &structure::part2::_out_of_place(profile, stmt.text(), stmt.at_eol()),
                         stmt.file(),
                     );
                 }
@@ -1042,7 +1042,11 @@ pub fn check_pointer_deref_with(
                     continue;
                 }
                 name = offender(scope, &[target, a.value.as_deref()]);
-                echo = Some(structure::part2::_out_of_place(stmt.text(), stmt.at_eol()));
+                echo = Some(structure::part2::_out_of_place(
+                    profile,
+                    stmt.text(),
+                    stmt.at_eol(),
+                ));
             }
             Stmt::Unparsed(_) => {
                 if let Some(m) = POINTER_UNPARSED_RE.fullmatch(stmt.text())
@@ -1052,7 +1056,11 @@ pub fn check_pointer_deref_with(
                     && !ty.ends_with('!')
                 {
                     name = Some(orig.clone());
-                    echo = Some(structure::part2::_out_of_place(stmt.text(), stmt.at_eol()));
+                    echo = Some(structure::part2::_out_of_place(
+                        profile,
+                        stmt.text(),
+                        stmt.at_eol(),
+                    ));
                 }
             }
             Stmt::If(i) => {
@@ -1128,7 +1136,8 @@ mod tests {
                 dims,
                 type_: ty.map(str::to_owned),
                 ..VarDecl::default()
-            })],
+            })]
+            .into(),
         }))
     }
 

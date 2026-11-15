@@ -66,38 +66,20 @@ mod pending_wiring {
         todo!("checker/instr_rules.py::_real_params")
     }
 
-    // TODO(integrator-2): import from `structure` once ported.
-    pub(super) const _FOR_MISSING: &str = "For missing parameter";
+    pub(super) use crate::checker::structure::{
+        _FOR_MISSING, _for_header_incomplete, _for_header_message, _for_header_parts,
+    };
 
-    // TODO(integrator-2): wire to `structure::_for_header_incomplete_with`.
-    pub(super) fn _for_header_incomplete(
-        _text: &str,
-        _profile: &'static Profile,
-    ) -> Option<(String, bool)> {
-        todo!("checker/structure.py::_for_header_incomplete")
+    pub(super) fn _for_init_match(text: &str) -> Option<String> {
+        crate::checker::structure::part6::_FOR_INIT_RE
+            .match_(text)
+            .and_then(|m| m.group(1).map(str::to_owned))
     }
 
-    // TODO(integrator-2): wire to `structure::_for_header_parts_with`.
-    pub(super) fn _for_header_parts(
-        _text: &str,
-        _profile: &'static Profile,
-    ) -> Vec<(String, String)> {
-        todo!("checker/structure.py::_for_header_parts")
-    }
-
-    // TODO(integrator-2): import `structure::_FOR_INIT_RE`.
-    pub(super) fn _for_init_match(_text: &str) -> Option<String> {
-        todo!("checker/structure.py::_FOR_INIT_RE")
-    }
-
-    // TODO(integrator-2): import `structure::_FOR_TO_RE`.
-    pub(super) fn _for_to_start(_text: &str) -> Option<usize> {
-        todo!("checker/structure.py::_FOR_TO_RE")
-    }
-
-    // TODO(integrator-2): wire to `structure::_for_header_message`.
-    pub(super) fn _for_header_message(_kind: &str, _part: &str) -> String {
-        todo!("checker/structure.py::_for_header_message")
+    pub(super) fn _for_to_start(text: &str) -> Option<usize> {
+        crate::checker::structure::part6::_FOR_TO_RE
+            .match_(text)
+            .and_then(|m| m.start(1))
     }
 }
 
@@ -283,10 +265,14 @@ pub fn first_declarations_with(program: &Program) -> OrderedMap<String, (String,
     let mut first: OrderedMap<String, (String, i64)> = OrderedMap::new();
     for st in &program.statements {
         let base = st.base();
+        let declaration_vars = match st.as_ref() {
+            Stmt::Declaration(d) => Some(d.vars.borrow()),
+            _ => None,
+        };
         let mut names: Vec<&str> = Vec::new();
         match st.as_ref() {
             Stmt::Declaration(decl) => {
-                for v in &decl.vars {
+                for v in declaration_vars.as_ref().unwrap().iter() {
                     names.push(&v.name);
                 }
             }
@@ -1128,7 +1114,8 @@ mod tests {
             vars: vec![Rc::new(VarDecl {
                 name: "Alpha".to_string(),
                 ..Default::default()
-            })],
+            })]
+            .into(),
         }));
         let cdecl = Rc::new(Stmt::ConstDecl(ConstDecl {
             base: StmtBase::new(4, "test.cr300"),

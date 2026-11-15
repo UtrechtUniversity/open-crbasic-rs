@@ -199,7 +199,7 @@ pub fn _check_uint1_dims_with(
         let Stmt::Declaration(decl) = stmt.as_ref() else {
             continue;
         };
-        for v in &decl.vars {
+        for v in decl.vars.borrow().iter() {
             if v.type_.as_deref() != Some("UINT1") {
                 continue;
             }
@@ -396,8 +396,20 @@ pub fn _check_reachability_with(
     let mut open_depth: i64 = 0;
     let mut sub_depth: i64 = 0;
     let mut begun = false;
-    // TODO: populate from `structure::pipeline_task_errors(program, profile)` once `structure` is ported.
-    let pipeline_delays: BTreeSet<usize> = BTreeSet::new();
+    let tasks = profile.pipeline_tasks().get("tasks");
+    let pipeline_delays: BTreeSet<usize> =
+        crate::checker::structure::pipeline_task_errors(program, env.profile)
+            .into_iter()
+            .filter(|(stmt, _)| {
+                _kw(stmt) == "DELAY"
+                    || tasks
+                        .and_then(|tasks| tasks.get(&_kw(stmt)))
+                        .and_then(|rule| rule.get("hides_unreached"))
+                        .and_then(crate::profiles::Json::as_bool)
+                        == Some(true)
+            })
+            .map(|(stmt, _)| crate::syntax::stmt_id(&stmt))
+            .collect();
 
     let mut i: usize = 0;
     while i < n {
@@ -1060,7 +1072,8 @@ mod tests {
                     type_: Some("UINT1".to_string()),
                     ..VarDecl::new("b")
                 }),
-            ],
+            ]
+            .into(),
         }));
         let prog = Program::new("t.cr6", vec![decl]);
         let mut diags = Diagnostics::new();
@@ -1247,7 +1260,7 @@ mod tests {
         let decl = Rc::new(Stmt::Declaration(Declaration {
             base: StmtBase::new(1, "t.cr6"),
             kind: "PUBLIC".to_string(),
-            vars: vec![Rc::new(VarDecl::new("x"))],
+            vars: vec![Rc::new(VarDecl::new("x"))].into(),
         }));
         let unparsed = Rc::new(Stmt::Unparsed(Unparsed {
             base: StmtBase {

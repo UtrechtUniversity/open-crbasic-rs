@@ -694,7 +694,7 @@ pub fn _matrix_shapes(program: &ProgramRef, env: &Env) -> OrderedMap<String, (i6
         if let Stmt::Declaration(d) = st.as_ref()
             && matches!(d.kind.as_str(), "PUBLIC" | "DIM" | "STATIC")
         {
-            for v in &d.vars {
+            for v in d.vars.borrow().iter() {
                 let up = pystr::upper(&v.name);
                 if seen.contains(&up) {
                     repeated.insert(up);
