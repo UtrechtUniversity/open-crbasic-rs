@@ -4,24 +4,19 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: both usage windows ran out on 2026-11-15 (Codex until 21:59 CET, Claude until
-20:50 CET). Nothing is running. Resume in this order, at most 2 Codex workers at a time:
-1. `cx-pass2` (worktree `.claude/worktrees/cx-pass2`): `check_pass2` (`structure.py` 2216-2702)
-   is partly written in `structure/part4.rs`, uncommitted and NOT compiling (3 errors, one is
-   `Message::replace` missing); its `HANDOFF.md` says where it stopped. Continue it there
-   (brief: scratchpad `pass2.md`, or re-create with the scope "only `check_pass2`").
-2. `cx-walk` (worktree `.claude/worktrees/cx-walk`): `_scan_placement_walk` (`structure.py`
-   781-849) into `_scan_placement_walk_with` in `structure/part2.rs`; not started.
-3. Wiring, strictly one task at a time because it edits callers across files. Per module, in
-   this order: structure, instr_rules, expressions, instr_data, instr_measure, cr3xx, tables,
-   then intervals, symbols, structs, longconv, mode, ess. For each `todo!()` skeleton stub that
-   has a `*_with` sibling: delete the stub, rename the sibling to the Python name, and give
-   every caller the real arguments (take them from the Python call site); drop the private
-   `_pN_*` copies; resolve what `handoffs/*.md` list. Needs one `syntax.rs` change:
-   `Declaration.vars` must be shortenable on a shared declaration (`structure.py` 1698,
-   `handoffs/struct-3.md`). `RuleFn` in `instr_rules/mod.rs` lacks `env` (`handoffs/rules-5.md`).
-   Gate after each module: full check set, no baseline file lost; record the parity number.
-4. Convergence on the fixture files (P5), then close-out (P6; delete `handoffs/`).
+Next wave (state at 2026-11-15 22:20 CET): `check_pass2` (`dcbd78b`) and `_scan_placement_walk`
+(`b85a733`) are merged as `*_with` siblings; nothing is left to port, only to wire. Wiring is
+strictly one task at a time because it edits callers across files. Order: instr_rules (started
+first because structure was still being ported; worktree `.claude/worktrees/wire-rules`, branch
+`wire-rules`, Sonnet, its `HANDOFF.md` says where it is), then structure, expressions,
+instr_data, instr_measure, cr3xx, tables, then intervals, symbols, structs, longconv, mode, ess.
+For each `todo!()` skeleton stub that has a `*_with` sibling: delete the stub, rename the
+sibling to the Python name, and give every caller the real arguments (take them from the Python
+call site); drop the private `_pN_*` copies; resolve what `handoffs/*.md` list. Needs one
+`syntax.rs` change: `Declaration.vars` must be shortenable on a shared declaration
+(`structure.py` 1698, `handoffs/struct-3.md`). Gate after each module: full check set, no
+baseline file lost; record the parity number. Then convergence on the fixture files (P5) and
+close-out (P6; delete `handoffs/`).
 
 Merged in this round: all nine `structure` parts and all five `instr_rules` parts, as `*_with`
 siblings with `handoffs/<task>.md`. Full check set green on `port` at `bb39c3b`: 278 unit
