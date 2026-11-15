@@ -4,14 +4,15 @@
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
-use crate::pystr;
 use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
 };
+use crate::{pyre, pystr};
 
 /// Port of `checker/instr_data.py::check_units_targets`.
 pub fn check_units_targets(program: &Program, _profile: &Profile, diags: &mut Diagnostics) {
@@ -143,8 +144,26 @@ pub fn _boolean_pick_ok(_token: &str) -> bool {
 }
 
 /// Port of `checker/instr_data.py::_pick_tokens`.
-pub fn _pick_tokens(_stmt: &Instruction) -> Option<Vec<String>> {
-    todo!("checker/instr_data.py::_pick_tokens")
+pub fn _pick_tokens(stmt: &Instruction) -> Option<Vec<String>> {
+    static MENU_PICK: LazyLock<pyre::Regex> =
+        LazyLock::new(|| pyre::Regex::new(r"\s*MenuPick\b(.*)$", pyre::I | pyre::S));
+
+    let matched = MENU_PICK.match_(&stmt.base.text)?;
+    let mut rest = String::new();
+    let mut quoted = false;
+    for ch in matched.group(1)?.chars() {
+        if ch == '"' {
+            quoted = !quoted;
+        } else if ch == '\'' && !quoted {
+            break;
+        }
+        rest.push(ch);
+    }
+    let mut rest = pystr::strip(&rest);
+    if rest.starts_with('(') && rest.ends_with(')') {
+        rest = pystr::slice(rest, Some(1), Some(-1));
+    }
+    Some(rest.split(',').map(str::to_owned).collect())
 }
 
 /// Port of `checker/instr_data.py::_check_boolean_picklist`.
@@ -249,4 +268,26 @@ pub fn drop_unreached_destinations(
     _diags: &mut Diagnostics,
 ) {
     todo!("checker/instr_data.py::drop_unreached_destinations (omitted: env: untyped)")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::_pick_tokens;
+    use crate::syntax::{Instruction, StmtBase};
+
+    #[test]
+    fn pick_tokens_preserve_trailing_slots_and_split_quoted_commas() {
+        let mut stmt = Instruction {
+            base: StmtBase {
+                text: "  mEnUpIcK (1,\"a,b'c\",) 'comment".to_owned(),
+                ..StmtBase::default()
+            },
+            ..Instruction::default()
+        };
+        let tokens = _pick_tokens(&stmt).unwrap();
+        assert_eq!(tokens, ["1", "\"a", "b'c\"", ""]);
+
+        stmt.base.text = "MenuPicker(1)".to_owned();
+        assert_eq!(_pick_tokens(&stmt), None);
+    }
 }

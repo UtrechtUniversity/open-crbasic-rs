@@ -4,6 +4,7 @@
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
@@ -11,6 +12,7 @@ use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
 };
+use crate::{pyre, pystr};
 
 /// Port of `checker/expressions.py::_names_through_over_index`.
 pub fn _names_through_over_index(_expr: Option<&Expr>, _known: &BTreeSet<String>) -> Vec<String> {
@@ -86,8 +88,37 @@ pub fn dimensions_message(_text: &str, _whole_statement: bool, _at_eol: bool) ->
 }
 
 /// Port of `checker/expressions.py::_arg_text`.
-pub fn _arg_text(_stmt: &Instruction, _i: i64) -> String {
-    todo!("checker/expressions.py::_arg_text")
+pub fn _arg_text(stmt: &Instruction, i: i64) -> String {
+    static SELECT_CASE: LazyLock<pyre::Regex> =
+        LazyLock::new(|| pyre::Regex::new(r"(?i)\s*Select\s+Case(.*)$", 0));
+
+    let text = &stmt.base.text;
+    if i == 0
+        && stmt.keyword.eq_ignore_ascii_case("SELECT")
+        && let Some(tail) = SELECT_CASE.match_(text).and_then(|m| m.group(1))
+    {
+        return tail.to_owned();
+    }
+    let index = |len: usize| {
+        if i < 0 {
+            len.checked_sub(usize::try_from(i.unsigned_abs()).ok()?)
+        } else {
+            usize::try_from(i).ok()
+        }
+    };
+    if let Some((start, end)) = index(stmt.arg_spans.len())
+        .and_then(|i| stmt.arg_spans.get(i))
+        .and_then(|span| *span)
+    {
+        return pystr::slice(text, Some(start), Some(end)).to_owned();
+    }
+    match index(stmt.args.len())
+        .and_then(|i| stmt.args.get(i))
+        .and_then(Option::as_deref)
+    {
+        Some(Expr::Name(name)) => name.name.clone(),
+        _ => String::new(),
+    }
 }
 
 /// Port of `checker/expressions.py::_call_arg_text`.
@@ -189,4 +220,29 @@ pub struct TablesWithFields {}
 /// Port of `checker/expressions.py::_data_table_fields`.
 pub fn _data_table_fields(_program: &Program) {
     todo!("checker/expressions.py::_data_table_fields (omitted: profile: untyped)")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::_arg_text;
+    use crate::syntax::{Instruction, StmtBase};
+
+    #[test]
+    fn arg_text_uses_character_spans_and_preserves_select_spacing() {
+        let mut stmt = Instruction {
+            base: StmtBase {
+                text: "Scan(é + 1,Sec)".to_owned(),
+                ..StmtBase::default()
+            },
+            keyword: "SCAN".to_owned(),
+            arg_spans: vec![Some((5, 10)), Some((11, 14))],
+            ..Instruction::default()
+        };
+        assert_eq!(_arg_text(&stmt, 0), "é + 1");
+        assert_eq!(_arg_text(&stmt, -1), "Sec");
+
+        stmt.keyword = "SELECT".to_owned();
+        stmt.base.text = " Select Case  X + Nope".to_owned();
+        assert_eq!(_arg_text(&stmt, 0), "  X + Nope");
+    }
 }
