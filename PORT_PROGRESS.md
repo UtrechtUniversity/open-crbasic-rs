@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: P1-e, P2-a..c in parallel (`P1-a`, `P1-b`, `P1-d` merged).
+Next wave: finish P1-e (chunk 4 + AST golden), then P1-c, P3, P4 (`P1-a`, `P1-b`, `P1-d`, `P2-a..c` merged).
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -36,11 +36,11 @@ Operating notes (learned in wave 1):
 | P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
 | P1-d | `consteval.py` (327) | `src/consteval.rs` | S | merged | `0b6c140`; 7 unit tests |
 | P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | running | chunks 1–3 (`19aef06`, helpers/exprs/stmts/decls) merged; 7 unit tests |
-| P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | todo | serial, one task per module group |
-| P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | todo | |
-| P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | todo | |
+| P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | merged | `5af36e1`; 54 files |
+| P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | merged | `d27829a`; 4 unit tests |
+| P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | merged | `06b9037`; 3 unit tests |
 | P3-h | `ess` 81, `longconv` 133, `symbols` 157, `structs` 236, `terminals` 427, `storage` 456, `mode.py` 143, `tdf.py` structs | one file each | H | todo | one task per module |
 | P3-s | `var_types` 553, `intervals` 679, `scan_time` 580, `warnings` 666, `compiler.py` 324, `cli.py` verdict path | one file each | S | todo | one task per module |
-| P4 | `structure` 6309 (8), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (3), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | todo | ranges fixed by P2-a's file split |
+| P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | todo | ranges fixed by P2-a's file split |
 | P5 | convergence: bucket (H), fix per bucket (S), station + fuzz + CLI bytes (S) | | H/S | todo | |
 | P6 | README, AGENTS status, CI | | H | todo | |
