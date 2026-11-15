@@ -25,46 +25,11 @@ mod pending_wiring {
         i64::try_from(n).unwrap_or(i64::MAX)
     }
 
-    // TODO(integrator-2): import from `cr3xx::part1` once ported.
-    pub(super) const _UNRESOLVED_SUFFIX: &str = " is not defined.";
-    // TODO(integrator-2): import from `cr3xx::part1` once ported.
-    pub(super) const _VARIABLE_ILLEGAL_PREFIX: &str = "Variable illegal in Parameter:";
-
-    // TODO(integrator-2): import from `instr_rules` once ported.
-    pub(super) const _SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
-
-    // TODO(integrator-2): wire to `instr_rules::shortfall_message_with`.
-    pub(super) fn shortfall_message(
-        _record: &profiles::Instruction,
-        _given: i64,
-    ) -> Option<String> {
-        todo!("checker/instr_rules.py::shortfall_message")
-    }
-
-    // TODO(integrator-2): wire to `instr_rules::given_count_of`.
-    pub(super) fn given_count_of(_args: &[String]) -> i64 {
-        todo!("checker/instr_rules.py::given_count_of")
-    }
-
-    // TODO(integrator-2): wire to `instr_rules::_next_simple_token`.
-    pub(super) fn _next_simple_token(_text: &str) -> String {
-        todo!("checker/instr_rules.py::_next_simple_token")
-    }
-
-    // TODO(integrator-2): wire to `instr_rules::given_count`.
-    pub(super) fn given_count(_stmt: &Instruction, _profile: &'static Profile) -> i64 {
-        todo!("checker/instr_rules.py::given_count")
-    }
-
-    // TODO(integrator-2): wire to `instr_rules::_required_count`.
-    pub(super) fn _required_count(_params: &[i64]) -> i64 {
-        todo!("checker/instr_rules.py::_required_count")
-    }
-
-    // TODO(integrator-2): wire to `instr_rules::_real_params`.
-    pub(super) fn _real_params(_params: &[i64]) -> Vec<i64> {
-        todo!("checker/instr_rules.py::_real_params")
-    }
+    pub(super) use super::super::part1::{_UNRESOLVED_SUFFIX, _VARIABLE_ILLEGAL_PREFIX};
+    pub(super) use crate::checker::instr_rules::{
+        _SERIALIN_DEST_MESSAGE, _next_simple_token, _real_params, _required_count, given_count,
+        given_count_of, shortfall_message,
+    };
 
     pub(super) use crate::checker::structure::{
         _FOR_MISSING, _for_header_incomplete, _for_header_message, _for_header_parts,
@@ -83,12 +48,13 @@ mod pending_wiring {
     }
 }
 
-const _CONST_FIRST_PARAM: [i64; 4] = [1, 5, 38, 39];
+pub(super) const _CONST_FIRST_PARAM: [i64; 4] = [1, 5, 38, 39];
 
-const _GENERIC_FALLBACK_PREFIX: &str = "Invalid, or out of place expression: ";
-static _LINE_WORD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[A-Za-z_][A-Za-z0-9_]*", 0));
+pub(super) const _GENERIC_FALLBACK_PREFIX: &str = "Invalid, or out of place expression: ";
+pub(super) static _LINE_WORD_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[A-Za-z_][A-Za-z0-9_]*", 0));
 
-static _TAIL_REJECTING: LazyLock<BTreeSet<String>> = LazyLock::new(|| {
+pub(super) static _TAIL_REJECTING: LazyLock<BTreeSet<String>> = LazyLock::new(|| {
     "BeginProg PipeLineMode SequentialMode EndIf WEND OpenInterval NEXTSCAN NEXTSUBSCAN ENDTABLE \
      FillStop ExitScan ContinueScan ExitSub ExitDo ExitFor Restore AngleDegrees ShutdownBegin \
      ShutdownEnd EndSequence ExitFunction AbortScan SampleFieldCal WaitTriggerSequence \
@@ -99,19 +65,19 @@ static _TAIL_REJECTING: LazyLock<BTreeSet<String>> = LazyLock::new(|| {
         .collect()
 });
 
-static _ZERO_TAIL_RE: LazyLock<Regex> =
+pub(super) static _ZERO_TAIL_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*([A-Za-z_]\w*)(?=[\s,(])(.*)$", pyre::S));
 
-static _LEAD_OP_WORD_RE: LazyLock<Regex> =
+pub(super) static _LEAD_OP_WORD_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)(is|mod|and|or|xor|imp|eqv|to)(?![A-Za-z0-9_])", 0));
-const _LEAD_OP_NO_OPERAND: [&str; 2] = ["IS", "MOD"];
-static _LEAD_OP_SKIP_RE: LazyLock<Regex> = LazyLock::new(|| {
+pub(super) const _LEAD_OP_NO_OPERAND: [&str; 2] = ["IS", "MOD"];
+pub(super) static _LEAD_OP_SKIP_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?i)^[ \t]*(?:(?:and|or|xor|imp|eqv|to|not|mod|is)(?![A-Za-z0-9_])[ \t]*)*",
         0,
     )
 });
-static _INSTRUCTION_PROSE_RE: LazyLock<Regex> = LazyLock::new(|| {
+pub(super) static _INSTRUCTION_PROSE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"\s*([A-Za-z_][A-Za-z0-9_]*)[ \t]+([A-Za-z_][^(]*)$",
         pyre::S,
@@ -126,9 +92,9 @@ static _LINE_OP_WORD_RE: LazyLock<Regex> = LazyLock::new(|| {
         0,
     )
 });
-static _TABLE_LINE_RE: LazyLock<Regex> =
+pub(super) static _TABLE_LINE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*([A-Za-z_][A-Za-z0-9_]*)\.", 0));
-static _SIGNED_TABLE_RE: LazyLock<Regex> =
+pub(super) static _SIGNED_TABLE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*[-+][ \t]*([A-Za-z_][A-Za-z0-9_]*)\.(?=[A-Za-z_])", 0));
 static _LINE_OP_RUN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -216,13 +182,8 @@ pub fn _loose_before_beginprog(program: &Program, line: i64, file: &str) -> bool
     false
 }
 
-/// Port of `checker/cr3xx.py::prose_known`.
-pub fn prose_known(_program: &Program) -> BTreeSet<String> {
-    todo!("checker/cr3xx.py::prose_known (omitted: profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::prose_known`.
-pub fn prose_known_with(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
+/// Port of checker/cr3xx.py::prose_known
+pub fn prose_known(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
     let symbols = profile.symbols();
     let functions = profile.functions();
     let instruction_only: BTreeSet<&str> = profile
@@ -241,27 +202,14 @@ pub fn prose_known_with(program: &ProgramRef, profile: &'static Profile) -> BTre
         .collect()
 }
 
-/// Port of `checker/cr3xx.py::prose_known_tables`.
-pub fn prose_known_tables(_program: &Program) -> BTreeSet<String> {
-    todo!("checker/cr3xx.py::prose_known_tables (omitted: profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::prose_known_tables`.
-pub fn prose_known_tables_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-) -> BTreeSet<String> {
+/// Port of checker/cr3xx.py::prose_known_tables
+pub fn prose_known_tables(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
     let ctx = context::of(program, Some(profile), None);
     ctx.known_names().tables.clone()
 }
 
-/// Port of `checker/cr3xx.py::first_declarations`.
-pub fn first_declarations(_program: &Program) {
-    todo!("checker/cr3xx.py::first_declarations")
-}
-
-/// Port of `checker/cr3xx.py::first_declarations`.
-pub fn first_declarations_with(program: &Program) -> OrderedMap<String, (String, i64)> {
+/// Port of checker/cr3xx.py::first_declarations
+pub fn first_declarations(program: &Program) -> OrderedMap<String, (String, i64)> {
     let mut first: OrderedMap<String, (String, i64)> = OrderedMap::new();
     for st in &program.statements {
         let base = st.base();
@@ -298,13 +246,8 @@ pub fn first_declarations_with(program: &Program) -> OrderedMap<String, (String,
     first
 }
 
-/// Port of `checker/cr3xx.py::declared_later`.
-pub fn declared_later(_line: i64, _file: &str) -> BTreeSet<String> {
-    todo!("checker/cr3xx.py::declared_later (omitted: first: dict[str, tuple[str, int]])")
-}
-
-/// Port of `checker/cr3xx.py::declared_later`.
-pub fn declared_later_with(
+/// Port of checker/cr3xx.py::declared_later
+pub fn declared_later(
     first: &OrderedMap<String, (String, i64)>,
     line: i64,
     file: &str,
@@ -512,7 +455,7 @@ pub fn _leading_unknown_words_with(
         .collect()
 }
 
-const _CALL_ADJACENT_EXCLUDED: [&str; 15] = [
+pub(super) const _CALL_ADJACENT_EXCLUDED: [&str; 15] = [
     "DATA", "DATALONG", "ALIAS", "UNITS", "SUB", "FUNCTION", "IF", "ELSEIF", "WHILE", "UNTIL",
     "SELECT", "CASE", "FOR", "DO", "LOOP",
 ];
@@ -564,18 +507,8 @@ const _ADJACENT_TABLE_SOURCES: [&str; 6] = [
     "SAMPLE", "AVERAGE", "MAXIMUM", "MINIMUM", "TOTALIZE", "STDDEV",
 ];
 
-/// Port of `checker/cr3xx.py::_call_adjacent_arg_messages`.
+/// Port of checker/cr3xx.py::_call_adjacent_arg_messages
 pub fn _call_adjacent_arg_messages(
-    _inner: &str,
-    _here: &BTreeSet<String>,
-    _variables: &BTreeSet<String>,
-    _in_table: bool,
-) -> Option<Vec<String>> {
-    todo!("checker/cr3xx.py::_call_adjacent_arg_messages (omitted: record: dict, profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::_call_adjacent_arg_messages`.
-pub fn _call_adjacent_arg_messages_with(
     inner: &str,
     record: &profiles::Instruction,
     here: &BTreeSet<String>,
@@ -627,7 +560,7 @@ pub fn _call_adjacent_arg_messages_with(
             pystr::lstrip(&arg)
         };
         if let Some(short) =
-            pending_wiring::shortfall_message(record, pending_wiring::given_count_of(&args))
+            pending_wiring::shortfall_message(record, pending_wiring::given_count_of(args.clone()))
         {
             return Some(vec![short]);
         }
@@ -674,13 +607,8 @@ pub fn _call_adjacent_arg_messages_with(
     Some(out)
 }
 
-/// Port of `checker/cr3xx.py::order_email_destination`.
-pub fn order_email_destination(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::order_email_destination (omitted: profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::order_email_destination`.
-pub fn order_email_destination_with(
+/// Port of checker/cr3xx.py::order_email_destination
+pub fn order_email_destination(
     _program: &Program,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -716,13 +644,8 @@ const _SHORTFALL_MESSAGES: [&str; 2] = [
     "Too few parameters in instruction.",
 ];
 
-/// Port of `checker/cr3xx.py::drop_shortfall_with_names`.
-pub fn drop_shortfall_with_names(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::drop_shortfall_with_names (omitted: profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::drop_shortfall_with_names`.
-pub fn drop_shortfall_with_names_with(
+/// Port of checker/cr3xx.py::drop_shortfall_with_names
+pub fn drop_shortfall_with_names(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -791,7 +714,7 @@ pub fn drop_shortfall_with_names_with(
             return false;
         };
         pending_wiring::given_count(inst, profile)
-            < pending_wiring::_required_count(&pending_wiring::_real_params(&record.params))
+            < pending_wiring::_required_count(pending_wiring::_real_params(record.params.clone()))
     };
 
     let first = stmts.iter().position(|st| {
@@ -934,17 +857,8 @@ static _FOR_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*For\s"
 static _FOR_EQ_TO_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"=(.*?)\sTo\s", pyre::I | pyre::S));
 
-/// Port of `checker/cr3xx.py::check_for_header`.
-pub fn check_for_header(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::check_for_header (omitted: profile: untyped)")
-}
-
-/// Port of `checker/cr3xx.py::check_for_header`.
-pub fn check_for_header_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-) {
+/// Port of checker/cr3xx.py::check_for_header
+pub fn check_for_header(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     if !matches!(profile.name, "cr300" | "cr350") {
         return;
     }
@@ -984,8 +898,8 @@ pub fn check_for_header_with(
         if !own_ok {
             continue;
         }
-        let known_set = known.get_or_insert_with(|| prose_known_with(program, profile));
-        let later = declared_later_with(&first_declarations_with(program), key_line, key_file);
+        let known_set = known.get_or_insert_with(|| prose_known(program, profile));
+        let later = declared_later(&first_declarations(program), key_line, key_file);
         let here: BTreeSet<String> = known_set.difference(&later).cloned().collect();
         let start = pending_wiring::_for_to_start(text).expect("_for_header_incomplete matched");
         let eq = _FOR_EQ_TO_RE.search(pystr::slice(
@@ -1044,11 +958,11 @@ pub fn _echo_key(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        _adjacent_operands, _call_adjacent_arg_messages_with, _echo_key, _inside_table,
+        _adjacent_operands, _call_adjacent_arg_messages, _echo_key, _inside_table,
         _leading_unknown_words, _loose_before_beginprog, _split_args_quoted, _split_top_commas,
         BTreeSet, ConstDecl, Declaration, Diagnostics, Expr, ExprRef, Instruction, Program, Rc,
-        Stmt, StmtRef, VarDecl, declared_later_with, first_declarations_with,
-        order_email_destination_with, profiles, prose_known_tables_with, prose_known_with,
+        Stmt, StmtRef, VarDecl, declared_later, first_declarations, order_email_destination,
+        profiles, prose_known, prose_known_tables,
     };
     use crate::syntax::{Name, Node, StmtBase};
 
@@ -1125,12 +1039,12 @@ mod tests {
             vec![Some(make_name(6, "Alpha")), Some(make_name(6, "Gamma"))],
         );
         let prog = Program::new("test.cr300", vec![decl, cdecl, alias]);
-        let first = first_declarations_with(&prog);
+        let first = first_declarations(&prog);
         assert_eq!(first.get("ALPHA"), Some(&("test.cr300".to_string(), 2)));
         assert_eq!(first.get("BETA"), Some(&("test.cr300".to_string(), 4)));
         assert_eq!(first.get("GAMMA"), Some(&("test.cr300".to_string(), 6)));
 
-        let later = declared_later_with(&first, 3, "test.cr300");
+        let later = declared_later(&first, 3, "test.cr300");
         assert_eq!(
             later,
             BTreeSet::from(["BETA".to_string(), "GAMMA".to_string()])
@@ -1142,12 +1056,12 @@ mod tests {
         let prof = profiles::get("cr300").unwrap();
         let dt = make_instr(1, "DataTable", vec![Some(make_name(1, "MyTable"))]);
         let prog = Rc::new(Program::new("test.cr300", vec![dt]));
-        let known = prose_known_with(&prog, prof);
+        let known = prose_known(&prog, prof);
         assert!(!known.contains("BATTERY"));
         assert!(known.contains("SCAN"));
         assert!(known.contains("SIN"));
         assert!(!known.contains("MYTABLE"));
-        let tables = prose_known_tables_with(&prog, prof);
+        let tables = prose_known_tables(&prog, prof);
         assert!(tables.contains("MYTABLE"));
     }
 
@@ -1209,13 +1123,13 @@ mod tests {
         let here = BTreeSet::from(["X".to_string()]);
         let vars = BTreeSet::from(["X".to_string()]);
         let msgs =
-            _call_adjacent_arg_messages_with("1, x y)", delay, &here, &vars, prof, false).unwrap();
+            _call_adjacent_arg_messages("1, x y)", delay, &here, &vars, prof, false).unwrap();
         assert_eq!(
             msgs,
             vec!["y is not defined.", "Incomplete expression: x y."]
         );
         let const_msgs =
-            _call_adjacent_arg_messages_with("x y)", delay, &here, &vars, prof, false).unwrap();
+            _call_adjacent_arg_messages("x y)", delay, &here, &vars, prof, false).unwrap();
         assert_eq!(
             const_msgs,
             vec![
@@ -1238,7 +1152,7 @@ mod tests {
         );
         diags.error_basic(10, "Foo is not defined.", "test.cr300");
         diags.error_basic(10, "Bar is not defined.", "test.cr300");
-        order_email_destination_with(&prog, prof, &mut diags);
+        order_email_destination(&prog, prof, &mut diags);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,

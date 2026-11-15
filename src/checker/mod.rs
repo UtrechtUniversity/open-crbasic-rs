@@ -659,10 +659,10 @@ pub fn _check_with_context(
         expressions::check_data_params(program, profile, diags);
     });
     _run_pass("cr3xx::check", "pass1", || {
-        cr3xx::check(program, diags);
+        cr3xx::check(program, profile, diags);
     });
     _run_pass("cr3xx::check_dropped_tail", "pass1", || {
-        cr3xx::check_dropped_tail(program, diags);
+        cr3xx::check_dropped_tail(program, profile, diags);
     });
     _run_pass("instr_rules::check", "pass1", || {
         instr_rules::check(ctx.flat(), profile, diags);
@@ -1176,26 +1176,26 @@ pub fn _check_with_context(
         }
 
         _run_pass("cr3xx::check_unknown_line_words", "tier_b", || {
-            cr3xx::check_unknown_line_words(&flat, diags);
+            cr3xx::check_unknown_line_words(&flat, profile, diags);
         });
         _run_pass("cr3xx::check_for_header", "tier_b", || {
-            cr3xx::check_for_header(&flat, diags);
+            cr3xx::check_for_header(&flat, profile, diags);
         });
         _run_pass("cr3xx::check_float_destinations", "tier_b", || {
-            cr3xx::check_float_destinations(&flat, diags);
+            cr3xx::check_float_destinations(&flat, profile, diags);
         });
         _run_pass(
             "cr3xx::drop_too_many_after_variable_illegal",
             "tier_b",
             || {
-                cr3xx::drop_too_many_after_variable_illegal(&flat, diags);
+                cr3xx::drop_too_many_after_variable_illegal(&flat, profile, diags);
             },
         );
         _run_pass(
             "cr3xx::drop_calltable_error_with_other_errors",
             "tier_b",
             || {
-                cr3xx::drop_calltable_error_with_other_errors(program, diags);
+                cr3xx::drop_calltable_error_with_other_errors(program, profile, diags);
             },
         );
 
@@ -1576,20 +1576,20 @@ pub fn _check_with_context(
         "cr3xx::drop_block_closer_errors_after_errors",
         "cr3xx",
         || {
-            cr3xx::drop_block_closer_errors_after_errors(program, diags);
+            cr3xx::drop_block_closer_errors_after_errors(program, profile, diags);
         },
     );
     _run_pass("cr3xx::order_names_around_arity", "cr3xx", || {
-        cr3xx::order_names_around_arity(program, diags);
+        cr3xx::order_names_around_arity(program, profile, diags);
     });
     _run_pass("cr3xx::order_names_before_call_arity", "cr3xx", || {
-        cr3xx::order_names_before_call_arity(program, diags);
+        cr3xx::order_names_before_call_arity(program, profile, diags);
     });
     _run_pass("cr3xx::order_email_destination", "cr3xx", || {
-        cr3xx::order_email_destination(program, diags);
+        cr3xx::order_email_destination(program, profile, diags);
     });
     _run_pass("cr3xx::drop_shortfall_with_names", "cr3xx", || {
-        cr3xx::drop_shortfall_with_names(program, diags);
+        cr3xx::drop_shortfall_with_names(program, profile, diags);
     });
     if profile.single_pass {
         _run_pass("instr_data::finalize_illegal_table_names", "cr3xx", || {
@@ -1597,28 +1597,28 @@ pub fn _check_with_context(
         });
     }
     _run_pass("cr3xx::order_block_keyword_calls", "cr3xx", || {
-        cr3xx::order_block_keyword_calls(program, diags);
+        cr3xx::order_block_keyword_calls(program, profile, diags);
     });
     _run_pass("cr3xx::fix_then_operand", "cr3xx", || {
-        cr3xx::fix_then_operand(program, diags);
+        cr3xx::fix_then_operand(program, profile, diags);
     });
     _run_pass("cr3xx::order_invalid_assignments", "cr3xx", || {
-        cr3xx::order_invalid_assignments(program, diags);
+        cr3xx::order_invalid_assignments(program, profile, diags);
     });
     _run_pass("cr3xx::order_unterminated_string", "cr3xx", || {
-        cr3xx::order_unterminated_string(program, diags);
+        cr3xx::order_unterminated_string(program, profile, diags);
     });
     _run_pass("cr3xx::check_tcpopen_handle", "cr3xx", || {
-        cr3xx::check_tcpopen_handle(program, diags);
+        cr3xx::check_tcpopen_handle(program, profile, diags);
     });
     _run_pass("cr3xx::add_string_illegal", "cr3xx", || {
-        cr3xx::add_string_illegal(program, diags);
+        cr3xx::add_string_illegal(program, profile, diags);
     });
     _run_pass("warnings::add_truncate_warnings", "cr3xx", || {
         warnings::add_truncate_warnings(ctx.flat(), diags);
     });
     _run_pass("cr3xx::semicolon_headers", "cr3xx", || {
-        cr3xx::semicolon_headers(program, diags);
+        cr3xx::semicolon_headers(program, profile, diags);
     });
     _run_pass("intervals::fold_timeout_expressions", "cr3xx", || {
         intervals::fold_timeout_expressions(ctx.flat(), diags);

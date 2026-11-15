@@ -998,7 +998,7 @@ pub fn check_serialbrk_comport(
     }
 }
 
-pub(super) const _SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
+pub const _SERIALIN_DEST_MESSAGE: &str = "A string variable destination is required";
 
 /// Port of `checker/instr_rules.py::_serialin_bad_destination`.
 pub fn _serialin_bad_destination(arg: &Expr, types: &OrderedMap<String, String>) -> Option<bool> {

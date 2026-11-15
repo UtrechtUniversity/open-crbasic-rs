@@ -157,19 +157,8 @@ fn with_inline_stmts(statements: &[StmtRef]) -> Vec<StmtRef> {
     out
 }
 
-/// Port of `checker/cr3xx.py::_check_cr350_comms_mode`.
+/// Port of checker/cr3xx.py::_check_cr350_comms_mode
 pub fn _check_cr350_comms_mode(
-    _stmt: &Call,
-    _port: i64,
-    _diags: &mut Diagnostics,
-    _invalid_format: bool,
-    _shifted: bool,
-) {
-    todo!("checker/cr3xx.py::_check_cr350_comms_mode (omitted: profile: untyped, consts: dict)")
-}
-
-/// Helper for `_check_cr350_comms_mode` taking `profile` and `consts`.
-pub fn _check_cr350_comms_mode_with(
     stmt: &Call,
     port: i64,
     profile: &'static Profile,
@@ -233,15 +222,8 @@ pub fn _check_cr350_comms_mode_with(
     }
 }
 
-/// Port of `checker/cr3xx.py::_commsmode_problem`.
-pub fn _commsmode_problem(_stmt: &Call, _index: i64) -> Option<(bool, String)> {
-    todo!(
-        "checker/cr3xx.py::_commsmode_problem (omitted: profile: untyped, consts: dict | None, mode: object)"
-    )
-}
-
-/// Helper for `_commsmode_problem` taking `profile`, `consts`, and `mode`.
-pub fn _commsmode_problem_with(
+/// Port of checker/cr3xx.py::_commsmode_problem
+pub fn _commsmode_problem(
     stmt: &Call,
     profile: &'static Profile,
     consts: Option<&OrderedMap<String, ConstValue>>,
@@ -308,13 +290,8 @@ pub fn bare_unknown_delay(stmt: &Call, known: &BTreeSet<String>) -> bool {
         )
 }
 
-/// Port of `checker/cr3xx.py::_format_needs_com1_4`.
-pub fn _format_needs_com1_4(_stmt: &Call) -> bool {
-    todo!("checker/cr3xx.py::_format_needs_com1_4 (omitted: profile: untyped, consts: dict | None)")
-}
-
-/// Helper for `_format_needs_com1_4` taking `profile` and `consts`.
-pub fn _format_needs_com1_4_with(
+/// Port of checker/cr3xx.py::_format_needs_com1_4
+pub fn _format_needs_com1_4(
     stmt: &Call,
     profile: &'static Profile,
     consts: Option<&OrderedMap<String, ConstValue>>,
@@ -334,13 +311,8 @@ pub fn _format_needs_com1_4_with(
     (1..=8).contains(&p) && (16..I32_MAX_EXCL_I64).contains(&f)
 }
 
-/// Port of `checker/cr3xx.py::_non_finite`.
-pub fn _non_finite(_arg: Option<&Expr>) -> Option<String> {
-    todo!("checker/cr3xx.py::_non_finite (omitted: profile: untyped, consts: dict | None)")
-}
-
-/// Helper for `_non_finite` taking `profile` and `consts`.
-pub fn _non_finite_with(
+/// Port of checker/cr3xx.py::_non_finite
+pub fn _non_finite(
     arg: Option<&Expr>,
     profile: &'static Profile,
     consts: Option<&OrderedMap<String, ConstValue>>,
@@ -362,13 +334,8 @@ pub fn _non_finite_with(
     }
 }
 
-/// Port of `checker/cr3xx.py::_invalid_cr3xx_serial_format`.
-pub fn _invalid_cr3xx_serial_format(_arg: &Expr) -> bool {
-    todo!("checker/cr3xx.py::_invalid_cr3xx_serial_format (omitted: env: consteval.Env)")
-}
-
-/// Helper for `_invalid_cr3xx_serial_format` taking `env`.
-pub fn _invalid_cr3xx_serial_format_with(arg: &Expr, env: &Env) -> bool {
+/// Port of checker/cr3xx.py::_invalid_cr3xx_serial_format
+pub fn _invalid_cr3xx_serial_format(arg: &Expr, env: &Env) -> bool {
     if !matches!(arg, Expr::Name(_)) && consteval::is_float(Some(arg), env) == Some(true) {
         return false;
     }
@@ -390,15 +357,8 @@ pub fn _invalid_cr3xx_serial_format_with(arg: &Expr, env: &Env) -> bool {
     }
 }
 
-/// Port of `checker/cr3xx.py::_non_numeric`.
-pub fn _non_numeric() -> bool {
-    todo!(
-        "checker/cr3xx.py::_non_numeric (omitted: expr: untyped, profile: untyped, consts: dict | None, variable_names: untyped)"
-    )
-}
-
-/// Helper for `_non_numeric` taking `expr`, `profile`, `consts`, and `variable_names`.
-pub fn _non_numeric_with(
+/// Port of checker/cr3xx.py::_non_numeric
+pub fn _non_numeric(
     expr: Option<&Expr>,
     profile: &'static Profile,
     consts: Option<&OrderedMap<String, ConstValue>>,
@@ -414,13 +374,8 @@ pub fn _non_numeric_with(
     matches!(value, ConstValue::Str(_)) || expressions::part1::_not_constant_integer(expr)
 }
 
-/// Port of `checker/cr3xx.py::_check_baud`.
-pub fn _check_baud(_stmt: &Call, _diags: &mut Diagnostics, _port11: bool) {
-    todo!("checker/cr3xx.py::_check_baud (omitted: profile: untyped, consts: dict | None)")
-}
-
-/// Helper for `_check_baud` taking `profile` and `consts`.
-pub fn _check_baud_with(
+/// Port of checker/cr3xx.py::_check_baud
+pub fn _check_baud(
     stmt: &Call,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -485,18 +440,14 @@ pub fn _check_baud_with(
     }
 }
 
-/// Port of `checker/cr3xx.py::check_dropped_tail`.
-pub fn check_dropped_tail(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::check_dropped_tail (omitted: profile: untyped)")
-}
-
-/// Helper for `check_dropped_tail` taking `profile` and `known`.
-pub fn check_dropped_tail_with(
+/// Port of checker/cr3xx.py::check_dropped_tail
+pub fn check_dropped_tail(
     program: &ProgramRef,
     profile: &'static Profile,
-    known: &BTreeSet<String>,
     diags: &mut Diagnostics,
 ) {
+    let known_ctx = context::of(program, Some(profile), None);
+    let known = &known_ctx.known_names().names;
     if !matches!(profile.name, "cr300" | "cr350") {
         return;
     }
@@ -524,18 +475,10 @@ pub fn check_dropped_tail_with(
     }
 }
 
-/// Port of `checker/cr3xx.py::check`.
-pub fn check(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::check (omitted: profile: untyped)")
-}
-
-/// Helper for `check` taking `profile` and `known`.
-pub fn check_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    known: &BTreeSet<String>,
-    diags: &mut Diagnostics,
-) {
+/// Port of checker/cr3xx.py::check
+pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
+    let known_ctx = context::of(program, Some(profile), None);
+    let known = &known_ctx.known_names().names;
     let cr3 = matches!(profile.name, "cr300" | "cr350");
     let ctx = context::of(program, Some(profile), None);
     let variable_names = ctx.declared_variable_names();
@@ -664,7 +607,7 @@ pub fn check_with(
             }
         }
 
-        _check_baud_with(
+        _check_baud(
             stmt,
             profile,
             diags,
@@ -680,7 +623,7 @@ pub fn check_with(
             && port.as_ref().is_some_and(consteval::is_finite_number)
             && format_arg.is_some_and(|fa| {
                 expressions::part1::_variable_refs(Some(fa), variable_names).is_empty()
-                    && _invalid_cr3xx_serial_format_with(fa, &env)
+                    && _invalid_cr3xx_serial_format(fa, &env)
             });
         if invalid_format {
             diags.error_basic(
@@ -695,7 +638,7 @@ pub fn check_with(
             && constant_port
             && !invalid_format
             && format_arg.is_some_and(|fa| {
-                _non_numeric_with(Some(fa), profile, Some(&program.consts), variable_names)
+                _non_numeric(Some(fa), profile, Some(&program.consts), variable_names)
                     || (!matches!(fa, Expr::Name(_))
                         && longconv::_float_typed_with(Some(fa), &empty_float_names))
             });
@@ -705,15 +648,7 @@ pub fn check_with(
                 && consteval::is_finite_number(p)
                 && let Some(p_int) = const_to_i64_exact(p)
             {
-                _check_cr350_comms_mode_with(
-                    stmt,
-                    p_int,
-                    profile,
-                    &program.consts,
-                    diags,
-                    false,
-                    true,
-                );
+                _check_cr350_comms_mode(stmt, p_int, profile, &program.consts, diags, false, true);
             } else if stmt.args.len() > 5 {
                 diags.error_basic(
                     stmt.base.node.line,
@@ -730,7 +665,7 @@ pub fn check_with(
         let mut shifted = !cr3
             && constant_port
             && format_arg.is_some_and(|fa| {
-                _non_numeric_with(Some(fa), profile, Some(&program.consts), variable_names)
+                _non_numeric(Some(fa), profile, Some(&program.consts), variable_names)
             });
         shifted = shifted || (!cr3 && constant_port && bare_unknown_delay(stmt, known));
 
@@ -738,7 +673,7 @@ pub fn check_with(
             && constant_port
             && !shifted
             && format_arg.is_some()
-            && _format_needs_com1_4_with(stmt, profile, Some(&program.consts))
+            && _format_needs_com1_4(stmt, profile, Some(&program.consts))
         {
             diags.error_basic(
                 stmt.base.node.line,
@@ -780,7 +715,7 @@ pub fn check_with(
         let mode_arg_opt = stmt.args.get(5).and_then(|a| a.as_deref());
         let check_mode = !cr3 && constant_port && !shifted && mode_arg_opt.is_some();
         let mode_kind = if check_mode {
-            _non_finite_with(mode_arg_opt, profile, Some(&program.consts))
+            _non_finite(mode_arg_opt, profile, Some(&program.consts))
         } else {
             None
         };
@@ -791,7 +726,7 @@ pub fn check_with(
 
         if !cr3
             && constant_port
-            && let Some(problem) = _commsmode_problem_with(
+            && let Some(problem) = _commsmode_problem(
                 stmt,
                 profile,
                 Some(&program.consts),
@@ -852,7 +787,7 @@ pub fn check_with(
         }
         if constant_port
             && stmt.args.len() > 4
-            && let Some(kind) = _non_finite_with(buf_arg, profile, Some(&program.consts))
+            && let Some(kind) = _non_finite(buf_arg, profile, Some(&program.consts))
         {
             let verb = if kind == "divide" && !cr3 {
                 "Divide by zero in expression"
@@ -894,7 +829,7 @@ pub fn check_with(
             && consteval::is_finite_number(p)
             && let Some(p_int) = const_to_i64_exact(p)
         {
-            _check_cr350_comms_mode_with(
+            _check_cr350_comms_mode(
                 stmt,
                 p_int,
                 profile,
@@ -955,20 +890,15 @@ pub fn check_with(
     }
 }
 
-const _UNRESOLVED_SUFFIX: &str = " is not defined.";
-const _VARIABLE_ILLEGAL_PREFIX: &str = "Variable illegal in Parameter:";
+pub(super) const _UNRESOLVED_SUFFIX: &str = " is not defined.";
+pub(super) const _VARIABLE_ILLEGAL_PREFIX: &str = "Variable illegal in Parameter:";
 const _TOO_MANY_PREFIX: &str = "Too many parameters:";
 
 const _FLOAT_DEST: i64 = 8;
 const _DEST_MESSAGE: &str = "Illegal destination variable type, expecting Float.";
 
-/// Port of `checker/cr3xx.py::_destination_types`.
-pub fn _destination_types(_program: &Program) {
-    todo!("checker/cr3xx.py::_destination_types")
-}
-
-/// Helper for `_destination_types` taking `profile`.
-pub fn _destination_types_with(
+/// Port of checker/cr3xx.py::_destination_types
+pub fn _destination_types(
     program: &ProgramRef,
     profile: &'static Profile,
 ) -> (
@@ -1045,33 +975,19 @@ pub fn _is_bad_destination(expr: &Expr, types: &OrderedMap<String, String>) -> O
     }
 }
 
-/// Cross-module callbacks needed by `check_float_destinations_with` until `expressions`,
-/// `instr_data`, and `instr_rules` helpers are wired.
-pub struct Cr3xxFloatDestHooks<'a> {
-    pub known: &'a BTreeSet<String>,
-    pub destination_env: Env,
-    pub constant_destination: fn(Option<&Expr>, &Env, &BTreeSet<String>) -> bool,
-    pub next_simple_token: fn(&str) -> String,
-    pub names_and_dims: fn(&BTreeSet<String>, &StmtRef, &Expr) -> (Vec<String>, bool),
-    pub has_undefined_index: fn(&Expr, &BTreeSet<String>, &StmtRef) -> bool,
-    pub dimensions_message: fn(&str, &Profile, bool) -> String,
-}
-
-/// Port of `checker/cr3xx.py::check_float_destinations`.
-pub fn check_float_destinations(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::check_float_destinations (omitted: profile: untyped)")
-}
-
-/// Helper for `check_float_destinations` taking `profile` and cross-module hooks.
-pub fn check_float_destinations_with(
+/// Port of checker/cr3xx.py::check_float_destinations
+pub fn check_float_destinations(
     program: &ProgramRef,
     profile: &'static Profile,
-    hooks: &mut Cr3xxFloatDestHooks<'_>,
     diags: &mut Diagnostics,
 ) {
     if !matches!(profile.name, "cr300" | "cr350") {
         return;
     }
+    let ctx = context::of(program, Some(profile), None);
+    let known_view = ctx.known_names();
+    let ds = ctx.dims_state();
+    let destination_env = super::super::instr_data::_destination_env(&Env::new(profile));
     let mut types_cache: Option<(
         OrderedMap<String, String>,
         HashMap<usize, OrderedMap<String, String>>,
@@ -1129,8 +1045,7 @@ pub fn check_float_destinations_with(
                 let name = pystr::upper(&cd.name);
                 constant_names.insert(name.clone());
                 if let Some(val) = program.consts.get(&name) {
-                    hooks
-                        .destination_env
+                    destination_env
                         .consts
                         .borrow_mut()
                         .insert(name, val.clone());
@@ -1181,9 +1096,9 @@ pub fn check_float_destinations_with(
                     }
                     let a = a_opt.as_deref();
                     let bad = if named_destination {
-                        (hooks.constant_destination)(
+                        super::super::instr_data::constant_destination(
                             a,
-                            &hooks.destination_env,
+                            &destination_env,
                             &dest_vars_with_params,
                         )
                     } else {
@@ -1220,7 +1135,7 @@ pub fn check_float_destinations_with(
             if let Some(Some(_)) = inst.args.get(following) {
                 let raw =
                     expressions::part2::_arg_text(inst, i64::try_from(following).unwrap_or(0));
-                let tok = (hooks.next_simple_token)(&raw);
+                let tok = super::super::instr_rules::_next_simple_token(&raw);
                 let text = if tok.is_empty() { raw } else { tok };
                 new_diags.push(Rc::new(Diagnostic::basic(
                     "error",
@@ -1256,10 +1171,10 @@ pub fn check_float_destinations_with(
             continue;
         }
         if types_cache.is_none() {
-            types_cache = Some(_destination_types_with(program, profile));
+            types_cache = Some(_destination_types(program, profile));
         }
         let (types, scoped) = types_cache.as_ref().unwrap();
-        let known = hooks.known;
+        let known = &known_view.names;
         let arg = inst.args[0].as_deref().unwrap();
         if let Expr::Name(n) = arg
             && profile.functions().contains(&pystr::upper(&n.name))
@@ -1284,7 +1199,7 @@ pub fn check_float_destinations_with(
             )));
             if let Some(Some(_)) = inst.args.get(1) {
                 let raw_1 = expressions::part2::_arg_text(inst, 1);
-                let tok = (hooks.next_simple_token)(&raw_1);
+                let tok = super::super::instr_rules::_next_simple_token(&raw_1);
                 let token = if tok.is_empty() { raw_1 } else { tok };
                 diags.error_basic(
                     inst.base.node.line,
@@ -1319,7 +1234,13 @@ pub fn check_float_destinations_with(
         let keep: Vec<String> = if !undefined.is_empty() {
             if matches!(arg, Expr::Binary(_) | Expr::Unary(_)) || call {
                 expression = true;
-                (undefined, dims) = (hooks.names_and_dims)(known, stmt, arg);
+                (undefined, dims) = expressions::_names_and_dims(
+                    known_view,
+                    Some(ds),
+                    Some(stmt_id(stmt)),
+                    &[],
+                    &inst.args[..1],
+                );
             } else if !matches!(arg, Expr::Name(_) | Expr::Index(_)) {
                 continue;
             }
@@ -1405,12 +1326,23 @@ pub fn check_float_destinations_with(
         } else if expression {
             dims
         } else {
-            (hooks.has_undefined_index)(arg, known, stmt)
+            expressions::_has_undefined_index(
+                inst.args[0].as_ref(),
+                known_view,
+                Some(ds),
+                Some(stmt_id(stmt)),
+                &[],
+            )
         };
         if !keep.is_empty() && undef_idx {
             let arg0_raw = expressions::part2::_arg_text(inst, 0);
             let arg0_stripped = pystr::strip(&arg0_raw);
-            let msg = (hooks.dimensions_message)(arg0_stripped, profile, false);
+            let msg = expressions::dimensions_message(
+                arg0_stripped,
+                profile,
+                false,
+                inst.base.at_eol.get(),
+            );
             new_diags.push(Rc::new(Diagnostic::basic(
                 "error",
                 inst.base.node.line,
@@ -1427,7 +1359,7 @@ pub fn check_float_destinations_with(
         }
         if let Some(Some(_)) = inst.args.get(1) {
             let raw_1 = expressions::part2::_arg_text(inst, 1);
-            let tok = (hooks.next_simple_token)(&raw_1);
+            let tok = super::super::instr_rules::_next_simple_token(&raw_1);
             let text = if tok.is_empty() { raw_1 } else { tok };
             new_diags.push(Rc::new(Diagnostic::basic(
                 "error",
@@ -1462,13 +1394,8 @@ pub fn check_float_destinations_with(
 
 const _ABORTING_PARAMS: &[i64] = &[2, 8, 24, 25, 26, 27, 28, 29, 33, 40, 41, 47];
 
-/// Port of `checker/cr3xx.py::drop_too_many_after_variable_illegal`.
-pub fn drop_too_many_after_variable_illegal(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::drop_too_many_after_variable_illegal (omitted: profile: untyped)")
-}
-
-/// Helper for `drop_too_many_after_variable_illegal` taking `profile`.
-pub fn drop_too_many_after_variable_illegal_with(
+/// Port of checker/cr3xx.py::drop_too_many_after_variable_illegal
+pub fn drop_too_many_after_variable_illegal(
     program: &ProgramRef,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -1633,14 +1560,14 @@ mod tests {
         assert!(!bare_unknown_delay(&call, &known));
 
         let cr6 = profiles::get("cr6").unwrap();
-        assert!(_format_needs_com1_4_with(&call, cr6, None));
+        assert!(_format_needs_com1_4(&call, cr6, None));
     }
 
     #[test]
     fn non_finite_and_commsmode_problem() {
         let cr6 = profiles::get("cr6").unwrap();
         assert_eq!(
-            _non_finite_with(Some(&name_expr("INF")), cr6, None),
+            _non_finite(Some(&name_expr("INF")), cr6, None),
             Some("float".to_string())
         );
         let div0 = Expr::Binary(Binary {
@@ -1650,7 +1577,7 @@ mod tests {
             right: Some(int_expr(0)),
         });
         assert_eq!(
-            _non_finite_with(Some(&div0), cr6, None),
+            _non_finite(Some(&div0), cr6, None),
             Some("divide".to_string())
         );
 
@@ -1672,7 +1599,7 @@ mod tests {
             ..Call::default()
         };
         assert_eq!(
-            _commsmode_problem_with(&call, cr6, None, 5, None),
+            _commsmode_problem(&call, cr6, None, 5, None),
             Some((
                 true,
                 "CommsMode Option 9 not supported on ComC1.".to_string()
@@ -1710,8 +1637,7 @@ mod tests {
         }]);
         let prog = Rc::new(Program::new("a.cr300", vec![st_call]));
         let mut diags = Diagnostics::new();
-        let known = BTreeSet::new();
-        check_with(&prog, cr300, &known, &mut diags);
+        check(&prog, cr300, &mut diags);
         assert_eq!(diags.items.len(), 2);
         assert_eq!(diags.items[0].message, "ComPort 0 illegal.");
         assert_eq!(
@@ -1720,7 +1646,7 @@ mod tests {
         );
 
         let mut tail_diags = Diagnostics::new();
-        check_dropped_tail_with(&prog, cr300, &known, &mut tail_diags);
+        check_dropped_tail(&prog, cr300, &mut tail_diags);
         assert_eq!(tail_diags.items.len(), 1);
         assert_eq!(tail_diags.items[0].message, "TailWord is not defined.");
 
@@ -1745,7 +1671,7 @@ mod tests {
             }))],
         ));
         let mut diags6 = Diagnostics::new();
-        check_with(&prog6, cr6, &known, &mut diags6);
+        check(&prog6, cr6, &mut diags6);
         assert!(
             diags6
                 .items
@@ -1783,13 +1709,13 @@ mod tests {
                 })),
             ],
         ));
-        let (_types, scoped) = _destination_types_with(&prog, cr300);
+        let (_types, scoped) = _destination_types(&prog, cr300);
         assert_eq!(scoped.len(), 2);
 
         let mut diags = Diagnostics::new();
         diags.error_basic(2, "Too many parameters:  bar.", "a.cr300");
         diags.error_basic(2, "foo is not defined.", "a.cr300");
-        drop_too_many_after_variable_illegal_with(&prog, cr300, &mut diags);
+        drop_too_many_after_variable_illegal(&prog, cr300, &mut diags);
         assert_eq!(diags.items[0].message, "foo is not defined.");
         assert_eq!(diags.items[1].message, "Too many parameters:  bar.");
     }
@@ -1798,8 +1724,8 @@ mod tests {
     fn cr350_comms_mode_invalid_format_and_float_dest() {
         let cr350 = profiles::get("cr350").unwrap();
         let env = Env::new(cr350);
-        assert!(_invalid_cr3xx_serial_format_with(&int_expr(16), &env));
-        assert!(!_invalid_cr3xx_serial_format_with(&int_expr(15), &env));
+        assert!(_invalid_cr3xx_serial_format(&int_expr(16), &env));
+        assert!(!_invalid_cr3xx_serial_format(&int_expr(15), &env));
 
         let call = Call {
             base: StmtBase {
@@ -1819,7 +1745,7 @@ mod tests {
             ..Call::default()
         };
         let mut diags = Diagnostics::new();
-        _check_cr350_comms_mode_with(
+        _check_cr350_comms_mode(
             &call,
             1,
             cr350,
@@ -1848,18 +1774,8 @@ mod tests {
                 ..Instruction::default()
             }))],
         ));
-        let known = BTreeSet::new();
-        let mut hooks = Cr3xxFloatDestHooks {
-            known: &known,
-            destination_env: Env::new(cr300),
-            constant_destination: |_, _, _| false,
-            next_simple_token: |s| s.trim().to_string(),
-            names_and_dims: |_, _, _| (Vec::new(), false),
-            has_undefined_index: |_, _, _| false,
-            dimensions_message: |t, _, _| format!("Dimensions not declared: {t}."),
-        };
         let mut fdiags = Diagnostics::new();
-        check_float_destinations_with(&prog, cr300, &mut hooks, &mut fdiags);
+        check_float_destinations(&prog, cr300, &mut fdiags);
         assert_eq!(fdiags.items.len(), 1);
         assert_eq!(fdiags.items[0].message, _DEST_MESSAGE);
     }

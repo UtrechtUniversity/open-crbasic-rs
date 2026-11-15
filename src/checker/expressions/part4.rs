@@ -252,7 +252,7 @@ pub fn _check_unparsed_data(
                     &stmt.base.node.file,
                 );
             } else {
-                let known = cr3xx::part2::prose_known_with(program, profile);
+                let known = cr3xx::part2::prose_known(program, profile);
                 for name in cr3xx::part2::_leading_unknown_words(&text, &known) {
                     diags.error_basic(
                         stmt.base.node.line,

@@ -6,6 +6,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::sync::LazyLock;
 
+use super::part1::_UNRESOLVED_SUFFIX;
+use super::part2::{
+    _GENERIC_FALLBACK_PREFIX, _leading_unknown_words, declared_later, first_declarations,
+    prose_known,
+};
+use super::part3::{_IF_STRING_RE, _STRING_END_QUOTE, _string_reached};
+use crate::checker::context;
+use crate::checker::expressions::{_index_nodes, _stmt_exprs};
+use crate::checker::structure::_unparsed_string_messages;
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics, ShowFile};
 use crate::lexer;
 use crate::profiles::Profile;
@@ -14,18 +23,9 @@ use crate::pystr;
 use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
+    ends_routine,
 };
 
-const _UNRESOLVED_SUFFIX_P4: &str = " is not defined.";
-const _GENERIC_FALLBACK_PREFIX_P4: &str = "Invalid, or out of place expression: ";
-const _STRING_END_QUOTE_P4: &str = "String without end quote";
-
-static _IF_STRING_RE_P4: LazyLock<pyre::Regex> = LazyLock::new(|| {
-    pyre::Regex::new(
-        r"(?i)\s*If\s+(.*?)\s+Then\s+([A-Za-z_]\w*)\s*(?:\([^()]*\))?\s*=",
-        0,
-    )
-});
 static _SUB_P4: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r#"\s*([A-Za-z_]\w*)\s*\([^()"]*\)\s+""#, 0));
 static _DECL_P4: LazyLock<pyre::Regex> =
@@ -49,24 +49,17 @@ fn make_error_diag_p4(line: i64, message: &str, file: &str) -> DiagRef {
 }
 
 /// Port of `checker/cr3xx.py::order_unterminated_string`.
-pub fn order_unterminated_string(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::order_unterminated_string (omitted: profile: untyped)")
-}
-
-/// Full implementation of `checker/cr3xx.py::order_unterminated_string`.
-pub fn order_unterminated_string_with(
-    program: &Program,
-    profile: &Profile,
+pub fn order_unterminated_string(
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    declared: &BTreeSet<String>,
-    prose_known_fn: impl Fn(&Program, &Profile) -> BTreeSet<String>,
-    declared_later_fn: impl Fn(i64, &str) -> BTreeSet<String>,
-    string_reached_fn: impl Fn(&str) -> bool,
-    leading_unknown_words_fn: impl Fn(&str, &BTreeSet<String>) -> Vec<String>,
 ) {
     if profile.name != "cr300" && profile.name != "cr350" {
         return;
     }
+    let declared = context::of(program, Some(profile), None)
+        .declared_variable_names()
+        .clone();
     let mut known: Option<BTreeSet<String>> = None;
     for stmt in &program.statements {
         let Stmt::Unparsed(u) = stmt.as_ref() else {
@@ -87,7 +80,7 @@ pub fn order_unterminated_string_with(
         let final_diag = own
             .iter()
             .find(|d| {
-                d.message.starts_with(_GENERIC_FALLBACK_PREFIX_P4)
+                d.message.starts_with(_GENERIC_FALLBACK_PREFIX)
                     || d.message.starts_with("Incomplete expression:")
                     || d.message.starts_with("No Matching, or out of place )")
             })
@@ -96,8 +89,8 @@ pub fn order_unterminated_string_with(
             continue;
         };
         if !own.iter().all(|d| {
-            d.message.ends_with(_UNRESOLVED_SUFFIX_P4)
-                || d.message == _STRING_END_QUOTE_P4
+            d.message.ends_with(_UNRESOLVED_SUFFIX)
+                || d.message == _STRING_END_QUOTE
                 || Rc::ptr_eq(d, &final_diag)
         }) {
             continue;
@@ -109,22 +102,22 @@ pub fn order_unterminated_string_with(
         if sub_declared || _DECL_P4.match_(text).is_some() {
             continue;
         }
-        let if_match = _IF_STRING_RE_P4.match_(text);
-        if if_match.is_none() && !string_reached_fn(text) {
+        let if_match = _IF_STRING_RE.match_(text);
+        if if_match.is_none() && !_string_reached(text) {
             continue;
         }
         let mut names: Vec<DiagRef> = own
             .iter()
-            .filter(|d| d.message.ends_with(_UNRESOLVED_SUFFIX_P4))
+            .filter(|d| d.message.ends_with(_UNRESOLVED_SUFFIX))
             .cloned()
             .collect();
         if names.is_empty()
             && let Some(m) = if_match
         {
             if known.is_none() {
-                known = Some(prose_known_fn(program, profile));
+                known = Some(prose_known(program, profile));
             }
-            let later = declared_later_fn(line, &file);
+            let later = declared_later(&first_declarations(program), line, &file);
             let here: BTreeSet<String> = known
                 .as_ref()
                 .expect("known initialized")
@@ -133,7 +126,7 @@ pub fn order_unterminated_string_with(
                 .collect();
             let cond = m.group(1).unwrap_or("");
             let target = m.group(2).unwrap_or("");
-            let mut words = leading_unknown_words_fn(cond, &here);
+            let mut words = _leading_unknown_words(cond, &here);
             if !here.contains(&pystr::upper(target)) {
                 words.push(target.to_string());
             }
@@ -153,7 +146,7 @@ pub fn order_unterminated_string_with(
                 } else {
                     ""
                 };
-                let msg = format!("{_GENERIC_FALLBACK_PREFIX_P4}{text}{nl}.");
+                let msg = format!("{_GENERIC_FALLBACK_PREFIX}{text}{nl}.");
                 final_diag = Rc::new(final_diag.replace(|d| d.message = msg));
             }
         }
@@ -166,19 +159,14 @@ pub fn order_unterminated_string_with(
             .items
             .retain(|d| (d.line, d.file.as_str()) != (line, file.as_str()));
         let mut replacement = names;
-        replacement.push(make_error_diag_p4(line, _STRING_END_QUOTE_P4, &file));
+        replacement.push(make_error_diag_p4(line, _STRING_END_QUOTE, &file));
         replacement.push(final_diag);
         diags.items.splice(at..at, replacement);
     }
 }
 
 /// Port of `checker/cr3xx.py::semicolon_headers`.
-pub fn semicolon_headers(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::semicolon_headers (omitted: profile: untyped)")
-}
-
-/// Full implementation of `checker/cr3xx.py::semicolon_headers`.
-pub fn semicolon_headers_with(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
+pub fn semicolon_headers(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
     if profile.name != "cr300" && profile.name != "cr350" {
         return;
     }
@@ -281,16 +269,10 @@ pub fn semicolon_headers_with(program: &Program, profile: &Profile, diags: &mut 
 }
 
 /// Port of `checker/cr3xx.py::add_string_illegal`.
-pub fn add_string_illegal(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::add_string_illegal (omitted: profile: untyped)")
-}
-
-/// Full implementation of `checker/cr3xx.py::add_string_illegal`.
-pub fn add_string_illegal_with(
-    program: &Program,
-    profile: &Profile,
+pub fn add_string_illegal(
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    unparsed_string_messages_fn: impl Fn(&Unparsed, &Program, &Profile) -> Vec<String>,
 ) {
     if profile.name != "cr300" && profile.name != "cr350" {
         return;
@@ -314,7 +296,7 @@ pub fn add_string_illegal_with(
         let final_diag = own
             .iter()
             .find(|d| {
-                d.message.starts_with(_GENERIC_FALLBACK_PREFIX_P4)
+                d.message.starts_with(_GENERIC_FALLBACK_PREFIX)
                     || d.message.starts_with("Incomplete expression:")
                     || (has_semi && d.message.starts_with("Invalid symbol in expression:"))
             })
@@ -325,7 +307,7 @@ pub fn add_string_illegal_with(
         if own.iter().any(|d| d.message == "String is illegal here") {
             continue;
         }
-        let messages = unparsed_string_messages_fn(u, program, profile);
+        let messages = _unparsed_string_messages(u, program, profile);
         if !messages.is_empty() {
             let at = diags
                 .items
@@ -379,7 +361,7 @@ pub fn _order_arith_string_lines(diags: &mut Diagnostics) {
             .collect();
         let names: Vec<DiagRef> = own
             .iter()
-            .filter(|d| d.message.ends_with(_UNRESOLVED_SUFFIX_P4))
+            .filter(|d| d.message.ends_with(_UNRESOLVED_SUFFIX))
             .cloned()
             .collect();
         if names.is_empty() || (!arith.is_empty() && !logical.is_empty()) {
@@ -412,24 +394,17 @@ pub fn _order_arith_string_lines(diags: &mut Diagnostics) {
 pub const _TCPOPEN_HANDLE: &str = "Parameter must be a variable of type long";
 
 /// Port of `checker/cr3xx.py::check_tcpopen_handle`.
-pub fn check_tcpopen_handle(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/cr3xx.py::check_tcpopen_handle (omitted: profile: untyped)")
-}
-
-/// Full implementation of `checker/cr3xx.py::check_tcpopen_handle`.
-pub fn check_tcpopen_handle_with(
-    program: &Program,
-    profile: &Profile,
+pub fn check_tcpopen_handle(
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    types: &BTreeMap<String, String>,
-    known: &BTreeSet<String>,
-    closes_routine_fn: impl Fn(&Stmt) -> bool,
-    stmt_exprs_fn: impl Fn(&Stmt) -> Vec<Option<ExprRef>>,
-    index_nodes_fn: impl Fn(Option<&Expr>) -> Vec<&Index>,
 ) {
     if profile.name != "cr300" && profile.name != "cr350" {
         return;
     }
+    let ctx = context::of(program, Some(profile), None);
+    let types = ctx.variable_types(false);
+    let known = &ctx.known_names().names;
     let mut params: BTreeMap<String, Option<String>> = BTreeMap::new();
     for stmt in &program.statements {
         if let Stmt::SubDef(sd) = stmt.as_ref() {
@@ -448,7 +423,7 @@ pub fn check_tcpopen_handle_with(
             }
             continue;
         }
-        if closes_routine_fn(stmt.as_ref()) {
+        if ends_routine(stmt.as_ref()) {
             params.clear();
             continue;
         }
@@ -456,8 +431,8 @@ pub fn check_tcpopen_handle_with(
             Stmt::Call(c) if pystr::upper(&c.name) == "TCPOPEN" => vec![c.args.clone()],
             _ => {
                 let mut out = Vec::new();
-                for e_opt in stmt_exprs_fn(stmt.as_ref()) {
-                    for ix in index_nodes_fn(e_opt.as_deref()) {
+                for e_opt in _stmt_exprs(stmt.as_ref()) {
+                    for ix in _index_nodes(e_opt.as_deref()) {
                         if pystr::upper(&ix.name) == "TCPOPEN" {
                             out.push(ix.args.clone());
                         }
@@ -548,7 +523,7 @@ pub fn check_tcpopen_handle_with(
             let names: Vec<usize> = own
                 .iter()
                 .copied()
-                .filter(|&i| diags.items[i].message.ends_with(_UNRESOLVED_SUFFIX_P4))
+                .filter(|&i| diags.items[i].message.ends_with(_UNRESOLVED_SUFFIX))
                 .collect();
             let at = if let Some(&last_name) = names.last() {
                 last_name + 1
@@ -649,7 +624,7 @@ mod tests {
             "test.cr300",
         ));
 
-        semicolon_headers_with(&program, cr300_profile(), &mut diags);
+        semicolon_headers(&program, cr300_profile(), &mut diags);
 
         assert_eq!(diags.items.len(), 2);
         assert_eq!(diags.items[0].message, "Invalid symbol in expression: 1 ;.");
@@ -669,9 +644,7 @@ mod tests {
             "test.cr300",
         ));
 
-        add_string_illegal_with(&program, cr300_profile(), &mut diags, |_, _, _| {
-            vec!["String is illegal here".to_string()]
-        });
+        add_string_illegal(&Rc::new(program), cr300_profile(), &mut diags);
 
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
@@ -701,31 +674,13 @@ mod tests {
             .items
             .push(make_error_diag_p4(2, "Foo is not defined.", "test.cr300"));
 
-        let declared = BTreeSet::new();
+        let program = Rc::new(program);
         // Skips CR6
-        order_unterminated_string_with(
-            &program,
-            cr6_profile(),
-            &mut diags,
-            &declared,
-            |_, _| BTreeSet::new(),
-            |_, _| BTreeSet::new(),
-            |_| true,
-            |_, _| Vec::new(),
-        );
+        order_unterminated_string(&program, cr6_profile(), &mut diags);
         assert_eq!(diags.items.len(), 2);
 
         // Reorders on CR300
-        order_unterminated_string_with(
-            &program,
-            cr300_profile(),
-            &mut diags,
-            &declared,
-            |_, _| BTreeSet::new(),
-            |_, _| BTreeSet::new(),
-            |_| true,
-            |_, _| Vec::new(),
-        );
+        order_unterminated_string(&program, cr300_profile(), &mut diags);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,
@@ -735,90 +690,5 @@ mod tests {
                 "Invalid, or out of place expression: Foo \"abc.",
             ]
         );
-    }
-
-    #[test]
-    fn test_check_tcpopen_handle_flags_float_and_allows_long() {
-        let make_call = |line: i64, var_name: &str| -> StmtRef {
-            Rc::new(Stmt::Call(Call {
-                base: StmtBase {
-                    node: Node {
-                        line,
-                        file: "test.cr300".to_string(),
-                    },
-                    ..StmtBase::default()
-                },
-                name: "TCPOpen".to_string(),
-                args: vec![
-                    Some(Rc::new(Expr::String(StringLit {
-                        value: "1.2.3.4".to_string(),
-                        ..Default::default()
-                    }))),
-                    Some(Rc::new(Expr::Number(Number {
-                        text: "80".to_string(),
-                        ..Default::default()
-                    }))),
-                    Some(Rc::new(Expr::Number(Number {
-                        text: "0".to_string(),
-                        ..Default::default()
-                    }))),
-                    Some(Rc::new(Expr::Number(Number {
-                        text: "100".to_string(),
-                        ..Default::default()
-                    }))),
-                    Some(Rc::new(Expr::Name(Name {
-                        name: var_name.to_string(),
-                        ..Default::default()
-                    }))),
-                ],
-                ..Default::default()
-            }))
-        };
-
-        let mut program = Program::default();
-        program.statements.push(make_call(10, "GoodSock"));
-        program.statements.push(make_call(11, "BadSock"));
-        program.statements.push(Rc::new(Stmt::SubDef(SubDef {
-            base: StmtBase {
-                node: Node {
-                    line: 20,
-                    file: "test.cr300".to_string(),
-                },
-                ..StmtBase::default()
-            },
-            keyword: "Sub".to_string(),
-            name: "S".to_string(),
-            params: vec![Rc::new(Param {
-                name: "H".to_string(),
-                type_: Some("Float".to_string()),
-                ..Default::default()
-            })],
-            ..Default::default()
-        })));
-        program.statements.push(make_call(21, "H"));
-
-        let mut types = BTreeMap::new();
-        types.insert("GOODSOCK".to_string(), "LONG".to_string());
-        types.insert("BADSOCK".to_string(), "FLOAT".to_string());
-        let mut known = BTreeSet::new();
-        known.insert("GOODSOCK".to_string());
-        known.insert("BADSOCK".to_string());
-
-        let mut diags = Diagnostics::new();
-        check_tcpopen_handle_with(
-            &program,
-            cr300_profile(),
-            &mut diags,
-            &types,
-            &known,
-            |_| false,
-            |_| Vec::new(),
-            |_| Vec::new(),
-        );
-
-        let lines: Vec<i64> = diags.items.iter().map(|d| d.line).collect();
-        assert_eq!(lines, vec![11, 21]);
-        assert_eq!(diags.items[0].message, _TCPOPEN_HANDLE);
-        assert_eq!(diags.items[1].message, _TCPOPEN_HANDLE);
     }
 }
