@@ -4,8 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: continue P4 with `instr_data.py::check_units_targets` in part 2. The P3-s verdict CLI
-and fixture runner are in place.
+Next wave: continue P4 with the table and menu placement dependencies in `instr_data` part 2.
 
 The first live verdict replay matched Python on 25,964 of 77,293 cases and all cases in 20 of
 613 files. CLI probes matched Python's stdout, message-file bytes and exit status in 14 of
@@ -15,8 +14,15 @@ when compiling existing files.
 
 P4 table-name round: ported name extraction, diagnostic classification and CR300/CR350
 finalization in `instr_data/part3.rs`. Verdict parity rose by 134 cases to 26,098 of 77,293,
-with all 20 baseline files still passing. The CR6/CR1000X caller remains in `check_table_structure`;
-its skeleton needs the Python stop-location return type before that pass can be ported.
+with all 20 baseline files still passing. The CR6/CR1000X caller is
+`check_table_and_menu_placement`. The separate `check_table_structure` skeleton needs the
+Python stop-location return type.
+
+P4 Units round: ported target validation and duplicate assignment diagnostics in
+`instr_data/part2.rs`. Verdict parity rose to 26,118 of 77,293 cases.
+`r16_units_extra_words.json` became the 21st baseline file. Twenty CLI probes across all four
+loggers matched the pinned Python verdict for unknown, extra indexed, duplicate, indexed
+override and alias targets.
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3

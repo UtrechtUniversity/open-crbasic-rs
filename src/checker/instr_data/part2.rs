@@ -7,14 +7,125 @@ use std::rc::Rc;
 
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
+use crate::pystr;
 use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
     Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
 };
 
 /// Port of `checker/instr_data.py::check_units_targets`.
-pub fn check_units_targets(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_data.py::check_units_targets")
+pub fn check_units_targets(program: &Program, _profile: &Profile, diags: &mut Diagnostics) {
+    let struct_types: BTreeSet<_> = program
+        .statements
+        .iter()
+        .filter_map(|st| match st.as_ref() {
+            Stmt::Instruction(st)
+                if matches!(
+                    pystr::upper(&st.keyword).as_str(),
+                    "STRUCTURETYPE" | "OBJECTTYPE"
+                ) =>
+            {
+                match st.args.first()?.as_deref()? {
+                    Expr::Name(name) => Some(pystr::upper(&name.name)),
+                    _ => None,
+                }
+            }
+            _ => None,
+        })
+        .collect();
+    let mut allowed = BTreeSet::new();
+    for st in &program.statements {
+        match st.as_ref() {
+            Stmt::Declaration(decl)
+                if matches!(decl.kind.as_str(), "PUBLIC" | "DIM" | "STATIC") =>
+            {
+                allowed.extend(
+                    decl.vars
+                        .iter()
+                        .filter(|v| v.type_.as_ref().is_none_or(|ty| !struct_types.contains(ty)))
+                        .map(|v| pystr::upper(&v.name)),
+                );
+            }
+            Stmt::Instruction(st) if st.keyword.eq_ignore_ascii_case("ALIAS") => {
+                allowed.extend(
+                    st.args
+                        .iter()
+                        .skip(1)
+                        .filter_map(|arg| match arg.as_deref() {
+                            Some(Expr::Name(name)) => Some(pystr::upper(&name.name)),
+                            _ => None,
+                        }),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    let mut in_struct = false;
+    let mut assigned: Vec<(String, Vec<(&Instruction, &str)>)> = Vec::new();
+    let mut indexed = BTreeSet::new();
+    let mut invalid_target = |st: &Instruction, name: &str| {
+        diags.error_basic(
+            st.base.node.line,
+            &format!(
+                "Can't assign units to {name}, it must be declared Public or referenced as a source in a Data Table."
+            ),
+            &st.base.node.file,
+        );
+    };
+    for st in &program.statements {
+        let Stmt::Instruction(st) = st.as_ref() else {
+            continue;
+        };
+        let kw = pystr::upper(&st.keyword);
+        match kw.as_str() {
+            "STRUCTURETYPE" | "OBJECTTYPE" => in_struct = true,
+            "ENDSTRUCTURETYPE" | "ENDOBJECTTYPE" => in_struct = false,
+            _ => {}
+        }
+        if in_struct || kw != "UNITS" || st.args.is_empty() {
+            continue;
+        }
+        for extra in &st.extra_targets {
+            let name = extra.name();
+            if !allowed.contains(&pystr::upper(name)) {
+                invalid_target(st, name);
+            }
+        }
+        let (name, is_indexed) = match st.args.first().and_then(Option::as_deref) {
+            Some(Expr::Name(name)) => (name.name.as_str(), false),
+            Some(Expr::Index(index)) => (index.name.as_str(), true),
+            _ => continue,
+        };
+        let key = pystr::upper(name);
+        if !allowed.contains(&key) {
+            invalid_target(st, name);
+        } else if is_indexed {
+            indexed.insert(key);
+        } else if let Some((_, statements)) = assigned.iter_mut().find(|(k, _)| *k == key) {
+            statements.push((st, name));
+        } else {
+            assigned.push((key, vec![(st, name)]));
+        }
+    }
+
+    for (key, statements) in assigned {
+        if statements.len() < 2 || indexed.contains(&key) {
+            continue;
+        }
+        for (st, name) in &statements {
+            let Some(Expr::String(units)) = st.args.get(1).and_then(Option::as_deref) else {
+                continue;
+            };
+            for _ in 1..statements.len() {
+                diags.error_basic(
+                    st.base.node.line,
+                    &format!("{name} already assigned Units {}.", units.value),
+                    &st.base.node.file,
+                );
+            }
+        }
+    }
 }
 
 /// Port of `checker/instr_data.py::check_table_and_menu_placement`.
