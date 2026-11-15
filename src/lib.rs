@@ -2,6 +2,7 @@
 //! the open re-implementation of Campbell Scientific's CRBasic compilers. In progress: see
 //! `PORT_PROGRESS.md`.
 
+pub mod consteval;
 pub mod diagnostics;
 pub mod lexer;
 pub mod profiles;
