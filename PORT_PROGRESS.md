@@ -4,25 +4,26 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (state at 2026-11-15 22:35 CET): nothing is left to port, only to wire. Wiring is
-strictly one task at a time because it edits callers across files. instr_rules is wired
-(`2deee67`, `handoffs/wire-rules.md` lists the caller TODOs it left in cr3xx, instr_data,
-instr_measure, scan_time and expressions). Running: structure wiring, one Codex worker, worktree
-`.claude/worktrees/wire-struct`, branch `wire-struct`, brief = the wiring rules below plus the
-authorised `syntax.rs` change; its `HANDOFF.md` says where it is. If it is found stopped:
-verify (full check set, no baseline file lost), commit what compiles and passes, and re-launch
-for the rest. Then, in order: expressions, instr_data, instr_measure, cr3xx, tables, then
-intervals, symbols, structs, longconv, mode, ess.
+Next wave (state at 2026-11-15 23:55 CET): nothing is left to port, only to wire. Wiring is
+strictly one task at a time because it edits callers across files. Wired and verified on
+`port`: instr_rules (`2deee67`), structure (`d714d5b`), expressions (`e37d558`); each left a
+`handoffs/wire-*.md` with the caller TODOs for the modules that follow. Running: instr_data
+wiring, one Codex worker, worktree `.claude/worktrees/wire-data`, branch `wire-data`; its
+`HANDOFF.md` says where it is. If it is found stopped: verify (check set, no baseline file
+lost), commit what compiles and passes, and re-launch for the rest. Then, in order:
+instr_measure, cr3xx, tables (expressions `_data_table_fields` needs a `BuildTablesHooks`
+adapter), then the single files with stubs left (`grep -c 'todo!(' src/checker/*.rs src/*.rs`):
+intervals, symbols, structs, longconv, mode, ess and the rest.
 Wiring rules: for each `todo!()` skeleton stub that has a `*_with` sibling, delete the stub,
 rename the sibling to the Python name, and give every caller the real arguments (take them
 from the Python call site); drop the private `_pN_*` copies; resolve what `handoffs/*.md` list.
-The one `syntax.rs` change: `Declaration.vars` must be shortenable on a shared declaration
-(`structure.py` 1698, `handoffs/struct-3.md`). Gate after each module: full check set, no
-baseline file lost; record the parity number. Then convergence on the fixture files (P5) and
-close-out (P6; delete `handoffs/`).
+Gate after each module: check set, no baseline file lost; record the parity number. Then
+convergence on the fixture files (P5; known first buckets: `r12_cr3xx_table_field_hidden` and
+`r10_cr3xx_block_quotes` lost cases in the expressions wiring) and close-out (P6; delete
+`handoffs/`).
 
-After the instr_rules wiring, full check set green on `port`: 281 unit tests, verdict parity
-34,492 of 77,293, 53 files fully passing (baseline ratcheted).
+After the expressions wiring, check set green on `port`: 282 unit tests, verdict parity
+59,494 of 77,293, 306 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
 
 Merged in this round: all nine `structure` parts and all five `instr_rules` parts, as `*_with`
 siblings with `handoffs/<task>.md`. Full check set green on `port` at `bb39c3b`: 278 unit
@@ -78,6 +79,8 @@ Verdict parity rose by 278 cases to 26,408 of 77,293, and `spi_open_order.json` 
 23rd baseline file.
 
 Operating notes (learned in wave 1):
+- The fixture replay takes about 13 minutes in a debug build since the structure wiring and
+  95 s with `cargo test --release --test fixtures`; verify with the release build.
 - Codex has its own 5-hour window. Run at most 2 Codex workers at a time (3 only for small
   tasks) and start the next one when one finishes; never launch a wide wave (human, 2026-11-15).
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
