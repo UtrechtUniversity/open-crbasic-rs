@@ -5,6 +5,7 @@
 pub mod consteval;
 pub mod diagnostics;
 pub mod lexer;
+pub mod parser;
 pub mod profiles;
 pub mod pyre;
 pub mod pystr;
