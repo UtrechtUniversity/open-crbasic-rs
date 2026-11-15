@@ -7,14 +7,14 @@ use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use std::sync::LazyLock;
 
-use crate::consteval::{self, Env, NotConstant};
-use crate::diagnostics::{self, Positions, PositionsGuard};
+use crate::consteval::{self, Env};
+use crate::diagnostics::{Positions, PositionsGuard};
 use crate::profiles::Profile;
 use crate::pyre;
 use crate::pystr;
 use crate::syntax::{
     ConstValue, Expr, ExprRef, OrderedMap, Program, ProgramRef, Stmt, StmtRef, ends_routine,
-    expr_id, program_id, rc_id, replace_stmt, stmt_id,
+    expr_id, program_id, replace_stmt, stmt_id,
 };
 
 use super::expressions::{DimsState, KnownNames};
@@ -1624,6 +1624,7 @@ pub fn of(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::diagnostics;
     use crate::profiles;
     use crate::syntax::{
         ConstDecl, Declaration, If, Instruction, Name, Node, Number, NumberValue, StmtBase,
