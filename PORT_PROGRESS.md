@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: P1-b, P1-d, P1-e, P2-a in parallel (`P1-a` merged).
+Next wave: P1-b, P1-e, P2-a in parallel (`P1-a`, `P1-d` merged).
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
@@ -34,7 +34,7 @@ Operating notes (learned in wave 1):
 | P1-a | `lexer.py` (183) | `src/lexer.rs` | H | merged | `sources.py` moved to P1-b; 6 unit tests |
 | P1-b | `sources.py` (125), `source.py` (625) | `src/sources.rs`, `src/source.rs` | S | todo | macros excluded |
 | P1-c | `preprocess.py` (269) | `src/preprocess.rs` | S | todo | after P1-e |
-| P1-d | `consteval.py` (327) | `src/consteval.rs` | S | todo | |
+| P1-d | `consteval.py` (327) | `src/consteval.rs` | S | merged | `0b6c140`; 7 unit tests |
 | P1-e1..4 | `parser.py` (3336), 4 ranges | `src/parser/*.rs` | S | todo | serial; ranges fixed when P1-b merges |
 | P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | todo | serial, one task per module group |
 | P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | todo | |
