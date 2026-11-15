@@ -39,7 +39,7 @@ Operating notes (learned in wave 1):
 | P2-a | all `checker/*`, `tables.py`, `mode.py`, `compiler.py` signatures | skeleton, `todo!()` bodies, `RULES` table | S | merged | `5af36e1`; 54 files |
 | P2-b1..2 | `checker/context.py` (771) | `src/checker/context.rs` | S | merged | `d27829a`; 4 unit tests |
 | P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | merged | `06b9037`; 3 unit tests |
-| P3-h | `ess` 81, `longconv` 133, `symbols` 157, `structs` 236, `terminals` 427, `storage` 456, `mode.py` 143, `tdf.py` structs | one file each | H | todo | one task per module |
+| P3-h | `ess` 81, `longconv` 133, `symbols` 157, `structs` 236, `terminals` 427, `storage` 456, `mode.py` 143, `tdf.py` structs | one file each | H | running | P3-h2 (`symbols`, `structs`, `43f16a0`) merged; 3 unit tests |
 | P3-s | `var_types` 553, `intervals` 679, `scan_time` 580, `warnings` 666, `compiler.py` 324, `cli.py` verdict path | one file each | S | todo | one task per module |
 | P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | todo | ranges fixed by P2-a's file split |
 | P5 | convergence: bucket (H), fix per bucket (S), station + fuzz + CLI bytes (S) | | H/S | todo | |
