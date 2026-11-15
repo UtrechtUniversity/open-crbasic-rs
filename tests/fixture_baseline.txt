@@ -1,0 +1,1 @@
+# Fixture files that must fully pass; see tests/fixtures.rs. Empty until the compiler is wired in.

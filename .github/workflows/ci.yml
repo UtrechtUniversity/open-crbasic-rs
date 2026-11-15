@@ -12,14 +12,22 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # The Python compiler is the specification; its checkout supplies the verdict goldens.
+      OPENCRBASIC_PY: ${{ github.workspace }}/open-crbasic-py
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2.9.3
+      - uses: actions/checkout@v7
+        with:
+          repository: UtrechtUniversity/open-crbasic
+          path: open-crbasic-py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
       - uses: astral-sh/setup-uv@v10.3.3
+      - run: uv run --project "$OPENCRBASIC_PY" python tools/pydump.py
+      - run: cargo test
       - run: uvx pre-commit run --all-files --show-diff-on-failure
