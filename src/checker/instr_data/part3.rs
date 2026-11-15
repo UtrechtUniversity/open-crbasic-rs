@@ -24,41 +24,6 @@ use crate::tables::part2::{_anonymous_string_len_impl, _is_anonymous_source_impl
 use crate::{pyre, pystr};
 
 const STAGE2A_INT32_MIN: i64 = -2_147_483_648;
-const STAGE2A_TABLE_OUTPUT: &[&str] = &[
-    "TOTALIZE",
-    "AVERAGE",
-    "MAXIMUM",
-    "MINIMUM",
-    "SAMPLEMAXMIN",
-    "STDDEV",
-    "MOMENT",
-    "SAMPLE",
-    "COVARIANCE",
-    "MEDIAN",
-];
-
-type Stage2aAliasMap = OrderedMap<String, (String, String, String, i64, i64)>;
-
-/// External dependencies for `_check_stage2a_with` until `part1`, `part2`, `instr_rules`,
-/// `structure`, and `expressions::KnownNames` are wired together.
-pub struct Stage2aHooks<'a> {
-    pub with_inline: &'a dyn Fn(&[StmtRef]) -> Vec<StmtRef>,
-    pub alias_sources: &'a dyn Fn(&Program, &ScopeLookup, &Env) -> Stage2aAliasMap,
-    pub reps_value: &'a dyn Fn(Option<&Expr>, &Env) -> Option<i64>,
-    pub short_array: &'a dyn Fn(Option<&Expr>, i64, &OrderedMap<String, Vec<i64>>, &Env) -> bool,
-    pub wind_options: &'a dyn Fn(&Instruction, Option<i64>, &Env, &mut Diagnostics, bool) -> bool,
-    pub debug_history_oom: &'a dyn Fn(&Instruction, &Env, &Profile, &Program) -> bool,
-    pub undefined_table_source: &'a dyn Fn(&Instruction, &Profile, &KnownNames) -> Option<String>,
-    pub report_undefined_source: &'a dyn Fn(
-        &Instruction,
-        &profiles::Instruction,
-        &KnownNames,
-        &Profile,
-        &mut Diagnostics,
-    ) -> bool,
-    pub is_struct_typed: &'a dyn Fn(&Program, &str) -> bool,
-}
-
 fn stage3_expr_name_attr(expr: Option<&Expr>) -> &str {
     match expr {
         Some(Expr::Name(n)) => &n.name,
@@ -78,60 +43,25 @@ fn stage3_var_info_to_data(info: VarInfo) -> VarInfoData {
     }
 }
 
-fn stage3_reps_value(expr: Option<&Expr>, env: &Env) -> Option<i64> {
-    let expr = expr?;
-    if matches!(expr, Expr::String(_)) {
-        return Some(STAGE2A_INT32_MIN);
-    }
-    let Ok(value) = consteval::value_of(Some(expr), env) else {
-        return None;
-    };
-    let int_val = match value {
-        ConstValue::Int(i) => i,
-        ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            if !f.is_finite() {
-                return Some(STAGE2A_INT32_MIN);
-            }
-            pystr::py_int_from_f64(f)?
-        }
-        ConstValue::BigInt(_) | ConstValue::Str(_) => return None,
-    };
-    if (-(1_i64 << 31)..(1_i64 << 31)).contains(&int_val) {
-        Some(int_val)
-    } else {
-        Some(STAGE2A_INT32_MIN)
-    }
-}
-
-/// Port of `checker/instr_data.py::_check_stage2a`.
+/// Port of checker/instr_data.py::_check_stage2a
 pub fn _check_stage2a(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-    _destinations: bool,
-) -> bool {
-    todo!("checker/instr_data.py::_check_stage2a (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_check_stage2a`.
-pub fn _check_stage2a_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
     env: &Env,
     destinations: bool,
-    known: &KnownNames,
-    hooks: &Stage2aHooks<'_>,
 ) -> bool {
     let ctx = context::of(program, Some(profile), Some(env.clone()));
+    let known = ctx.known_names();
     let reported = false;
     let tables = ctx.scope_tables(false, false);
-    let aliases = (hooks.alias_sources)(program, &tables, env);
+    let aliases =
+        super::part2::_alias_sources(program, &|st| tables.for_statement(st).clone(), env);
     let mut source_vars: Option<OrderedMap<String, VarInfoData>> = None;
     let mut in_table = false;
     let mut sources_ok = true;
     let top_level: HashSet<usize> = program.statements.iter().map(stmt_id).collect();
-    for st in (hooks.with_inline)(&program.statements) {
+    for st in super::part1::_with_inline(&program.statements) {
         let Stmt::Instruction(inst) = st.as_ref() else {
             continue;
         };
@@ -152,7 +82,7 @@ pub fn _check_stage2a_with(
             continue;
         }
         if kw == "WINDVECTOR" && !inst.args.is_empty() && !inline {
-            let reps = (hooks.reps_value)(inst.args[0].as_deref(), env);
+            let reps = super::part2::_reps_value(inst.args[0].as_deref(), env);
             if let Some(r) = reps
                 && STAGE2A_INT32_MIN < r
                 && r < 0
@@ -171,7 +101,12 @@ pub fn _check_stage2a_with(
             if in_table && inst.args.len() >= 8 {
                 if profile.single_pass
                     && reps.is_some_and(|r| r > 0)
-                    && (hooks.short_array)(inst.args[2].as_deref(), reps.unwrap_or(0), dims, env)
+                    && super::part2::_short_array(
+                        inst.args[2].as_deref(),
+                        reps.unwrap_or(0),
+                        dims,
+                        env,
+                    )
                 {
                     let name = stage3_expr_name_attr(inst.args[2].as_deref());
                     diags.error_basic(
@@ -182,13 +117,21 @@ pub fn _check_stage2a_with(
                 }
                 let short_speed = profile.single_pass
                     && reps.is_some_and(|r| r > 0)
-                    && (hooks.short_array)(inst.args[1].as_deref(), reps.unwrap_or(0), dims, env);
-                if (hooks.wind_options)(inst, reps, env, diags, short_speed) {
+                    && super::part2::_short_array(
+                        inst.args[1].as_deref(),
+                        reps.unwrap_or(0),
+                        dims,
+                        env,
+                    );
+                if super::part2::_wind_options(inst, reps, env, diags, short_speed) {
                     return true;
                 }
             }
         }
-        if kw == "DEBUG" && !inline && (hooks.debug_history_oom)(inst, env, profile, program) {
+        if kw == "DEBUG"
+            && !inline
+            && crate::checker::instr_rules::debug_history_oom(inst, env, profile, program)
+        {
             diags.error(
                 inst.base.node.line,
                 "Out of memory.",
@@ -203,11 +146,20 @@ pub fn _check_stage2a_with(
         if inline {
             continue;
         }
-        if destinations && in_table && STAGE2A_TABLE_OUTPUT.contains(&kw.as_str()) && sources_ok {
-            sources_ok = (hooks.undefined_table_source)(inst, profile, known).is_none();
+        if destinations
+            && in_table
+            && super::part2::_TABLE_OUTPUT.contains(&kw.as_str())
+            && sources_ok
+        {
+            sources_ok = crate::checker::structure::_undefined_table_source(
+                inst,
+                profile,
+                &crate::checker::expressions::KnownView::from(known),
+            )
+            .is_none();
         }
         let mut wind_reps = if kw == "WINDVECTOR" && !inst.args.is_empty() {
-            (hooks.reps_value)(inst.args[0].as_deref(), env)
+            super::part2::_reps_value(inst.args[0].as_deref(), env)
         } else {
             None
         };
@@ -224,7 +176,12 @@ pub fn _check_stage2a_with(
             && wind_reps.unwrap_or(0) >= 1;
         if wind
             && destinations
-            && (hooks.short_array)(inst.args[2].as_deref(), wind_reps.unwrap_or(0), dims, env)
+            && super::part2::_short_array(
+                inst.args[2].as_deref(),
+                wind_reps.unwrap_or(0),
+                dims,
+                env,
+            )
         {
             let name = stage3_expr_name_attr(inst.args[2].as_deref());
             diags.error_basic(
@@ -235,7 +192,7 @@ pub fn _check_stage2a_with(
         }
         let mut source_type: Option<String> = None;
         if profile.single_pass && in_table {
-            if let Some(message) = _odd_pair_reps_with(inst, env) {
+            if let Some(message) = _odd_pair_reps(inst, env) {
                 diags.error_basic(inst.base.node.line, &message, &inst.base.node.file);
             }
             let source = inst.args.get(1).and_then(|a| a.as_deref());
@@ -250,10 +207,10 @@ pub fn _check_stage2a_with(
             }
             if kw == "SAMPLE"
                 && inst.args.len() >= 3
-                && _constant_data_type_with(inst, 2, env) == Some(1)
+                && _constant_data_type(inst, 2, env) == Some(1)
                 && !matches!(source_type.as_deref(), None | Some("UINT1"))
-                && let Some(reps) = (hooks.reps_value)(inst.args[0].as_deref(), env)
-                && !(hooks.short_array)(source, reps, dims, env)
+                && let Some(reps) = super::part2::_reps_value(inst.args[0].as_deref(), env)
+                && !super::part2::_short_array(source, reps, dims, env)
             {
                 diags.error_basic(
                     inst.base.node.line,
@@ -262,12 +219,12 @@ pub fn _check_stage2a_with(
                 );
             }
         }
-        if (STAGE2A_TABLE_OUTPUT.contains(&kw.as_str()) || wind)
+        if (super::part2::_TABLE_OUTPUT.contains(&kw.as_str()) || wind)
             && inst.args.len() >= 2
             && sources_ok
             && (in_table || !destinations)
         {
-            let reps = (hooks.reps_value)(inst.args[0].as_deref(), env);
+            let reps = super::part2::_reps_value(inst.args[0].as_deref(), env);
             if let Some(r) = reps
                 && r < 1
             {
@@ -280,7 +237,7 @@ pub fn _check_stage2a_with(
             }
             if !destinations
                 && in_table
-                && (hooks.report_undefined_source)(inst, record, known, profile, diags)
+                && super::part2::_report_undefined_source(inst, record, known, profile, diags)
             {
                 return true;
             }
@@ -349,7 +306,7 @@ pub fn _check_stage2a_with(
                     if destinations
                         && in_table
                         && !wind
-                        && let Some(message) = _odd_pair_reps_with(inst, env)
+                        && let Some(message) = _odd_pair_reps(inst, env)
                     {
                         diags.error_basic(inst.base.node.line, &message, &inst.base.node.file);
                     }
@@ -381,7 +338,7 @@ pub fn _check_stage2a_with(
             let Some(shape) = shape else {
                 continue;
             };
-            if (hooks.is_struct_typed)(program, source_name) {
+            if super::part2::_is_struct_typed(program, source_name) {
                 continue;
             }
             let mut start: i64 = 1;
@@ -395,7 +352,7 @@ pub fn _check_stage2a_with(
                 }
                 let mut subs = Vec::with_capacity(ix.args.len());
                 for a in &ix.args {
-                    if let Some(k) = (hooks.reps_value)(a.as_deref(), env) {
+                    if let Some(k) = super::part2::_reps_value(a.as_deref(), env) {
                         subs.push(k);
                     }
                 }
@@ -411,7 +368,7 @@ pub fn _check_stage2a_with(
             if offset + reps > total {
                 if destinations
                     && in_table
-                    && let Some(message) = _odd_pair_reps_with(inst, env)
+                    && let Some(message) = _odd_pair_reps(inst, env)
                 {
                     diags.error_basic(inst.base.node.line, &message, &inst.base.node.file);
                 }
@@ -461,7 +418,7 @@ pub fn _check_stage2a_with(
     reported
 }
 
-/// Port of `checker/instr_data.py::check_eventcount_tables`.
+/// Port of checker/instr_data.py::check_eventcount_tables
 pub fn check_eventcount_tables(program: &Program, _profile: &Profile, diags: &mut Diagnostics) {
     let mut tables: OrderedMap<String, bool> = OrderedMap::new();
     let mut current: Option<String> = None;
@@ -493,7 +450,7 @@ pub fn check_eventcount_tables(program: &Program, _profile: &Profile, diags: &mu
     for st in &program.statements {
         let mut found = false;
         for expr in _statement_exprs(st) {
-            for node in _members_with(Some(&expr)) {
+            for node in _members(Some(&expr)) {
                 if let Some(Expr::Name(base)) = node.base.as_deref()
                     && pystr::upper(&node.member) == "EVENTCOUNT"
                     && tables.get(&pystr::upper(&base.name)) == Some(&false)
@@ -517,7 +474,7 @@ pub fn check_eventcount_tables(program: &Program, _profile: &Profile, diags: &mu
     }
 }
 
-/// Port of `checker/instr_data.py::_statement_exprs`.
+/// Port of checker/instr_data.py::_statement_exprs
 pub fn _statement_exprs(st: &Stmt) -> Vec<ExprRef> {
     let mut out: Vec<Option<ExprRef>> = Vec::new();
     match st {
@@ -540,13 +497,8 @@ pub fn _statement_exprs(st: &Stmt) -> Vec<ExprRef> {
     out.into_iter().flatten().collect()
 }
 
-/// Port of `checker/instr_data.py::_members`.
-pub fn _members(_expr: Option<&Expr>) {
-    todo!("checker/instr_data.py::_members")
-}
-
-/// Port of `checker/instr_data.py::_members`.
-pub fn _members_with(expr: Option<&Expr>) -> Vec<Member> {
+/// Port of checker/instr_data.py::_members
+pub fn _members(expr: Option<&Expr>) -> Vec<Member> {
     fn walk(expr: Option<&Expr>, out: &mut Vec<Member>) {
         let Some(e) = expr else {
             return;
@@ -585,7 +537,7 @@ static _EXPR_NAME: LazyLock<pyre::Regex> =
 static STRING_NAME: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"[0-9A-Za-z_.]+", 0));
 
-/// Port of `checker/instr_data.py::_declared_table_name`.
+/// Port of checker/instr_data.py::_declared_table_name
 pub fn _declared_table_name(st: &Instruction) -> Option<String> {
     match st.args.first()?.as_deref()? {
         Expr::Name(name) => Some(name.name.clone()),
@@ -604,7 +556,7 @@ pub fn _declared_table_name(st: &Instruction) -> Option<String> {
     }
 }
 
-/// Port of `checker/instr_data.py::_illegal_table_name`.
+/// Port of checker/instr_data.py::_illegal_table_name
 pub fn _illegal_table_name(st: &Instruction) -> Vec<DiagRef> {
     let Some(name) = _declared_table_name(st) else {
         return Vec::new();
@@ -645,12 +597,12 @@ pub fn _illegal_table_name(st: &Instruction) -> Vec<DiagRef> {
     ))]
 }
 
-/// Port of `checker/instr_data.py::is_table_name_diag`.
+/// Port of checker/instr_data.py::is_table_name_diag
 pub fn is_table_name_diag(d: &Diagnostic) -> bool {
     TABLE_NAME_KINDS.contains(&d.kind.as_str())
 }
 
-/// Port of `checker/instr_data.py::finalize_illegal_table_names`.
+/// Port of checker/instr_data.py::finalize_illegal_table_names
 pub fn finalize_illegal_table_names(
     program: &Program,
     _profile: &Profile,
@@ -771,13 +723,8 @@ fn _data_type_arg(kw: &str) -> Option<usize> {
     }
 }
 
-/// Port of `checker/instr_data.py::_constant_data_type`.
-pub fn _constant_data_type(_stmt: &Instruction, _pos: i64) -> Option<i64> {
-    todo!("checker/instr_data.py::_constant_data_type (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::_constant_data_type`.
-pub fn _constant_data_type_with(stmt: &Instruction, pos: i64, env: &Env) -> Option<i64> {
+/// Port of checker/instr_data.py::_constant_data_type
+pub fn _constant_data_type(stmt: &Instruction, pos: i64, env: &Env) -> Option<i64> {
     let idx = usize::try_from(pos).ok()?;
     let arg = stmt.args.get(idx)?;
     let Ok(value) = consteval::value_of(arg.as_deref(), env) else {
@@ -794,13 +741,8 @@ pub fn _constant_data_type_with(stmt: &Instruction, pos: i64, env: &Env) -> Opti
     }
 }
 
-/// Port of `checker/instr_data.py::_fieldless`.
-pub fn _fieldless(_stmt: &Instruction, _profile: &Profile) -> bool {
-    todo!("checker/instr_data.py::_fieldless (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::_fieldless`.
-pub fn _fieldless_with(stmt: &Instruction, profile: &Profile, env: &Env) -> bool {
+/// Port of checker/instr_data.py::_fieldless
+pub fn _fieldless(stmt: &Instruction, profile: &Profile, env: &Env) -> bool {
     let kw = pystr::upper(&stmt.keyword);
     let Some(pos) = _data_type_arg(&kw) else {
         return false;
@@ -824,17 +766,12 @@ pub fn _fieldless_with(stmt: &Instruction, profile: &Profile, env: &Env) -> bool
             return true;
         }
     }
-    _constant_data_type_with(stmt, i64::try_from(pos).unwrap_or(0), env)
+    _constant_data_type(stmt, i64::try_from(pos).unwrap_or(0), env)
         .is_some_and(|v| _is_fieldless_data_type(v) || _is_silent_fieldless(v))
 }
 
-/// Port of `checker/instr_data.py::check_output_datatype`.
-pub fn check_output_datatype(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_data.py::check_output_datatype (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::check_output_datatype`.
-pub fn check_output_datatype_with(
+/// Port of checker/instr_data.py::check_output_datatype
+pub fn check_output_datatype(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -859,7 +796,7 @@ pub fn check_output_datatype_with(
         if !in_table || pos >= stmt.args.len() || stmt.args[pos].is_none() {
             continue;
         }
-        let mut value = _constant_data_type_with(stmt, i64::try_from(pos).unwrap_or(0), env);
+        let mut value = _constant_data_type(stmt, i64::try_from(pos).unwrap_or(0), env);
         if value.is_none() && kw == "SAMPLE" && !profile.single_pass {
             let empty = BTreeSet::new();
             if let Some(wide) = crate::checker::longconv::long_value_with(
@@ -930,22 +867,17 @@ pub fn check_output_datatype_with(
     }
 }
 
-/// Port of `checker/instr_data.py::_odd_pair_reps`.
-pub fn _odd_pair_reps(_stmt: &Instruction) -> Option<String> {
-    todo!("checker/instr_data.py::_odd_pair_reps (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::_odd_pair_reps`.
-pub fn _odd_pair_reps_with(stmt: &Instruction, env: &Env) -> Option<String> {
+/// Port of checker/instr_data.py::_odd_pair_reps
+pub fn _odd_pair_reps(stmt: &Instruction, env: &Env) -> Option<String> {
     let pos = _data_type_arg(&pystr::upper(&stmt.keyword))?;
     if pos >= stmt.args.len() || stmt.args[pos].is_none() || stmt.args.first()?.is_none() {
         return None;
     }
-    let dtype = _constant_data_type_with(stmt, i64::try_from(pos).unwrap_or(0), env)?;
+    let dtype = _constant_data_type(stmt, i64::try_from(pos).unwrap_or(0), env)?;
     if !matches!(dtype, 1 | 17) {
         return None;
     }
-    let reps = stage3_reps_value(stmt.args[0].as_deref(), env)?;
+    let reps = super::part2::_reps_value(stmt.args[0].as_deref(), env)?;
     if reps > 0 && reps % 2 != 0 {
         Some(format!(
             "Reps {reps} illegal; with BOOL8 and UINT1 data types, reps must be evenly divisible by 2"
@@ -955,13 +887,8 @@ pub fn _odd_pair_reps_with(stmt: &Instruction, env: &Env) -> Option<String> {
     }
 }
 
-/// Port of `checker/instr_data.py::check_odd_pair_reps`.
-pub fn check_odd_pair_reps(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_data.py::check_odd_pair_reps (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::check_odd_pair_reps`.
-pub fn check_odd_pair_reps_with(
+/// Port of checker/instr_data.py::check_odd_pair_reps
+pub fn check_odd_pair_reps(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -1006,14 +933,14 @@ pub fn check_odd_pair_reps_with(
         };
         let kw = pystr::upper(&stmt.keyword);
         in_table = kw == "DATATABLE" || (in_table && kw != "ENDTABLE");
-        if in_table && let Some(message) = _odd_pair_reps_with(stmt, env) {
+        if in_table && let Some(message) = _odd_pair_reps(stmt, env) {
             diags.error_basic(stmt.base.node.line, &message, &stmt.base.node.file);
         }
         if in_table
             && kw == "SAMPLE"
             && stmt.args.len() > 2
             && stmt.args[2].is_some()
-            && _constant_data_type_with(stmt, 2, env) == Some(1)
+            && _constant_data_type(stmt, 2, env) == Some(1)
             && let Some(Expr::Name(Name { name: src, .. }) | Expr::Index(Index { name: src, .. })) =
                 stmt.args[1].as_deref()
             && types.get(&pystr::upper(src)).map(String::as_str) != Some("UINT1")
@@ -1086,7 +1013,7 @@ EndProg
         let mut all_members = Vec::new();
         for st in &prog.statements {
             for expr in _statement_exprs(st) {
-                for m in _members_with(Some(&expr)) {
+                for m in _members(Some(&expr)) {
                     all_members.push(m.member);
                 }
             }
@@ -1119,16 +1046,16 @@ EndTable
                 _ => None,
             })
             .collect();
-        assert_eq!(_constant_data_type_with(instrs[0], 2, &env), Some(2));
-        assert_eq!(_constant_data_type_with(instrs[3], 2, &env), None);
-        assert_eq!(_constant_data_type_with(instrs[5], 2, &env), None);
+        assert_eq!(_constant_data_type(instrs[0], 2, &env), Some(2));
+        assert_eq!(_constant_data_type(instrs[3], 2, &env), None);
+        assert_eq!(_constant_data_type(instrs[5], 2, &env), None);
 
-        assert!(!_fieldless_with(instrs[0], prof, &env));
-        assert!(_fieldless_with(instrs[1], prof, &env));
-        assert!(_fieldless_with(instrs[2], prof, &env));
-        assert!(_fieldless_with(instrs[3], prof, &env));
-        assert!(!_fieldless_with(instrs[4], prof, &env));
-        assert!(!_fieldless_with(instrs[1], prof300, &env));
+        assert!(!_fieldless(instrs[0], prof, &env));
+        assert!(_fieldless(instrs[1], prof, &env));
+        assert!(_fieldless(instrs[2], prof, &env));
+        assert!(_fieldless(instrs[3], prof, &env));
+        assert!(!_fieldless(instrs[4], prof, &env));
+        assert!(!_fieldless(instrs[1], prof300, &env));
     }
 
     #[test]
@@ -1147,7 +1074,7 @@ EndTable
 ";
         let (prog, _) = parse_text(src, "test.CR6", None, Some(prof));
         let mut diags = Diagnostics::default();
-        check_output_datatype_with(&prog, prof, &mut diags, &env);
+        check_output_datatype(&prog, prof, &mut diags, &env);
         let msgs: Vec<_> = diags
             .errors()
             .into_iter()
@@ -1173,7 +1100,7 @@ EndTable
 ";
         let (prog300, _) = parse_text(src300, "test.CR300", None, Some(prof300));
         let mut diags300 = Diagnostics::default();
-        check_output_datatype_with(&prog300, prof300, &mut diags300, &env300);
+        check_output_datatype(&prog300, prof300, &mut diags300, &env300);
         let msgs300: Vec<_> = diags300
             .errors()
             .into_iter()
@@ -1202,7 +1129,7 @@ EndTable
 ";
         let (prog, _) = parse_text(src, "test.CR6", None, Some(prof));
         let mut diags = Diagnostics::default();
-        check_odd_pair_reps_with(&prog, prof, &mut diags, &env);
+        check_odd_pair_reps(&prog, prof, &mut diags, &env);
         let msgs: Vec<_> = diags
             .errors()
             .into_iter()
@@ -1222,30 +1149,15 @@ EndTable
     fn stage2a_checks_reps_bounds_and_expr_sources() {
         let prof = cr6();
         let env = Env::new(prof);
-        let hooks = Stage2aHooks {
-            with_inline: &|stmts| stmts.to_vec(),
-            alias_sources: &|_, _, _| OrderedMap::new(),
-            reps_value: &stage3_reps_value,
-            short_array: &|_, _, _, _| false,
-            wind_options: &|_, _, _, _, _| false,
-            debug_history_oom: &|_, _, _, _| false,
-            undefined_table_source: &|_, _, _| None,
-            report_undefined_source: &|_, _, _, _, _| false,
-            is_struct_typed: &|_, _| false,
-        };
-
         let src_neg = "\
 Public X
 DataTable(T,True,-1)
   Sample(-1,X,FP2)
 EndTable
 ";
-        let known = KnownNames::default();
         let (prog_neg, _) = parse_text(src_neg, "test.CR6", None, Some(prof));
         let mut d_neg = Diagnostics::default();
-        assert!(_check_stage2a_with(
-            &prog_neg, prof, &mut d_neg, &env, false, &known, &hooks
-        ));
+        assert!(_check_stage2a(&prog_neg, prof, &mut d_neg, &env, false));
         assert_eq!(
             d_neg
                 .errors()
@@ -1263,15 +1175,7 @@ EndTable
 ";
         let (prog_expr, _) = parse_text(src_expr, "test.CR6", None, Some(prof));
         let mut d_expr = Diagnostics::default();
-        assert!(_check_stage2a_with(
-            &prog_expr,
-            prof,
-            &mut d_expr,
-            &env,
-            false,
-            &known,
-            &hooks
-        ));
+        assert!(_check_stage2a(&prog_expr, prof, &mut d_expr, &env, false));
         assert_eq!(
             d_expr
                 .errors()
@@ -1292,9 +1196,7 @@ EndTable
 ";
         let (prog_oob, _) = parse_text(src_oob, "test.CR6", None, Some(prof));
         let mut d_oob = Diagnostics::default();
-        assert!(_check_stage2a_with(
-            &prog_oob, prof, &mut d_oob, &env, false, &known, &hooks
-        ));
+        assert!(_check_stage2a(&prog_oob, prof, &mut d_oob, &env, false));
         assert_eq!(
             d_oob
                 .errors()

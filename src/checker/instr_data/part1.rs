@@ -20,7 +20,7 @@ use crate::syntax::{
 use crate::tdf::TdfTable;
 use crate::{pyre, pystr};
 
-/// Port of `checker/instr_data.py::TABLE_ONLY_INSTRUCTIONS`.
+/// Port of checker/instr_data.py::TABLE_ONLY_INSTRUCTIONS
 pub static TABLE_ONLY_INSTRUCTIONS: LazyLock<OrderedMap<&'static str, &'static str>> =
     LazyLock::new(|| {
         let mut map = OrderedMap::new();
@@ -61,7 +61,7 @@ pub static TABLE_ONLY_INSTRUCTIONS: LazyLock<OrderedMap<&'static str, &'static s
         map
     });
 
-/// Port of `checker/instr_data.py::_FIELD_PRODUCING_INSTRUCTIONS`.
+/// Port of checker/instr_data.py::_FIELD_PRODUCING_INSTRUCTIONS
 pub static _FIELD_PRODUCING_INSTRUCTIONS: LazyLock<BTreeSet<&'static str>> = LazyLock::new(|| {
     [
         "SAMPLE",
@@ -89,7 +89,7 @@ pub static _FIELD_PRODUCING_INSTRUCTIONS: LazyLock<BTreeSet<&'static str>> = Laz
     .collect()
 });
 
-/// Port of `checker/instr_data.py::_table_name`.
+/// Port of checker/instr_data.py::_table_name
 pub fn _table_name(stmt: &Instruction) -> Option<String> {
     match stmt.args.first()?.as_deref()? {
         Expr::Name(name) => Some(name.name.clone()),
@@ -97,8 +97,8 @@ pub fn _table_name(stmt: &Instruction) -> Option<String> {
     }
 }
 
-/// Port of `checker/instr_data.py::calltable_targets`.
-pub fn calltable_targets(program: &Program) -> BTreeSet<String> {
+/// Port of checker/instr_data.py::calltable_targets
+pub fn calltable_targets(program: &ProgramRef) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for stmt in &program.statements {
         if let Stmt::Instruction(inst) = stmt.as_ref()
@@ -109,7 +109,7 @@ pub fn calltable_targets(program: &Program) -> BTreeSet<String> {
             names.insert(pystr::upper(&name));
         }
     }
-    for (_stmt, name, spec) in _unknown_table_references_with(program, None) {
+    for (_stmt, name, spec) in _unknown_table_references(program, None) {
         if spec.2 {
             names.insert(pystr::upper(&name));
         }
@@ -117,22 +117,16 @@ pub fn calltable_targets(program: &Program) -> BTreeSet<String> {
     names
 }
 
-/// Port of `checker/instr_data.py::unknown_calltables`.
-pub fn unknown_calltables(_program: &Program) {
-    // TODO(integrator-2): return `Vec<(StmtRef, String)>` via `unknown_calltables_with`.
-    todo!("checker/instr_data.py::unknown_calltables")
-}
-
-/// Full implementation of `checker/instr_data.py::unknown_calltables`.
-pub fn unknown_calltables_with(program: &Program) -> Vec<(StmtRef, String)> {
+/// Port of checker/instr_data.py::unknown_calltables
+pub fn unknown_calltables(program: &Program) -> Vec<(StmtRef, String)> {
     let mut closed: BTreeSet<String> = BTreeSet::new();
     let mut pending: Option<String> = None;
     let mut unknown = Vec::new();
-    let names: HashMap<usize, String> = _calltable_names_with(program)
+    let names: HashMap<usize, String> = _calltable_names(program)
         .into_iter()
         .map(|(stmt, name)| (rc_id(&stmt), name))
         .collect();
-    for stmt in _with_inline_with(&program.statements) {
+    for stmt in _with_inline(&program.statements) {
         let Stmt::Instruction(inst) = stmt.as_ref() else {
             continue;
         };
@@ -163,30 +157,24 @@ pub fn unknown_calltables_with(program: &Program) -> Vec<(StmtRef, String)> {
     unknown
 }
 
-/// Port of `checker/instr_data.py::_with_inline`.
-pub fn _with_inline() {
-    // TODO(integrator-2): accept `stmts: &[StmtRef]` and delegate to `_with_inline_with`.
-    todo!("checker/instr_data.py::_with_inline (omitted: stmts: untyped)")
-}
-
-/// Full implementation of `checker/instr_data.py::_with_inline`.
-pub fn _with_inline_with(stmts: &[StmtRef]) -> Vec<StmtRef> {
+/// Port of checker/instr_data.py::_with_inline
+pub fn _with_inline(stmts: &[StmtRef]) -> Vec<StmtRef> {
     let mut out = Vec::new();
     for stmt in stmts {
         out.push(stmt.clone());
         if let Stmt::If(if_stmt) = stmt.as_ref() {
             if let Some(inline) = &if_stmt.inline {
-                out.extend(_with_inline_with(inline));
+                out.extend(_with_inline(inline));
             }
             if let Some(inline_else) = &if_stmt.inline_else {
-                out.extend(_with_inline_with(inline_else));
+                out.extend(_with_inline(inline_else));
             }
         }
     }
     out
 }
 
-/// Port of `checker/instr_data.py::_const_table_name`.
+/// Port of checker/instr_data.py::_const_table_name
 pub fn _const_table_name(name: &str, program: &Program) -> String {
     let value = program
         .consts
@@ -198,16 +186,10 @@ pub fn _const_table_name(name: &str, program: &Program) -> String {
     }
 }
 
-/// Port of `checker/instr_data.py::_calltable_names`.
-pub fn _calltable_names(_program: &Program) {
-    // TODO(integrator-2): return `Vec<(StmtRef, String)>` via `_calltable_names_with`.
-    todo!("checker/instr_data.py::_calltable_names")
-}
-
-/// Full implementation of `checker/instr_data.py::_calltable_names`.
-pub fn _calltable_names_with(program: &Program) -> Vec<(StmtRef, String)> {
+/// Port of checker/instr_data.py::_calltable_names
+pub fn _calltable_names(program: &Program) -> Vec<(StmtRef, String)> {
     let mut out = Vec::new();
-    for stmt in _with_inline_with(&program.statements) {
+    for stmt in _with_inline(&program.statements) {
         let Stmt::Instruction(inst) = stmt.as_ref() else {
             continue;
         };
@@ -235,7 +217,7 @@ pub fn _calltable_names_with(program: &Program) -> Vec<(StmtRef, String)> {
     out
 }
 
-/// Port of `checker/instr_data.py::TABLE_REFERENCES`.
+/// Port of checker/instr_data.py::TABLE_REFERENCES
 pub static TABLE_REFERENCES: LazyLock<OrderedMap<&'static str, (usize, &'static str, bool)>> =
     LazyLock::new(|| {
         let mut map = OrderedMap::new();
@@ -253,35 +235,23 @@ pub static TABLE_REFERENCES: LazyLock<OrderedMap<&'static str, (usize, &'static 
 
 static _SPECIAL_TABLES: &[&str] = &["STATUS", "PUBLIC", "SETTINGS", "DATATABLEINFO", "ENDTABLE"];
 
-/// Port of `checker/instr_data.py::unknown_table_references`.
-pub fn unknown_table_references(_program: &Program, _profile: Option<&Profile>) {
-    // TODO(integrator-2): return `Vec<(StmtRef, String, bool)>` via `unknown_table_references_with`.
-    todo!("checker/instr_data.py::unknown_table_references")
-}
-
-/// Full implementation of `checker/instr_data.py::unknown_table_references`.
-pub fn unknown_table_references_with(
-    program: &Program,
+/// Port of checker/instr_data.py::unknown_table_references
+pub fn unknown_table_references(
+    program: &ProgramRef,
     profile: Option<&'static Profile>,
 ) -> Vec<(StmtRef, String, bool)> {
-    _unknown_table_references_with(program, profile)
+    _unknown_table_references(program, profile)
         .into_iter()
         .map(|(stmt, name, spec)| (stmt, spec.1.replacen("{}", &name, 1), spec.2))
         .collect()
 }
 
-/// Port of `checker/instr_data.py::_unknown_table_references`.
-pub fn _unknown_table_references(_program: &Program, _profile: Option<&Profile>) {
-    // TODO(integrator-2): return `Vec<(StmtRef, String, (usize, String, bool))>` via `_unknown_table_references_with`.
-    todo!("checker/instr_data.py::_unknown_table_references")
-}
-
-/// Full implementation of `checker/instr_data.py::_unknown_table_references`.
-pub fn _unknown_table_references_with(
-    program: &Program,
+/// Port of checker/instr_data.py::_unknown_table_references
+pub fn _unknown_table_references(
+    program: &ProgramRef,
     profile: Option<&'static Profile>,
 ) -> Vec<(StmtRef, String, (usize, String, bool))> {
-    let const_tables: BTreeSet<String> = _with_inline_with(&program.statements)
+    let const_tables: BTreeSet<String> = _with_inline(&program.statements)
         .into_iter()
         .filter_map(|st| match st.as_ref() {
             Stmt::Instruction(inst) if pystr::upper(&inst.keyword) == "CONSTTABLE" => {
@@ -296,7 +266,7 @@ pub fn _unknown_table_references_with(
     let mut closed: BTreeSet<String> = BTreeSet::new();
     let mut pending: Option<String> = None;
     let mut out = Vec::new();
-    for stmt in _with_inline_with(&program.statements) {
+    for stmt in _with_inline(&program.statements) {
         let Stmt::Instruction(inst) = stmt.as_ref() else {
             continue;
         };
@@ -331,7 +301,8 @@ pub fn _unknown_table_references_with(
         if kw == "GETRECORD"
             && let Some(prof) = profile
             && closed.contains(&pystr::upper(&name))
-            && let Some(fields) = _getrecord_short(inst, &name, program, prof)
+            // TODO(wire): tables::build_tables needs a real BuildTablesHooks adapter for GetRecord fields.
+            && let Some(fields) = _getrecord_short(inst, &name, program, prof, &[])
         {
             out.push((
                 stmt.clone(),
@@ -357,19 +328,8 @@ pub fn _unknown_table_references_with(
     out
 }
 
-/// Port of `checker/instr_data.py::_getrecord_short`.
+/// Port of checker/instr_data.py::_getrecord_short
 pub fn _getrecord_short(
-    _stmt: &Instruction,
-    _table: &str,
-    _program: &Program,
-    _profile: &Profile,
-) -> Option<i64> {
-    // TODO(integrator-2): wire to `_getrecord_short_with` once `tables::build_tables` is wired.
-    None
-}
-
-/// Full implementation of `checker/instr_data.py::_getrecord_short`.
-pub fn _getrecord_short_with(
     stmt: &Instruction,
     table: &str,
     program: &ProgramRef,
@@ -411,24 +371,14 @@ pub fn _getrecord_short_with(
     if total < count { Some(count) } else { None }
 }
 
-/// Port of `checker/instr_data.py::check_unclosed_calltable`.
+/// Port of checker/instr_data.py::check_unclosed_calltable
 pub fn check_unclosed_calltable(
-    program: &Program,
-    diags: &mut Diagnostics,
-    _profile: Option<&Profile>,
-) {
-    // TODO(integrator-2): pass `Option<&'static Profile>` so `GETRECORD` short-destination checks run.
-    check_unclosed_calltable_with(program, diags, None);
-}
-
-/// Full implementation of `checker/instr_data.py::check_unclosed_calltable`.
-pub fn check_unclosed_calltable_with(
-    program: &Program,
+    program: &ProgramRef,
     diags: &mut Diagnostics,
     profile: Option<&'static Profile>,
 ) {
-    let refs = unknown_table_references_with(program, profile);
-    let first = unknown_calltables_with(program).into_iter().next();
+    let refs = unknown_table_references(program, profile);
+    let first = unknown_calltables(program).into_iter().next();
     let ending: Vec<(StmtRef, String)> = refs
         .iter()
         .filter(|(_stmt, _msg, ends)| *ends)
@@ -492,17 +442,8 @@ static _FIELDNAMES_OWNERS: LazyLock<BTreeSet<&'static str>> = LazyLock::new(|| {
 static _FIRST_WORD: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"\s*([A-Za-z_]\w*)", 0));
 
-/// Port of `checker/instr_data.py::fieldnames_owners`.
-pub fn fieldnames_owners(_program: &Program, _keyword: &str) {
-    // TODO(integrator-2): return `OrderedMap<usize, Option<StmtRef>>` via `fieldnames_owners_with`.
-    todo!("checker/instr_data.py::fieldnames_owners")
-}
-
-/// Full implementation of `checker/instr_data.py::fieldnames_owners`.
-pub fn fieldnames_owners_with(
-    program: &Program,
-    keyword: &str,
-) -> OrderedMap<usize, Option<StmtRef>> {
+/// Port of checker/instr_data.py::fieldnames_owners
+pub fn fieldnames_owners(program: &Program, keyword: &str) -> OrderedMap<usize, Option<StmtRef>> {
     let mut owners: OrderedMap<usize, Option<StmtRef>> = OrderedMap::new();
     let mut owner: Option<StmtRef> = None;
     let mut in_table = false;
@@ -549,14 +490,8 @@ static _CLASSIFY_INVALID_HEX: LazyLock<pyre::Regex> = LazyLock::new(|| {
     )
 });
 
-/// Port of `checker/instr_data.py::check_fieldclassify`.
-pub fn check_fieldclassify(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    // TODO(integrator-2): wire `env: &Env` and call `check_fieldclassify_with`.
-    todo!("checker/instr_data.py::check_fieldclassify (omitted: env: consteval.Env)")
-}
-
-/// Full implementation of `checker/instr_data.py::check_fieldclassify`.
-pub fn check_fieldclassify_with(
+/// Port of checker/instr_data.py::check_fieldclassify
+pub fn check_fieldclassify(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -565,7 +500,7 @@ pub fn check_fieldclassify_with(
     if !profile.instructions().contains("FIELDCLASSIFY") {
         return;
     }
-    let owners = fieldnames_owners_with(program, "FIELDCLASSIFY");
+    let owners = fieldnames_owners(program, "FIELDCLASSIFY");
     if owners.is_empty() {
         return;
     }
@@ -616,9 +551,9 @@ pub fn check_fieldclassify_with(
     }
 }
 
-/// Port of `checker/instr_data.py::move_fieldnames_symbol_errors`.
+/// Port of checker/instr_data.py::move_fieldnames_symbol_errors
 pub fn move_fieldnames_symbol_errors(program: &Program, diags: &mut Diagnostics) {
-    let owners = fieldnames_owners_with(program, "FIELDNAMES");
+    let owners = fieldnames_owners(program, "FIELDNAMES");
     let mut next_at: HashMap<usize, usize> = HashMap::new();
     for st in &program.statements {
         let Some(owner_opt) = owners.get(&rc_id(st)) else {
@@ -695,33 +630,16 @@ pub fn move_fieldnames_symbol_errors(program: &Program, diags: &mut Diagnostics)
     }
 }
 
-/// Port of `checker/instr_data.py::check_fieldnames`.
-pub fn check_fieldnames(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    // TODO(integrator-2): wire `env: &Env` and `&'static Profile` via `check_fieldnames_with`.
-    todo!("checker/instr_data.py::check_fieldnames (omitted: env: untyped)")
-}
-
-/// Full implementation of `checker/instr_data.py::check_fieldnames`.
-pub fn check_fieldnames_with(
+/// Port of checker/instr_data.py::check_fieldnames
+pub fn check_fieldnames(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
     env: &Env,
-) {
-    check_fieldnames_with_known(program, profile, diags, env, None);
-}
-
-/// Full implementation of `checker/instr_data.py::check_fieldnames` with optional `known_names`.
-pub fn check_fieldnames_with_known(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-    known_names: Option<&BTreeSet<String>>,
 ) {
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let tables = ctx.scope_tables(true, false);
-    let owners = fieldnames_owners_with(program, "FIELDNAMES");
+    let owners = fieldnames_owners(program, "FIELDNAMES");
     let named: BTreeSet<usize> = owners
         .values()
         .filter_map(|o| o.as_ref().map(rc_id))
@@ -741,7 +659,7 @@ pub fn check_fieldnames_with_known(
     } else {
         &["TABLESIZE", "BYTESPERRECORD"]
     };
-    let mut known: Option<&BTreeSet<String>> = known_names;
+    let mut known = None;
     let mut in_table = false;
     for st in &program.statements {
         let Stmt::Instruction(inst) = st.as_ref() else {
@@ -803,8 +721,8 @@ pub fn check_fieldnames_with_known(
                     if _variable_refs(arg, &var_set).is_empty() {
                         continue;
                     }
-                    let k = *known.get_or_insert_with(|| &ctx.known_names().names);
-                    if !_undefined_names(arg, &crate::checker::expressions::KnownView::from_set(k))
+                    let k = *known.get_or_insert_with(|| ctx.known_names());
+                    if !_undefined_names(arg, &crate::checker::expressions::KnownView::from(k))
                         .is_empty()
                     {
                         continue;
@@ -819,20 +737,14 @@ pub fn check_fieldnames_with_known(
     }
 }
 
-/// Port of `checker/instr_data.py::check_table_structure`.
-pub fn check_table_structure(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    // TODO(integrator-2): pass `&'static Profile` and return `Option<(String, i64)>` via `check_table_structure_with`.
-    todo!("checker/instr_data.py::check_table_structure")
-}
-
-/// Full implementation of `checker/instr_data.py::check_table_structure`.
-pub fn check_table_structure_with(
+/// Port of checker/instr_data.py::check_table_structure
+pub fn check_table_structure(
     program: &Program,
     profile: &'static Profile,
     diags: &mut Diagnostics,
 ) -> Option<(String, i64)> {
     const TABLE_NAME_LIMIT: i64 = 20;
-    let _env = Env::with_consts(profile, Rc::new(RefCell::new(program.consts.clone())));
+    let env = Env::with_consts(profile, Rc::new(RefCell::new(program.consts.clone())));
     let mut in_table = false;
     let mut table_name = String::new();
     let mut has_field = false;
@@ -885,9 +797,8 @@ pub fn check_table_structure_with(
             continue;
         }
         if in_table {
-            // TODO(integrator-2): call `_fieldless_with(inst, profile, &_env)` once `part3::_fieldless` is wired.
             if _FIELD_PRODUCING_INSTRUCTIONS.contains(kw.as_str())
-                && !super::part3::_fieldless(inst, profile)
+                && !super::part3::_fieldless(inst, profile, &env)
             {
                 has_field = true;
             } else if kw == "GOESTABLE" {
@@ -966,14 +877,8 @@ pub struct DupFieldEntry {
     pub dim: i64,
 }
 
-/// Port of `checker/instr_data.py::_dup_entries`.
-pub fn _dup_entries() {
-    // TODO(integrator-2): accept `table: &TdfTable` and delegate to `_dup_entries_with`.
-    todo!("checker/instr_data.py::_dup_entries (omitted: table: untyped)")
-}
-
-/// Full implementation of `checker/instr_data.py::_dup_entries`.
-pub fn _dup_entries_with(
+/// Port of checker/instr_data.py::_dup_entries
+pub fn _dup_entries(
     table: &TdfTable,
     dup_fields: Option<&[DupFieldEntry]>,
 ) -> Vec<(String, bool, Option<(i64, i64)>, bool)> {
@@ -1003,14 +908,8 @@ pub fn _dup_entries_with(
     out
 }
 
-/// Port of `checker/instr_data.py::check_duplicate_fields`.
-pub fn check_duplicate_fields(_program: &Program, _diags: &mut Diagnostics) {
-    // TODO(integrator-2): pass `result.tables` via `check_duplicate_fields_with`.
-    todo!("checker/instr_data.py::check_duplicate_fields (omitted: result: untyped)")
-}
-
-/// Full implementation of `checker/instr_data.py::check_duplicate_fields`.
-pub fn check_duplicate_fields_with(
+/// Port of checker/instr_data.py::check_duplicate_fields
+pub fn check_duplicate_fields(
     program: &Program,
     tables: &[TdfTable],
     dup_fields_by_table: Option<&[Vec<DupFieldEntry>]>,
@@ -1051,7 +950,7 @@ pub fn check_duplicate_fields_with(
             .chars()
             .count()
             + 2;
-        for (name, renamed, rng, placeholder) in _dup_entries_with(table, dup_fields) {
+        for (name, renamed, rng, placeholder) in _dup_entries(table, dup_fields) {
             if remaining < shortest {
                 break;
             }
@@ -1119,7 +1018,7 @@ mod tests {
         assert!(targets.contains("TN"));
         assert!(targets.contains("MISSING"));
 
-        let unknown = unknown_calltables_with(&prog);
+        let unknown = unknown_calltables(&prog);
         let names: Vec<&str> = unknown.iter().map(|(_, n)| n.as_str()).collect();
         assert_eq!(names, vec!["T2", "Missing"]);
     }
@@ -1138,7 +1037,7 @@ mod tests {
             profile,
         );
         let mut diags = Diagnostics::new();
-        check_unclosed_calltable_with(&prog, &mut diags, Some(profile));
+        check_unclosed_calltable(&prog, &mut diags, Some(profile));
         let msgs: Vec<(i64, &str)> = diags
             .items
             .iter()
@@ -1164,7 +1063,7 @@ mod tests {
              EndTable\n",
             profile,
         );
-        let owners = fieldnames_owners_with(&prog, "FIELDNAMES");
+        let owners = fieldnames_owners(&prog, "FIELDNAMES");
         assert_eq!(owners.len(), 1);
         let owner = owners.values().next().unwrap().as_ref().unwrap();
         assert_eq!(owner.line(), 2);
@@ -1236,7 +1135,7 @@ mod tests {
         );
         let env = Env::new(profile);
         let mut diags = Diagnostics::new();
-        check_fieldclassify_with(&prog, profile, &mut diags, &env);
+        check_fieldclassify(&prog, profile, &mut diags, &env);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,
@@ -1262,7 +1161,7 @@ mod tests {
         );
         let env = Env::with_consts(profile, Rc::new(RefCell::new(prog.consts.clone())));
         let mut diags = Diagnostics::new();
-        check_fieldnames_with(&prog, profile, &mut diags, &env);
+        check_fieldnames(&prog, profile, &mut diags, &env);
         let msgs: Vec<(i64, &str)> = diags
             .items
             .iter()
@@ -1290,7 +1189,7 @@ mod tests {
             profile,
         );
         let mut diags = Diagnostics::new();
-        let stop = check_table_structure_with(&prog, profile, &mut diags);
+        let stop = check_table_structure(&prog, profile, &mut diags);
         assert_eq!(stop, Some(("test.cr6".to_owned(), 3)));
         let msgs: Vec<(i64, &str)> = diags
             .items
@@ -1329,14 +1228,14 @@ mod tests {
             ..Default::default()
         }];
         let mut diags = Diagnostics::new();
-        check_duplicate_fields_with(&prog, &tables, None, &mut diags);
+        check_duplicate_fields(&prog, &tables, None, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,
             "Duplicate field name a in DataTable T1."
         );
 
-        let entries = _dup_entries_with(
+        let entries = _dup_entries(
             &tables[0],
             Some(&[DupFieldEntry {
                 name: String::new(),

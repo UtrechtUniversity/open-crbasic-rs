@@ -1,6 +1,7 @@
 //! Port of `checker/instr_data.py` (lines 1-1963).
 
 #![allow(dead_code, unused_variables, unused_imports)]
+#![allow(clippy::doc_markdown)]
 
 pub mod part1;
 pub use part1::*;

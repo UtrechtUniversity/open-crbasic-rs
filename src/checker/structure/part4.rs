@@ -20,7 +20,7 @@ use crate::syntax::{
 use crate::{lexer, pystr};
 
 /// Port of checker/structure.py::check_end_blocks
-pub fn check_end_blocks(program: &Program, diags: &mut Diagnostics) {
+pub fn check_end_blocks(program: &ProgramRef, diags: &mut Diagnostics) {
     let last_line = if program.last_line != 0 {
         program.last_line
     } else {

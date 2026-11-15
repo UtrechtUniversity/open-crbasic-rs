@@ -632,7 +632,7 @@ pub fn _check_with_context(
         expressions::check_consts(program, profile, diags);
     });
     _run_pass("instr_data::check_constant_destinations", "pass1", || {
-        instr_data::check_constant_destinations(program, profile, diags);
+        instr_data::check_constant_destinations(program, profile, diags, env);
     });
     _run_pass("expressions::check_const_family_args", "pass1", || {
         expressions::check_const_family_args(ctx.flat(), profile, diags);
@@ -755,7 +755,7 @@ pub fn _check_with_context(
         storage::check_pass1(program);
     });
     _run_pass("instr_data::drop_unreached_destinations", "pass1", || {
-        instr_data::drop_unreached_destinations(program, profile, diags);
+        instr_data::drop_unreached_destinations(program, profile, diags, env);
     });
     let pass1_errors = diags.has_errors();
     let _ = result;
@@ -769,7 +769,7 @@ pub fn _check_with_context(
 
     if !diags.has_errors() {
         _run_pass("instr_data::check_stage2a", "stage2a", || {
-            instr_data::check_stage2a(program, profile, diags);
+            instr_data::check_stage2a(program, profile, diags, env);
         });
         let soft: Vec<DiagRef> = diags
             .items
@@ -862,7 +862,7 @@ pub fn _check_with_context(
         } else {
             Vec::new()
         };
-        let unreached_off: BTreeSet<(String, i64)> = BTreeSet::new();
+        let mut unreached_off: BTreeSet<(String, i64)> = BTreeSet::new();
         if let Some(Some(stray_stop)) =
             _run_pass_capture("structure::check_stray_controls", "tier_b", || {
                 structure::check_stray_controls(program, profile, diags)
@@ -889,22 +889,28 @@ pub fn _check_with_context(
         if let Some(Some(menu_stop)) = _run_pass_capture(
             "instr_data::check_table_and_menu_placement",
             "tier_b",
-            || {
-                instr_data::check_table_and_menu_placement(program, profile, diags);
-                None::<(String, i64)>
-            },
+            || instr_data::check_table_and_menu_placement(program, profile, diags, Some(env), None),
         ) {
             stops.push(menu_stop);
         }
 
         if !profile.single_pass {
-            let _ = unreached_off;
+            for (stmt, _name) in instr_data::unknown_calltables(program) {
+                let key = (stmt.file().to_owned(), stmt.line());
+                stops.push(key.clone());
+                unreached_off.insert(key);
+            }
+            for (stmt, _message, ends) in
+                instr_data::unknown_table_references(program, Some(profile))
+            {
+                if ends {
+                    stops.push((stmt.file().to_owned(), stmt.line()));
+                }
+            }
             if let Some(Some(early_table_stop)) =
                 _run_pass_capture("instr_data::check_table_structure", "", || {
                     let mut tmp = Diagnostics::new();
-                    instr_data::check_table_structure(ctx.flat(), profile, &mut tmp);
-                    let r: Option<(String, i64)> = None;
-                    r
+                    instr_data::check_table_structure(ctx.flat(), profile, &mut tmp)
                 })
             {
                 stops.push(early_table_stop);
@@ -1011,7 +1017,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_data::check_output_datatype(&flat, profile, aside);
+                    instr_data::check_output_datatype(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1019,7 +1025,7 @@ pub fn _check_with_context(
                 "leading",
                 diags,
                 |aside| {
-                    instr_data::check_odd_pair_reps(&flat, profile, aside);
+                    instr_data::check_odd_pair_reps(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1285,7 +1291,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    instr_data::check_output_datatype(program, profile, aside);
+                    instr_data::check_output_datatype(program, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1349,7 +1355,7 @@ pub fn _check_with_context(
             );
         }
         _run_pass("instr_data::check_table_reps_late", "late", || {
-            instr_data::check_table_reps_late(program, profile, diags);
+            instr_data::check_table_reps_late(program, profile, diags, env);
         });
         if profile.single_pass {
             _run_pass("instr_rules::check_dnp_update", "late", || {
@@ -1376,7 +1382,17 @@ pub fn _check_with_context(
             structure::check_scan_placement_late(program, profile, diags)
         })
         .flatten();
-        let ref_lines: Vec<i64> = Vec::new();
+        let mut ref_lines: Vec<i64> = instr_data::unknown_table_references(program, Some(profile))
+            .into_iter()
+            .filter_map(|(st, _, ends)| ends.then_some(st.line()))
+            .collect();
+        if profile.single_pass {
+            ref_lines.extend(
+                instr_data::unknown_calltables(program)
+                    .into_iter()
+                    .map(|(st, _)| st.line()),
+            );
+        }
         if !ref_lines.is_empty() {
             let first_ref = *ref_lines.iter().min().unwrap_or(&0);
             diags
@@ -1470,15 +1486,14 @@ pub fn _check_with_context(
             terminals::check(program, profile, diags);
         });
         table_stop = _run_pass_capture("instr_data::check_table_structure", "tier_c", || {
-            instr_data::check_table_structure(ctx.flat(), profile, diags);
-            None::<(String, i64)>
+            instr_data::check_table_structure(ctx.flat(), profile, diags)
         })
         .flatten();
         _run_pass("instr_data::check_fieldnames", "tier_c", || {
-            instr_data::check_fieldnames(program, profile, diags);
+            instr_data::check_fieldnames(program, profile, diags, env);
         });
         _run_pass("instr_data::check_fieldclassify", "tier_c", || {
-            instr_data::check_fieldclassify(program, profile, diags);
+            instr_data::check_fieldclassify(program, profile, diags, env);
         });
         _run_aside(
             "structure::check_apply_restart_sequence",
@@ -1637,7 +1652,8 @@ pub fn _check_with_context(
             instr_measure::check_cpi_time(program, profile, diags);
         });
         _run_pass("instr_data::check_duplicate_fields", "post", || {
-            instr_data::check_duplicate_fields(program, diags);
+            // TODO(wire): tables builder must provide duplicate-field bookkeeping.
+            instr_data::check_duplicate_fields(program, &result.tables, None, diags);
         });
         if !diags.has_errors() {
             _run_pass("storage::check", "post", || {

@@ -951,7 +951,7 @@ pub fn check_scan_placement_late(
     let mut prefix = program.replaced();
     prefix.statements = program.statements[..at].to_vec();
     let prefix = Rc::new(prefix);
-    let table_stop = instr_data::check_table_structure_with(&prefix, profile, &mut early);
+    let table_stop = instr_data::check_table_structure(&prefix, profile, &mut early);
     for d in early.items {
         if d.severity != "error" {
             continue;

@@ -20,7 +20,7 @@ use crate::syntax::{
 };
 use crate::{pyre, pystr};
 
-/// Port of `checker/instr_data.py::check_units_targets`.
+/// Port of checker/instr_data.py::check_units_targets
 pub fn check_units_targets(program: &Program, _profile: &Profile, diags: &mut Diagnostics) {
     let struct_types: BTreeSet<_> = program
         .statements
@@ -151,105 +151,6 @@ const _SEQUENCE_CLOSERS: &[(&str, &str, Option<&str>)] = &[
     ("ENDVOICE", "EndVoice without Voice", None),
 ];
 
-// TODO(integrator-2): remove once `instr_rules::_real_params` is ported.
-fn _real_params_local(params: &[i64]) -> Vec<i64> {
-    let kinds = expressions::_type_code_kinds();
-    params
-        .iter()
-        .copied()
-        .filter(|&code| {
-            let key = usize::try_from(if code >= 100 { code % 100 } else { code }).ok();
-            key.and_then(|k| kinds.get(&k)).map(String::as_str) != Some("none")
-        })
-        .collect()
-}
-
-// TODO(integrator-2): remove once `expressions/part2::KnownNames` exposes `.names`.
-fn _fallback_known_names(program: &ProgramRef, profile: &'static Profile) -> BTreeSet<String> {
-    let ctx = context::of(program, Some(profile), None);
-    let mut out = ctx.declared_variable_names().clone();
-    for k in program.consts.keys() {
-        out.insert(pystr::upper(k));
-    }
-    for (k, _) in profile.symbols().iter() {
-        out.insert(k.to_owned());
-    }
-    for (k, _) in profile.instructions().iter() {
-        out.insert(k.to_owned());
-    }
-    for (k, _) in profile.functions().iter() {
-        out.insert(k.to_owned());
-    }
-    for &sys in symbols::_ALWAYS_KNOWN_SYSTEM_TABLES {
-        out.insert(sys.to_owned());
-    }
-    for st in &program.statements {
-        match st.as_ref() {
-            Stmt::Instruction(inst) => {
-                let kw = pystr::upper(&inst.keyword);
-                if matches!(
-                    kw.as_str(),
-                    "DATATABLE" | "STRUCTURETYPE" | "OBJECTTYPE" | "CONSTTABLE"
-                ) && let Some(Some(Expr::Name(n))) = inst.args.first().map(Option::as_deref)
-                {
-                    out.insert(pystr::upper(&n.name));
-                }
-            }
-            Stmt::ConstDecl(c) => {
-                out.insert(pystr::upper(&c.name));
-            }
-            Stmt::SubDef(s) => {
-                out.insert(pystr::upper(&s.name));
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
-// TODO(integrator-2): remove once `part1::_with_inline_with` is ported.
-fn _with_inline_local<'a>(stmts: &'a [StmtRef], out: &mut Vec<&'a StmtRef>) {
-    for stmt in stmts {
-        out.push(stmt);
-        if let Stmt::If(if_stmt) = stmt.as_ref() {
-            if let Some(inline) = &if_stmt.inline {
-                _with_inline_local(inline, out);
-            }
-            if let Some(inline_else) = &if_stmt.inline_else {
-                _with_inline_local(inline_else, out);
-            }
-        }
-    }
-}
-
-// TODO(integrator-2): remove once `expressions::_has_undefined_index` is ported.
-fn _has_undefined_index_local(expr: Option<&Expr>, known: &BTreeSet<String>) -> bool {
-    let Some(expr) = expr else {
-        return false;
-    };
-    match expr {
-        Expr::Index(idx) => {
-            if !idx.args.is_empty() && !known.contains(&pystr::upper(&idx.name)) {
-                return true;
-            }
-            idx.args
-                .iter()
-                .any(|a| _has_undefined_index_local(a.as_deref(), known))
-        }
-        Expr::Unary(u) => _has_undefined_index_local(u.operand.as_deref(), known),
-        Expr::Binary(b) => {
-            _has_undefined_index_local(b.left.as_deref(), known)
-                || _has_undefined_index_local(b.right.as_deref(), known)
-        }
-        Expr::Member(m) => _has_undefined_index_local(m.base.as_deref(), known),
-        Expr::ArrayLiteral(al) => al
-            .items
-            .iter()
-            .any(|item| _has_undefined_index_local(item.as_deref(), known)),
-        Expr::Name(_) | Expr::Number(_) | Expr::String(_) | Expr::Juxtaposed(_) => false,
-    }
-}
-
 fn _lookup_const_name(name: &str, env: &Env) -> Result<ConstValue, consteval::NotConstant> {
     let probe = Expr::Name(Name {
         name: name.to_owned(),
@@ -280,17 +181,8 @@ fn _mod_u32_decimal(token: &str) -> Option<u64> {
     Some(rem)
 }
 
-/// Port of `checker/instr_data.py::check_table_and_menu_placement`.
+/// Port of checker/instr_data.py::check_table_and_menu_placement
 pub fn check_table_and_menu_placement(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) -> Option<(String, i64)> {
-    todo!("checker/instr_data.py::check_table_and_menu_placement (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::check_table_and_menu_placement`.
-pub fn check_table_and_menu_placement_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -391,7 +283,7 @@ pub fn check_table_and_menu_placement_with(
             has_maxmin = true;
         } else if in_table && kw == "SAMPLEMAXMIN" && !has_maxmin {
             if let Some(rec) = profile.instructions().get(&kw) {
-                let need = _real_params_local(&rec.params).len();
+                let need = crate::checker::instr_rules::_real_params(rec.params.clone()).len();
                 if profile.single_pass
                     && (st.args.len() < need
                         || (need > 0 && st.args[need - 1].is_none())
@@ -473,8 +365,12 @@ pub fn check_table_and_menu_placement_with(
                 {
                     let menu_names = match known_names {
                         Some(kn) => kn,
-                        None => menu_names_owned
-                            .get_or_insert_with(|| _fallback_known_names(program, profile)),
+                        None => menu_names_owned.get_or_insert_with(|| {
+                            context::of(program, Some(profile), None)
+                                .known_names()
+                                .names
+                                .clone()
+                        }),
                     };
                     missing_name = !menu_names.contains(&pystr::upper(&n.name));
                 }
@@ -598,7 +494,7 @@ pub fn check_table_and_menu_placement_with(
                 });
                 let cur_last = levels.last().and_then(|l| l.last()).map(String::as_str);
                 if item_bool && matches!(cur_last, Some("MENUITEM" | "MENURECOMPILE")) {
-                    _check_boolean_picklist_with(st, env, diags);
+                    _check_boolean_picklist(st, env, diags);
                 } else if (after_item || cur_last == Some("MENURECOMPILE"))
                     && (item_kind.is_some() || item_const.is_some())
                 {
@@ -608,7 +504,7 @@ pub fn check_table_and_menu_placement_with(
                     } else {
                         item_kind
                     };
-                    _check_pick_consts_with(
+                    _check_pick_consts(
                         st,
                         eff_kind,
                         env,
@@ -672,13 +568,8 @@ static _BOOL_NAME_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"[A-Za-z_][A-Za-z0-9_]*\s*$", 0));
 static _BOOL_INT_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"[+-]?\d+$", 0));
 
-/// Port of `checker/instr_data.py::_boolean_pick_ok`.
-pub fn _boolean_pick_ok(_token: &str) -> bool {
-    todo!("checker/instr_data.py::_boolean_pick_ok (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_boolean_pick_ok`.
-pub fn _boolean_pick_ok_with(token: &str, env: &Env) -> bool {
+/// Port of checker/instr_data.py::_boolean_pick_ok
+pub fn _boolean_pick_ok(token: &str, env: &Env) -> bool {
     static HEX_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"[0-9A-Fa-f]+", 0));
     static BIN_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"[01]+", 0));
 
@@ -712,7 +603,7 @@ pub fn _boolean_pick_ok_with(token: &str, env: &Env) -> bool {
     u64::from_str_radix(body, radix).is_ok_and(|v| v == 0 || v == 0xFFFF_FFFF)
 }
 
-/// Port of `checker/instr_data.py::_pick_tokens`.
+/// Port of checker/instr_data.py::_pick_tokens
 pub fn _pick_tokens(stmt: &Instruction) -> Option<Vec<String>> {
     static MENU_PICK: LazyLock<pyre::Regex> =
         LazyLock::new(|| pyre::Regex::new(r"\s*MenuPick\b(.*)$", pyre::I | pyre::S));
@@ -735,13 +626,8 @@ pub fn _pick_tokens(stmt: &Instruction) -> Option<Vec<String>> {
     Some(rest.split(',').map(str::to_owned).collect())
 }
 
-/// Port of `checker/instr_data.py::_check_boolean_picklist`.
-pub fn _check_boolean_picklist(_stmt: &Instruction, _diags: &mut Diagnostics) {
-    todo!("checker/instr_data.py::_check_boolean_picklist (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_check_boolean_picklist`.
-pub fn _check_boolean_picklist_with(stmt: &Instruction, env: &Env, diags: &mut Diagnostics) {
+/// Port of checker/instr_data.py::_check_boolean_picklist
+pub fn _check_boolean_picklist(stmt: &Instruction, env: &Env, diags: &mut Diagnostics) {
     let Some(tokens) = _pick_tokens(stmt) else {
         return;
     };
@@ -752,7 +638,7 @@ pub fn _check_boolean_picklist_with(stmt: &Instruction, env: &Env, diags: &mut D
         &tokens[..]
     };
     for token in check_slice {
-        if !_boolean_pick_ok_with(token, env) {
+        if !_boolean_pick_ok(token, env) {
             diags.error_basic(
                 stmt.base.node.line,
                 "Boolean picklist must be True or False.",
@@ -781,15 +667,8 @@ static _PICK_RADIX_RE: LazyLock<pyre::Regex> =
 static _PICK_NAME_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"[A-Za-z_]\w*$", 0));
 
-/// Port of `checker/instr_data.py::_pick_value_bad`.
-pub fn _pick_value_bad(_token: &str, _kind: &str) -> Option<String> {
-    todo!(
-        "checker/instr_data.py::_pick_value_bad (omitted: env: untyped, program: untyped, profile: untyped, variables: untyped)"
-    )
-}
-
-/// Port of `checker/instr_data.py::_pick_value_bad`.
-pub fn _pick_value_bad_with(
+/// Port of checker/instr_data.py::_pick_value_bad
+pub fn _pick_value_bad(
     token: &str,
     kind: &str,
     env: &Env,
@@ -848,7 +727,10 @@ pub fn _pick_value_bad_with(
                 let kn = if let Some(kn) = known_names {
                     kn
                 } else {
-                    fallback_kn = _fallback_known_names(program, profile);
+                    fallback_kn = context::of(program, Some(profile), None)
+                        .known_names()
+                        .names
+                        .clone();
                     &fallback_kn
                 };
                 if variables.contains(&up) || !kn.contains(&up) || (kind == "int" && up == "NAN") {
@@ -880,16 +762,9 @@ pub fn _pick_value_bad_with(
     None
 }
 
-/// Port of `checker/instr_data.py::_check_pick_consts`.
-pub fn _check_pick_consts() {
-    todo!(
-        "checker/instr_data.py::_check_pick_consts (omitted: stmt: untyped, kind: untyped, env: untyped, program: untyped, profile: untyped, variables: untyped, diags: untyped, skip_first: untyped)"
-    )
-}
-
-/// Port of `checker/instr_data.py::_check_pick_consts`.
+/// Port of checker/instr_data.py::_check_pick_consts
 #[allow(clippy::too_many_arguments)]
-pub fn _check_pick_consts_with(
+pub fn _check_pick_consts(
     stmt: &Instruction,
     kind: Option<&str>,
     env: &Env,
@@ -921,7 +796,7 @@ pub fn _check_pick_consts_with(
     };
     for token in iter {
         if let Some(bad) =
-            _pick_value_bad_with(token, kind, env, program, profile, variables, known_names)
+            _pick_value_bad(token, kind, env, program, profile, variables, known_names)
         {
             diags.error_basic(
                 stmt.base.node.line,
@@ -955,7 +830,7 @@ pub(crate) const _TABLE_OUTPUT: &[&str] = &[
 const _OWN_VARIABLE_CHECK: &[&str] = &["ADDPRECISE", "MOVEPRECISE"];
 const _INT32_MIN: i64 = -2_147_483_648;
 
-/// Port of `checker/instr_data.py::_destination_expression`.
+/// Port of checker/instr_data.py::_destination_expression
 pub fn _destination_expression(expr: Option<&Expr>) -> bool {
     let Some(expr) = expr else {
         return false;
@@ -971,19 +846,8 @@ pub fn _destination_expression(expr: Option<&Expr>) -> bool {
     }
 }
 
-/// Port of `checker/instr_data.py::constant_destination`.
-pub fn constant_destination() -> bool {
-    todo!(
-        "checker/instr_data.py::constant_destination (omitted: expr: untyped, env: untyped, variables: untyped)"
-    )
-}
-
-/// Port of `checker/instr_data.py::constant_destination`.
-pub fn constant_destination_with(
-    expr: Option<&Expr>,
-    env: &Env,
-    variables: &BTreeSet<String>,
-) -> bool {
+/// Port of checker/instr_data.py::constant_destination
+pub fn constant_destination(expr: Option<&Expr>, env: &Env, variables: &BTreeSet<String>) -> bool {
     let Some(expr) = expr else {
         return false;
     };
@@ -1003,13 +867,8 @@ pub fn constant_destination_with(
     }
 }
 
-/// Port of `checker/instr_data.py::_destination_env`.
-pub fn _destination_env() {
-    todo!("checker/instr_data.py::_destination_env (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/instr_data.py::_destination_env`.
-pub fn _destination_env_with(env: &Env) -> Env {
+/// Port of checker/instr_data.py::_destination_env
+pub fn _destination_env(env: &Env) -> Env {
     let mut consts = OrderedMap::new();
     consts.insert("NAN".to_owned(), ConstValue::Float(f64::NAN));
     consts.insert("INF".to_owned(), ConstValue::Float(f64::INFINITY));
@@ -1023,13 +882,8 @@ pub fn _destination_env_with(env: &Env) -> Env {
     }
 }
 
-/// Port of `checker/instr_data.py::_reps_value`.
-pub fn _reps_value() -> Option<i64> {
-    todo!("checker/instr_data.py::_reps_value (omitted: expr: untyped, env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_reps_value`.
-pub fn _reps_value_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+/// Port of checker/instr_data.py::_reps_value
+pub fn _reps_value(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     if matches!(expr, Some(Expr::String(_))) {
         return Some(_INT32_MIN);
     }
@@ -1052,58 +906,37 @@ pub fn _reps_value_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     }
 }
 
-/// Port of `checker/instr_data.py::check_stage2a`.
-pub fn check_stage2a(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) -> bool {
-    todo!("checker/instr_data.py::check_stage2a (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::check_stage2a`.
-pub fn check_stage2a_with(
-    program: &Program,
-    profile: &Profile,
+/// Port of checker/instr_data.py::check_stage2a
+pub fn check_stage2a(
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    _env: &Env,
+    env: &Env,
 ) -> bool {
     if profile.name != "cr6" && profile.name != "cr1000x" {
         return false;
     }
-    // TODO(integrator-2): call `super::part3::_check_stage2a_with` once `part3` is ported.
-    super::part3::_check_stage2a(program, profile, diags, true)
+
+    super::part3::_check_stage2a(program, profile, diags, env, true)
 }
 
-/// Port of `checker/instr_data.py::check_table_reps_late`.
-pub fn check_table_reps_late(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_data.py::check_table_reps_late (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::check_table_reps_late`.
-pub fn check_table_reps_late_with(
-    program: &Program,
-    profile: &Profile,
+/// Port of checker/instr_data.py::check_table_reps_late
+pub fn check_table_reps_late(
+    program: &ProgramRef,
+    profile: &'static Profile,
     diags: &mut Diagnostics,
-    _env: &Env,
+    env: &Env,
 ) {
     if profile.name == "cr300" || profile.name == "cr350" {
-        // TODO(integrator-2): call `super::part3::_check_stage2a_with` once `part3` is ported.
-        super::part3::_check_stage2a(program, profile, diags, false);
+        super::part3::_check_stage2a(program, profile, diags, env, false);
     }
 }
 
-/// Port of `checker/instr_data.py::_report_undefined_source`.
+/// Port of checker/instr_data.py::_report_undefined_source
 pub fn _report_undefined_source(
-    _st: &Instruction,
-    _known: &BTreeSet<String>,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) -> bool {
-    todo!("checker/instr_data.py::_report_undefined_source (omitted: record: dict)")
-}
-
-/// Port of `checker/instr_data.py::_report_undefined_source`.
-pub fn _report_undefined_source_with(
     st: &Instruction,
     record: &crate::profiles::Instruction,
-    known: &BTreeSet<String>,
+    known: &expressions::KnownNames,
     profile: &Profile,
     diags: &mut Diagnostics,
 ) -> bool {
@@ -1119,7 +952,7 @@ pub fn _report_undefined_source_with(
         }
         let names = expressions::_undefined_names(
             Some(arg),
-            &crate::checker::expressions::KnownView::from_set(known),
+            &crate::checker::expressions::KnownView::from(known),
         )
         .into_iter()
         .map(crate::checker::expressions::UndefinedName::into_string)
@@ -1138,15 +971,13 @@ pub fn _report_undefined_source_with(
                 "",
             );
         }
-        // TODO(integrator-2): switch to `expressions::_has_undefined_index` and
-        // `expressions::dimensions_message` once `expressions/part2` is wired.
-        if _has_undefined_index_local(Some(arg), known) {
+        if expressions::_has_undefined_index(st.args[i].as_ref(), known, None, None, &[]) {
             let idx = i64::try_from(i).unwrap_or(0);
             let raw = expressions::_arg_text(st, idx);
             let txt = pystr::strip(&raw);
             diags.error_basic(
                 st.base.node.line,
-                &format!("Dimensions not declared: {txt}."),
+                &expressions::dimensions_message(txt, profile, false, false),
                 &st.base.node.file,
             );
         }
@@ -1155,7 +986,7 @@ pub fn _report_undefined_source_with(
     false
 }
 
-/// Port of `checker/instr_data.py::_is_struct_typed`.
+/// Port of checker/instr_data.py::_is_struct_typed
 pub fn _is_struct_typed(program: &Program, name: &str) -> bool {
     let types: BTreeSet<String> = program
         .statements
@@ -1184,13 +1015,8 @@ pub fn _is_struct_typed(program: &Program, name: &str) -> bool {
     })
 }
 
-/// Port of `checker/instr_data.py::_short_array`.
-pub fn _short_array(_reps: i64) -> bool {
-    todo!("checker/instr_data.py::_short_array (omitted: arg: untyped, dims: dict, env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_short_array`.
-pub fn _short_array_with(
+/// Port of checker/instr_data.py::_short_array
+pub fn _short_array(
     arg: Option<&Expr>,
     reps: i64,
     dims: &OrderedMap<String, Vec<i64>>,
@@ -1211,7 +1037,7 @@ pub fn _short_array_with(
         if args.len() != 1 || shape.len() != 1 {
             return false;
         }
-        let Some(sub) = _reps_value_with(args[0].as_deref(), env) else {
+        let Some(sub) = _reps_value(args[0].as_deref(), env) else {
             return false;
         };
         offset = sub - 1;
@@ -1220,13 +1046,8 @@ pub fn _short_array_with(
     offset + reps > total
 }
 
-/// Port of `checker/instr_data.py::_alias_sources`.
-pub fn _alias_sources(_program: &Program) {
-    todo!("checker/instr_data.py::_alias_sources (omitted: tables: untyped, env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_alias_sources`.
-pub fn _alias_sources_with(
+/// Port of checker/instr_data.py::_alias_sources
+pub fn _alias_sources(
     program: &Program,
     tables: &dyn Fn(&StmtRef) -> ScopeTables,
     env: &Env,
@@ -1271,7 +1092,7 @@ pub fn _alias_sources_with(
             if args.len() != 1 || shape.len() != 1 {
                 continue;
             }
-            let Some(k) = _reps_value_with(args[0].as_deref(), env) else {
+            let Some(k) = _reps_value(args[0].as_deref(), env) else {
                 continue;
             };
             offset = k - 1;
@@ -1316,18 +1137,8 @@ pub fn _alias_sources_with(
 pub const WIND_SUBINTERVAL: &str =
     "WindVector: non-zero SubInterval only valid for output modes 0, 2, and 4.";
 
-/// Port of `checker/instr_data.py::_wind_options`.
+/// Port of checker/instr_data.py::_wind_options
 pub fn _wind_options(
-    _st: &Instruction,
-    _reps: Option<i64>,
-    _diags: &mut Diagnostics,
-    _short_speed: bool,
-) -> bool {
-    todo!("checker/instr_data.py::_wind_options (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::_wind_options`.
-pub fn _wind_options_with(
     st: &Instruction,
     reps: Option<i64>,
     env: &Env,
@@ -1394,17 +1205,8 @@ pub fn _wind_options_with(
     false
 }
 
-/// Port of `checker/instr_data.py::check_constant_destinations`.
+/// Port of checker/instr_data.py::check_constant_destinations
 pub fn check_constant_destinations(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_data.py::check_constant_destinations (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::check_constant_destinations`.
-pub fn check_constant_destinations_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1413,7 +1215,7 @@ pub fn check_constant_destinations_with(
     if profile.name != "cr6" && profile.name != "cr1000x" {
         return;
     }
-    let env = _destination_env_with(env);
+    let env = _destination_env(env);
     let mut variables = context::of(program, Some(profile), None)
         .declared_variable_names()
         .clone();
@@ -1432,8 +1234,7 @@ pub fn check_constant_destinations_with(
             _ => {}
         }
     }
-    let mut flat = Vec::new();
-    _with_inline_local(&program.statements, &mut flat);
+    let flat = super::part1::_with_inline(&program.statements);
     for st_ref in flat {
         let Stmt::Instruction(st) = st_ref.as_ref() else {
             continue;
@@ -1448,7 +1249,7 @@ pub fn check_constant_destinations_with(
         let limit = record.params.len().min(st.args.len());
         for (i, &code) in record.params[..limit].iter().enumerate() {
             if matches!(code, 8 | 27 | 29)
-                && constant_destination_with(st.args[i].as_deref(), &env, &variables)
+                && constant_destination(st.args[i].as_deref(), &env, &variables)
             {
                 let idx = i64::try_from(i).unwrap_or(0);
                 let raw = expressions::_arg_text(st, idx);
@@ -1463,17 +1264,8 @@ pub fn check_constant_destinations_with(
     }
 }
 
-/// Port of `checker/instr_data.py::drop_unreached_destinations`.
+/// Port of checker/instr_data.py::drop_unreached_destinations
 pub fn drop_unreached_destinations(
-    _program: &Program,
-    _profile: &Profile,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/instr_data.py::drop_unreached_destinations (omitted: env: untyped)")
-}
-
-/// Port of `checker/instr_data.py::drop_unreached_destinations`.
-pub fn drop_unreached_destinations_with(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1482,13 +1274,12 @@ pub fn drop_unreached_destinations_with(
     if profile.name != "cr6" && profile.name != "cr1000x" {
         return;
     }
-    let env = _destination_env_with(env);
+    let env = _destination_env(env);
     let variables = context::of(program, Some(profile), None)
         .declared_variable_names()
         .clone();
     let mut drop: Vec<DiagRef> = Vec::new();
-    let mut flat = Vec::new();
-    _with_inline_local(&program.statements, &mut flat);
+    let flat = super::part1::_with_inline(&program.statements);
     for st_ref in flat {
         let Stmt::Instruction(st) = st_ref.as_ref() else {
             continue;
@@ -1526,7 +1317,7 @@ pub fn drop_unreached_destinations_with(
         for (i, &code) in record.params[..limit].iter().enumerate() {
             if i > first_bad
                 && matches!(code, 8 | 27 | 29)
-                && constant_destination_with(st.args[i].as_deref(), &env, &variables)
+                && constant_destination(st.args[i].as_deref(), &env, &variables)
                 && let Some(txt) = &texts[i]
             {
                 let needle = format!("Invalid Variable or Array: {txt}.");
@@ -1612,15 +1403,15 @@ mod tests {
         env.define("MY_TRUE", ConstValue::Int(-1), None);
         env.define("MY_TWO", ConstValue::Int(2), None);
 
-        assert!(_boolean_pick_ok_with(" True", &env));
-        assert!(_boolean_pick_ok_with("0", &env));
-        assert!(_boolean_pick_ok_with("-1", &env));
-        assert!(_boolean_pick_ok_with("&HFFFFFFFF", &env));
-        assert!(_boolean_pick_ok_with("&B0", &env));
-        assert!(_boolean_pick_ok_with("MY_TRUE", &env));
-        assert!(!_boolean_pick_ok_with("MY_TWO", &env));
-        assert!(!_boolean_pick_ok_with("1", &env));
-        assert!(!_boolean_pick_ok_with("0 ", &env));
+        assert!(_boolean_pick_ok(" True", &env));
+        assert!(_boolean_pick_ok("0", &env));
+        assert!(_boolean_pick_ok("-1", &env));
+        assert!(_boolean_pick_ok("&HFFFFFFFF", &env));
+        assert!(_boolean_pick_ok("&B0", &env));
+        assert!(_boolean_pick_ok("MY_TRUE", &env));
+        assert!(!_boolean_pick_ok("MY_TWO", &env));
+        assert!(!_boolean_pick_ok("1", &env));
+        assert!(!_boolean_pick_ok("0 ", &env));
 
         let mut base = StmtBase {
             text: "MenuPick(True, 2,)".to_owned(),
@@ -1634,7 +1425,7 @@ mod tests {
             ..Instruction::default()
         };
         let mut diags = Diagnostics::new();
-        _check_boolean_picklist_with(&stmt, &env, &mut diags);
+        _check_boolean_picklist(&stmt, &env, &mut diags);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,
@@ -1661,27 +1452,27 @@ mod tests {
         known.insert("NAN".to_owned());
 
         assert_eq!(
-            _pick_value_bad_with(" 1.5", "int", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" 1.5", "int", &env, &program, cr6, &vars, Some(&known)),
             Some("1.5".to_owned())
         );
         assert_eq!(
-            _pick_value_bad_with(" 1.5", "float", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" 1.5", "float", &env, &program, cr6, &vars, Some(&known)),
             None
         );
         assert_eq!(
-            _pick_value_bad_with(" C_FLT", "int", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" C_FLT", "int", &env, &program, cr6, &vars, Some(&known)),
             Some("C_FLT".to_owned())
         );
         assert_eq!(
-            _pick_value_bad_with(" C_INT", "int", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" C_INT", "int", &env, &program, cr6, &vars, Some(&known)),
             None
         );
         assert_eq!(
-            _pick_value_bad_with(" V", "float", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" V", "float", &env, &program, cr6, &vars, Some(&known)),
             Some("V".to_owned())
         );
         assert_eq!(
-            _pick_value_bad_with(" -A", "float", &env, &program, cr6, &vars, Some(&known)),
+            _pick_value_bad(" -A", "float", &env, &program, cr6, &vars, Some(&known)),
             Some("-A".to_owned())
         );
     }
@@ -1701,28 +1492,25 @@ mod tests {
             ..Binary::default()
         });
         assert!(_destination_expression(Some(&sum_expr)));
-        assert!(constant_destination_with(Some(&sum_expr), &env, &vars));
+        assert!(constant_destination(Some(&sum_expr), &env, &vars));
 
         let var_expr = Expr::Name(Name {
             name: "X".to_owned(),
             ..Name::default()
         });
-        assert!(!constant_destination_with(Some(&var_expr), &env, &vars));
+        assert!(!constant_destination(Some(&var_expr), &env, &vars));
 
-        let dest_env = _destination_env_with(&env);
+        let dest_env = _destination_env(&env);
         let nan_expr = Expr::Name(Name {
             name: "NaN".to_owned(),
             ..Name::default()
         });
-        assert!(constant_destination_with(Some(&nan_expr), &dest_env, &vars));
+        assert!(constant_destination(Some(&nan_expr), &dest_env, &vars));
 
+        assert_eq!(_reps_value(Some(&str_expr("fuzz")), &env), Some(_INT32_MIN));
+        assert_eq!(_reps_value(Some(&int_expr(4)), &env), Some(4));
         assert_eq!(
-            _reps_value_with(Some(&str_expr("fuzz")), &env),
-            Some(_INT32_MIN)
-        );
-        assert_eq!(_reps_value_with(Some(&int_expr(4)), &env), Some(4));
-        assert_eq!(
-            _reps_value_with(Some(&int_expr(999_999_999_999)), &env),
+            _reps_value(Some(&int_expr(999_999_999_999)), &env),
             Some(_INT32_MIN)
         );
     }
@@ -1765,8 +1553,8 @@ mod tests {
             args: vec![Some(int_expr(4))],
             ..Index::default()
         });
-        assert!(_short_array_with(Some(&idx_expr), 3, &dims, &env));
-        assert!(!_short_array_with(Some(&idx_expr), 2, &dims, &env));
+        assert!(_short_array(Some(&idx_expr), 3, &dims, &env));
+        assert!(!_short_array(Some(&idx_expr), 2, &dims, &env));
 
         let mut wind_base = StmtBase::default();
         wind_base.node.line = 12;
@@ -1787,13 +1575,7 @@ mod tests {
             ..Instruction::default()
         };
         let mut diags = Diagnostics::new();
-        assert!(_wind_options_with(
-            &wind_st,
-            Some(1),
-            &env,
-            &mut diags,
-            true
-        ));
+        assert!(_wind_options(&wind_st, Some(1), &env, &mut diags, true));
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,
@@ -1826,7 +1608,7 @@ mod tests {
             ],
         ));
         let mut diags = Diagnostics::new();
-        let stopped = check_table_and_menu_placement_with(&program, cr6, &mut diags, None, None);
+        let stopped = check_table_and_menu_placement(&program, cr6, &mut diags, None, None);
         assert_eq!(stopped, Some(("main.CR6".to_owned(), 7)));
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
@@ -1881,7 +1663,7 @@ mod tests {
         let mut scope = ScopeTables::default();
         scope.dims.insert("ARR".to_owned(), vec![3]);
         scope.types.insert("ARR".to_owned(), "FLOAT".to_owned());
-        let aliases = _alias_sources_with(&program, &|_| scope.clone(), &env);
+        let aliases = _alias_sources(&program, &|_| scope.clone(), &env);
         assert_eq!(
             aliases.get("B"),
             Some(&("B".to_owned(), "B".to_owned(), "Arr".to_owned(), 1, 3))
@@ -1892,7 +1674,7 @@ mod tests {
         );
 
         let mut diags = Diagnostics::new();
-        check_constant_destinations_with(&program, cr6, &mut diags, &env);
+        check_constant_destinations(&program, cr6, &mut diags, &env);
         assert_eq!(diags.items.len(), 1);
         assert!(
             diags.items[0]
