@@ -163,26 +163,6 @@ fn us_per_unit(unit: i64) -> i128 {
     }
 }
 
-// TODO(P4): use `expressions::_stmt_exprs` once its return type is fixed.
-fn stmt_exprs_compat(stmt: &Stmt) -> Vec<Option<ExprRef>> {
-    match stmt {
-        Stmt::Assignment(a) => vec![a.target.clone(), a.value.clone()],
-        Stmt::If(i) => vec![i.cond.clone()],
-        Stmt::ElseIf(e) => vec![e.cond.clone()],
-        Stmt::DoLoop(d) => vec![d.cond.clone()],
-        Stmt::For(f) => vec![
-            f.var.clone(),
-            f.start.clone(),
-            f.end.clone(),
-            f.step.clone(),
-        ],
-        Stmt::Call(c) if c.tail_expr.is_some() => vec![c.tail_expr.clone()],
-        Stmt::Instruction(i) => i.args.clone(),
-        Stmt::Call(c) => c.args.clone(),
-        _ => Vec::new(),
-    }
-}
-
 /// Port of `checker/intervals.py::gate_text`.
 pub fn gate_text() -> Option<String> {
     todo!("checker/intervals.py::gate_text (omitted: stmt: untyped)")
@@ -279,12 +259,13 @@ pub fn check_with(
         {
             in_table = true;
             let _ = *known_cache.get_or_insert_with(|| ctx.known_names());
-            blocked_table = i
-                .args
-                .iter()
-                .skip(1)
-                .flatten()
-                .any(|a| !expressions::_undefined_names(Some(a), &empty_known).is_empty());
+            blocked_table = i.args.iter().skip(1).flatten().any(|a| {
+                !expressions::_undefined_names(
+                    Some(a),
+                    &crate::checker::expressions::KnownView::from_set(&empty_known),
+                )
+                .is_empty()
+            });
         } else if kw == "ENDTABLE" {
             in_table = false;
             blocked_table = false;
@@ -414,7 +395,7 @@ pub fn _timer_context_with(
         return (Rc::clone(stmt), false);
     }
     let mut before = false;
-    for expr in stmt_exprs_compat(stmt) {
+    for expr in expressions::_stmt_exprs(stmt) {
         if !(single_pass && matches!(&**stmt, Stmt::Call(_))) {
             before = false;
         }
@@ -601,8 +582,13 @@ pub fn _undefined_sibling_with(
     let empty_known = BTreeSet::new();
     args.iter().enumerate().any(|(j, a)| {
         j != i
-            && a.as_deref()
-                .is_some_and(|e| !expressions::_undefined_names(Some(e), &empty_known).is_empty())
+            && a.as_deref().is_some_and(|e| {
+                !expressions::_undefined_names(
+                    Some(e),
+                    &crate::checker::expressions::KnownView::from_set(&empty_known),
+                )
+                .is_empty()
+            })
     })
 }
 
@@ -740,7 +726,11 @@ pub fn fold_timeout_expressions_with(
                     }
                     before = args[..i].iter().any(|a| {
                         a.as_deref().is_some_and(|e| {
-                            !expressions::_undefined_names(Some(e), &empty_known).is_empty()
+                            !expressions::_undefined_names(
+                                Some(e),
+                                &crate::checker::expressions::KnownView::from_set(&empty_known),
+                            )
+                            .is_empty()
                         })
                     });
                 }
@@ -754,6 +744,7 @@ pub fn fold_timeout_expressions_with(
                         let msg = expressions::_arity_message(
                             "constint",
                             stmt.text(),
+                            profile,
                             stmt.at_eol(),
                             true,
                         );

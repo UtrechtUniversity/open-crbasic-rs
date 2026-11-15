@@ -623,7 +623,7 @@ pub fn check_pass1(
                     .filter(|n| !decl_variables.contains(*n))
                     .cloned()
                     .collect();
-                let here = known.as_ref().unwrap().without_names(&remove);
+                let here = known.as_ref().unwrap().without(&remove);
                 let indexed_constants: BTreeSet<String> = predefined_constants
                     .iter()
                     .cloned()
@@ -1010,7 +1010,7 @@ pub fn check_pass1(
                     .difference(&decl_variables)
                     .cloned()
                     .collect();
-                let here = known.as_ref().unwrap().without_names(&remove);
+                let here = known.as_ref().unwrap().without(&remove);
                 let variables = decl_variables
                     .union(&alias_parameter_names)
                     .cloned()
@@ -1185,7 +1185,7 @@ pub fn check_pass1(
             };
             deferred = parts
                 .iter()
-                .any(|e| !expressions::_undefined_names_with(Some(e), &view).is_empty())
+                .any(|e| !expressions::_undefined_names(Some(e), &view).is_empty())
                 || matches!(stmt.as_ref(), Stmt::Call(c) if !c.explicit && !all_known.names.contains(&pystr::upper(&c.name)));
         }
         if let Stmt::If(i) = stmt.as_ref()

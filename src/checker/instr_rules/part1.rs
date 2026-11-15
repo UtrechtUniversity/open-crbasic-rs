@@ -487,7 +487,7 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
                         .ok()
                         .and_then(|b| kinds.get(&b))
                         .is_some_and(|k| _TOO_MANY_SAFE_KINDS.contains(&k.as_str()))
-                    && !expressions::_undefined_names_with(
+                    && !expressions::_undefined_names(
                         a.as_deref(),
                         &expressions::KnownView {
                             names: &known.names,
@@ -591,7 +591,7 @@ pub fn _report_constant_destinations(
         let known = ctx.known_names();
         let variables = ctx.declared_variable_names();
         if let Some(Some(arg)) = stmt.args.first()
-            && expressions::_undefined_names_with(
+            && expressions::_undefined_names(
                 Some(arg),
                 &expressions::KnownView {
                     names: &known.names,

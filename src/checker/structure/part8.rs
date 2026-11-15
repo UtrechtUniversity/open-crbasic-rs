@@ -13,9 +13,9 @@
 use super::part7::{_illegal_dim_message, _split_top};
 use super::part9::_alias_name_lead;
 use crate::checker::expressions::part1::{
-    _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names_with, _variable_refs, KnownView,
+    _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names, _variable_refs, KnownView,
 };
-use crate::checker::expressions::part4::_find_arity_problem_with;
+use crate::checker::expressions::part4::_find_arity_problem;
 use crate::checker::symbols::is_reserved_predefined_name_with_profile;
 use crate::consteval::{self, Env};
 use crate::diagnostics::ShowFile;
@@ -96,10 +96,10 @@ pub fn _report_decl_expr(
     indexed_constants: &BTreeSet<String>,
 ) -> bool {
     let indexed = !indexed_constants.is_empty()
-        && _find_arity_problem_with(expr, profile, None, indexed_constants).as_deref()
+        && _find_arity_problem(expr, profile, None, indexed_constants).as_deref()
             == Some("indexed_const");
     if indexed
-        && _find_arity_problem_with(expr, profile, Some(known.names), indexed_constants).as_deref()
+        && _find_arity_problem(expr, profile, Some(known.names), indexed_constants).as_deref()
             == Some("indexed_const")
     {
         diags.error_basic(
@@ -109,7 +109,7 @@ pub fn _report_decl_expr(
         );
         return true;
     }
-    let names = _undefined_names_with(expr, known);
+    let names = _undefined_names(expr, known);
     if !names.is_empty() {
         if _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name) {
             diags.error_basic(
@@ -178,7 +178,7 @@ pub fn _report_juxtaposed_dim(
 ) -> bool {
     let expr = Expr::Juxtaposed(expr.clone());
     if _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name) {
-        if _undefined_names_with(Some(&expr), known).is_empty() {
+        if _undefined_names(Some(&expr), known).is_empty() {
             diags.error_basic(
                 stmt.line(),
                 &format!("Incomplete expression: {echo}."),
@@ -199,7 +199,7 @@ pub fn _report_juxtaposed_dim(
         );
         return true;
     }
-    for name in _undefined_names_with(Some(&expr), known) {
+    for name in _undefined_names(Some(&expr), known) {
         diags.error_basic(
             stmt.line(),
             &match &name {
@@ -218,7 +218,7 @@ pub fn _report_juxtaposed_dim(
         &format!("Incomplete expression: {echo}."),
         stmt.file(),
     );
-    if !_undefined_names_with(Some(&expr), known).is_empty()
+    if !_undefined_names(Some(&expr), known).is_empty()
         || !_variable_refs(Some(&expr), variables).is_empty()
     {
         diags.error_basic(
@@ -763,7 +763,7 @@ pub fn _check_alias_index_names(
     let statement = Stmt::Instruction(stmt.clone());
     for (a, text) in target.args.iter().zip(items) {
         if !indexed_constants.is_empty()
-            && _find_arity_problem_with(a.as_deref(), profile, Some(known.names), indexed_constants)
+            && _find_arity_problem(a.as_deref(), profile, Some(known.names), indexed_constants)
                 .as_deref()
                 == Some("indexed_const")
         {
@@ -783,7 +783,7 @@ pub fn _check_alias_index_names(
             return true;
         }
         if a.is_some()
-            && (!_undefined_names_with(a.as_deref(), known).is_empty()
+            && (!_undefined_names(a.as_deref(), known).is_empty()
                 || (check_variables && !_variable_refs(a.as_deref(), variables).is_empty()))
         {
             bad |= _report_decl_expr(

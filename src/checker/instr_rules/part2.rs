@@ -940,9 +940,9 @@ pub fn _string_typed(
 /// Port of checker/instr_rules.py::check_iif_types
 pub fn check_iif_types(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     use crate::checker::expressions::{
-        part1::{_undefined_names_with, KnownView},
-        part2::_stmt_exprs_with,
-        part5::_index_nodes_with,
+        part1::{_undefined_names, KnownView},
+        part2::_stmt_exprs,
+        part5::_index_nodes,
     };
     if !profile.functions().contains("IIF") {
         return;
@@ -970,8 +970,8 @@ pub fn check_iif_types(program: &ProgramRef, profile: &'static Profile, diags: &
             continue;
         }
         let mut done = false;
-        for e in _stmt_exprs_with(stmt) {
-            for ix in _index_nodes_with(e.as_deref()) {
+        for e in _stmt_exprs(stmt) {
+            for ix in _index_nodes(e.as_deref()) {
                 let expr = Expr::Index(ix.clone());
                 if pystr::upper(&ix.name) != "IIF"
                     || ![2, 3].contains(&ix.args.len())
@@ -988,8 +988,8 @@ pub fn check_iif_types(program: &ProgramRef, profile: &'static Profile, diags: &
                 if let Stmt::Assignment(a) = stmt.as_ref()
                     && ix.args.len() == 3
                     && ix.args.iter().any(Option::is_none)
-                    && _undefined_names_with(a.target.as_deref(), &view).is_empty()
-                    && _undefined_names_with(a.value.as_deref(), &view).is_empty()
+                    && _undefined_names(a.target.as_deref(), &view).is_empty()
+                    && _undefined_names(a.value.as_deref(), &view).is_empty()
                 {
                     if ix.args[0].is_some() && arms[0] == Some(true) && ix.args[2].is_none() {
                         diags.error_basic(base.node.line, "type mismatch", &base.node.file);

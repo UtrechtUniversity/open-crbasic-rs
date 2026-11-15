@@ -51,7 +51,7 @@ pub(crate) const _EXTRA_PREDEFINED_SYMBOLS: &[&str] = &["NAN", "INF"];
 
 pub(crate) const _CONST_ONLY_VARIABLE_REJECT_KINDS: &[&str] = &["const_expr", "const_expr_only"];
 
-/// Port of `checker/expressions.py::_has_dotted_field`.
+/// Port of checker/expressions.py::_has_dotted_field
 #[must_use]
 pub fn _has_dotted_field(expr: Option<&Expr>) -> bool {
     let Some(expr) = expr else {
@@ -70,7 +70,7 @@ pub fn _has_dotted_field(expr: Option<&Expr>) -> bool {
     }
 }
 
-/// Port of `checker/expressions.py::_variable_refs`.
+/// Port of checker/expressions.py::_variable_refs
 #[must_use]
 pub fn _variable_refs(expr: Option<&Expr>, variable_names: &BTreeSet<String>) -> Vec<String> {
     let Some(expr) = expr else {
@@ -397,14 +397,8 @@ thread_local! {
     pub(crate) static _TIMER_CONTEXT: RefCell<Option<TimerContext>> = const { RefCell::new(None) };
 }
 
-/// Port of `checker/expressions.py::set_arity_context`.
-pub fn set_arity_context(program: &Program, declared: Option<BTreeSet<String>>) {
-    let prog_ref = Rc::new(program.clone());
-    set_arity_context_with(&prog_ref, None, declared);
-}
-
-/// Port of `checker/expressions.py::set_arity_context` (with `ProgramRef` and `Profile`).
-pub fn set_arity_context_with(
+/// Port of checker/expressions.py::set_arity_context
+pub fn set_arity_context(
     program: &ProgramRef,
     profile: Option<&'static Profile>,
     declared: Option<BTreeSet<String>>,
@@ -441,16 +435,9 @@ pub enum TimerArg {
     Float,
 }
 
-/// Port of `checker/expressions.py::_timer_arg`.
-pub fn _timer_arg(_declared: &BTreeSet<String>) {}
-
-/// Port of `checker/expressions.py::_timer_arg`.
+/// Port of checker/expressions.py::_timer_arg
 #[must_use]
-pub fn _timer_arg_with(
-    arg: Option<&Expr>,
-    env: &Env,
-    declared: &BTreeSet<String>,
-) -> Option<TimerArg> {
+pub fn _timer_arg(arg: Option<&Expr>, env: &Env, declared: &BTreeSet<String>) -> Option<TimerArg> {
     let arg = arg?;
     let wide = |value: i64| -> TimerArg {
         if (env.profile.name == "cr300" || env.profile.name == "cr350")
@@ -544,7 +531,7 @@ pub fn _timer_arg_with(
             }
         }
         Expr::Unary(u) => {
-            let inner = _timer_arg_with(u.operand.as_deref(), env, declared)?;
+            let inner = _timer_arg(u.operand.as_deref(), env, declared)?;
             let TimerArg::Int(iv) = inner else {
                 return Some(TimerArg::Float);
             };
@@ -556,8 +543,8 @@ pub fn _timer_arg_with(
             Some(TimerArg::Int(intervals::_signed32(value)))
         }
         Expr::Binary(b) => {
-            let left = _timer_arg_with(b.left.as_deref(), env, declared)?;
-            let right = _timer_arg_with(b.right.as_deref(), env, declared)?;
+            let left = _timer_arg(b.left.as_deref(), env, declared)?;
+            let right = _timer_arg(b.right.as_deref(), env, declared)?;
             if left == TimerArg::Float || right == TimerArg::Float || b.op == "/" || b.op == "^" {
                 return Some(TimerArg::Float);
             }
@@ -589,27 +576,18 @@ pub fn _timer_arg_with(
     }
 }
 
-/// Port of `checker/expressions.py::_timeout_wide`.
+/// Port of checker/expressions.py::_timeout_wide
 #[must_use]
-pub fn _timeout_wide() -> bool {
-    false
-}
-
-/// Port of `checker/expressions.py::_timeout_wide`.
-#[must_use]
-pub fn _timeout_wide_with(arg: Option<&Expr>, profile: &Profile) -> bool {
+pub fn _timeout_wide(arg: Option<&Expr>, profile: &Profile) -> bool {
     _TIMEOUT_WIDE.with(|wide| {
         intervals::timeout_value_with(arg, None, profile, &wide.borrow())
             == Some(intervals::TimeoutValue::Wide)
     })
 }
 
-/// Port of `checker/expressions.py::_network_integer_problem`.
-pub fn _network_integer_problem() {}
-
-/// Port of `checker/expressions.py::_network_integer_problem`.
+/// Port of checker/expressions.py::_network_integer_problem
 #[must_use]
-pub fn _network_integer_problem_with(
+pub fn _network_integer_problem(
     name: &str,
     arg: Option<&Expr>,
     profile: &Profile,
@@ -655,7 +633,7 @@ pub fn _network_integer_problem_with(
     let val = match tv {
         Some(intervals::TimeoutValue::Wide) => Some(NumOrWide::WideOrFloat),
         Some(intervals::TimeoutValue::Int(i)) => Some(NumOrWide::Int(i)),
-        None => match _timer_arg_with(Some(arg), &ctx.env, &ctx.declared) {
+        None => match _timer_arg(Some(arg), &ctx.env, &ctx.declared) {
             Some(TimerArg::Float) => Some(NumOrWide::WideOrFloat),
             Some(TimerArg::Int(i)) => Some(NumOrWide::Int(i)),
             None => None,
@@ -676,15 +654,9 @@ pub fn _network_integer_problem_with(
     None
 }
 
-/// Port of `checker/expressions.py::_not_integer_type`.
+/// Port of checker/expressions.py::_not_integer_type
 #[must_use]
-pub fn _not_integer_type() -> bool {
-    false
-}
-
-/// Port of `checker/expressions.py::_not_integer_type`.
-#[must_use]
-pub fn _not_integer_type_with(arg: Option<&Expr>) -> bool {
+pub fn _not_integer_type(arg: Option<&Expr>) -> bool {
     match arg {
         Some(Expr::Number(n)) => matches!(n.value, NumberValue::Float(_)),
         Some(Expr::String(_)) => true,
@@ -693,15 +665,9 @@ pub fn _not_integer_type_with(arg: Option<&Expr>) -> bool {
     }
 }
 
-/// Port of `checker/expressions.py::_not_constant_integer`.
+/// Port of checker/expressions.py::_not_constant_integer
 #[must_use]
-pub fn _not_constant_integer() -> bool {
-    false
-}
-
-/// Port of `checker/expressions.py::_not_constant_integer`.
-#[must_use]
-pub fn _not_constant_integer_with(arg: Option<&Expr>) -> bool {
+pub fn _not_constant_integer(arg: Option<&Expr>) -> bool {
     match arg {
         Some(Expr::String(_)) => true,
         Some(Expr::Name(n)) => pystr::upper(&n.name) == "NAN",
@@ -834,22 +800,15 @@ static TYPE_CODE_KINDS: LazyLock<OrderedMap<usize, String>> = LazyLock::new(|| {
     deserialize_type_codes(&mut de).expect("valid data/type_codes.json")
 });
 
-/// Port of `checker/expressions.py::_type_code_kinds`.
+/// Port of checker/expressions.py::_type_code_kinds
 #[must_use]
 pub fn _type_code_kinds() -> OrderedMap<usize, String> {
     TYPE_CODE_KINDS.clone()
 }
 
-/// Port of `checker/expressions.py::_position_kinds`.
+/// Port of checker/expressions.py::_position_kinds
 #[must_use]
-#[allow(clippy::needless_pass_by_value)]
-pub fn _position_kinds(params: Vec<i64>, keyword: &str) -> OrderedMap<usize, String> {
-    _position_kinds_with(&params, keyword, None)
-}
-
-/// Port of `checker/expressions.py::_position_kinds`.
-#[must_use]
-pub fn _position_kinds_with(
+pub fn _position_kinds(
     params: &[i64],
     keyword: &str,
     profile: Option<&Profile>,
@@ -909,7 +868,7 @@ impl UndefinedName {
     }
 }
 
-/// View of `KnownNames` (or a plain `BTreeSet<String>`) for `_undefined_names_with`.
+/// View of `KnownNames` (or a plain `BTreeSet<String>`) for `_undefined_names`.
 pub struct KnownView<'a> {
     pub names: &'a BTreeSet<String>,
     pub tables: &'a BTreeSet<String>,
@@ -931,19 +890,21 @@ impl<'a> KnownView<'a> {
     }
 }
 
-/// Port of `checker/expressions.py::_undefined_names`.
-#[must_use]
-pub fn _undefined_names(expr: Option<&Expr>, known: &BTreeSet<String>) -> Vec<String> {
-    _undefined_names_with(expr, &KnownView::from_set(known))
-        .into_iter()
-        .map(UndefinedName::into_string)
-        .collect()
+impl<'a> From<&'a super::part2::KnownNames> for KnownView<'a> {
+    fn from(known: &'a super::part2::KnownNames) -> Self {
+        Self {
+            names: &known.names,
+            tables: &known.tables,
+            out_of_scope: &known.out_of_scope,
+            dotted_tables: known.dotted_tables,
+        }
+    }
 }
 
-/// Port of `checker/expressions.py::_undefined_names`.
+/// Port of checker/expressions.py::_undefined_names
 #[must_use]
-pub fn _undefined_names_with(expr: Option<&Expr>, known: &KnownView<'_>) -> Vec<UndefinedName> {
-    let out = _undefined_names_walk_with(expr, known);
+pub fn _undefined_names(expr: Option<&Expr>, known: &KnownView<'_>) -> Vec<UndefinedName> {
+    let out = _undefined_names_walk(expr, known);
     for (i, n) in out.iter().enumerate() {
         if !matches!(n, UndefinedName::Dotted(_)) {
             let mut res = out[..=i].to_vec();
@@ -959,21 +920,9 @@ pub fn _undefined_names_with(expr: Option<&Expr>, known: &KnownView<'_>) -> Vec<
     out
 }
 
-/// Port of `checker/expressions.py::_undefined_names_walk`.
+/// Port of checker/expressions.py::_undefined_names_walk
 #[must_use]
-pub fn _undefined_names_walk(expr: Option<&Expr>, known: &BTreeSet<String>) -> Vec<String> {
-    _undefined_names_walk_with(expr, &KnownView::from_set(known))
-        .into_iter()
-        .map(UndefinedName::into_string)
-        .collect()
-}
-
-/// Port of `checker/expressions.py::_undefined_names_walk`.
-#[must_use]
-pub fn _undefined_names_walk_with(
-    expr: Option<&Expr>,
-    known: &KnownView<'_>,
-) -> Vec<UndefinedName> {
+pub fn _undefined_names_walk(expr: Option<&Expr>, known: &KnownView<'_>) -> Vec<UndefinedName> {
     let Some(expr) = expr else {
         return Vec::new();
     };
@@ -997,10 +946,10 @@ pub fn _undefined_names_walk_with(
                 vec![UndefinedName::Plain(n.name.clone())]
             }
         }
-        Expr::Unary(u) => _undefined_names_walk_with(u.operand.as_deref(), known),
+        Expr::Unary(u) => _undefined_names_walk(u.operand.as_deref(), known),
         Expr::Binary(b) => {
-            let mut out = _undefined_names_walk_with(b.left.as_deref(), known);
-            out.extend(_undefined_names_walk_with(b.right.as_deref(), known));
+            let mut out = _undefined_names_walk(b.left.as_deref(), known);
+            out.extend(_undefined_names_walk(b.right.as_deref(), known));
             out
         }
         Expr::Index(idx) => {
@@ -1012,7 +961,7 @@ pub fn _undefined_names_walk_with(
                 vec![UndefinedName::Plain(idx.name.clone())]
             };
             for a in &idx.args {
-                head.extend(_undefined_names_walk_with(a.as_deref(), known));
+                head.extend(_undefined_names_walk(a.as_deref(), known));
             }
             head
         }
@@ -1026,7 +975,7 @@ pub fn _undefined_names_walk_with(
             {
                 Vec::new()
             } else {
-                _undefined_names_walk_with(base, known)
+                _undefined_names_walk(base, known)
             };
             if !out.is_empty()
                 && let Some(Expr::Name(base_name)) = base
@@ -1036,7 +985,7 @@ pub fn _undefined_names_walk_with(
             }
             if let Some(args) = &m.args {
                 for a in args {
-                    out.extend(_undefined_names_walk_with(a.as_deref(), known));
+                    out.extend(_undefined_names_walk(a.as_deref(), known));
                 }
             }
             out
@@ -1045,7 +994,7 @@ pub fn _undefined_names_walk_with(
             let mut out = Vec::new();
             if let Some(items) = expr.array_items() {
                 for item in items {
-                    out.extend(_undefined_names_walk_with(item.as_deref(), known));
+                    out.extend(_undefined_names_walk(item.as_deref(), known));
                 }
             }
             out
@@ -1165,31 +1114,31 @@ mod tests {
         decl.insert("X".to_string());
 
         assert_eq!(
-            _timer_arg_with(Some(&*int_num(0xFFFF_FFFF, "&HFFFFFFFF")), &env6, &decl),
+            _timer_arg(Some(&*int_num(0xFFFF_FFFF, "&HFFFFFFFF")), &env6, &decl),
             Some(TimerArg::Int(-1))
         );
         assert_eq!(
-            _timer_arg_with(Some(&*int_num(1_i64 << 31, "2147483648")), &env6, &decl),
+            _timer_arg(Some(&*int_num(1_i64 << 31, "2147483648")), &env6, &decl),
             Some(TimerArg::Float)
         );
         assert_eq!(
-            _timer_arg_with(Some(&*int_num(1_i64 << 31, "2147483648")), &env300, &decl),
+            _timer_arg(Some(&*int_num(1_i64 << 31, "2147483648")), &env300, &decl),
             Some(TimerArg::Int(-(1_i64 << 31)))
         );
         assert_eq!(
-            _timer_arg_with(Some(&*name("c_int")), &env6, &decl),
+            _timer_arg(Some(&*name("c_int")), &env6, &decl),
             Some(TimerArg::Int(42))
         );
         assert_eq!(
-            _timer_arg_with(Some(&*name("c_flt")), &env6, &decl),
+            _timer_arg(Some(&*name("c_flt")), &env6, &decl),
             Some(TimerArg::Float)
         );
         assert_eq!(
-            _timer_arg_with(Some(&*name("x")), &env6, &decl),
+            _timer_arg(Some(&*name("x")), &env6, &decl),
             Some(TimerArg::Float)
         );
         assert_eq!(
-            _timer_arg_with(Some(&*name("inf")), &env6, &decl),
+            _timer_arg(Some(&*name("inf")), &env6, &decl),
             Some(TimerArg::Float)
         );
         let div = Expr::Binary(Binary {
@@ -1201,10 +1150,7 @@ mod tests {
             left: Some(int_num(4, "4")),
             right: Some(int_num(2, "2")),
         });
-        assert_eq!(
-            _timer_arg_with(Some(&div), &env6, &decl),
-            Some(TimerArg::Float)
-        );
+        assert_eq!(_timer_arg(Some(&div), &env6, &decl), Some(TimerArg::Float));
         let add = Expr::Binary(Binary {
             node: Node {
                 line: 1,
@@ -1215,7 +1161,7 @@ mod tests {
             right: Some(name("c_int")),
         });
         assert_eq!(
-            _timer_arg_with(Some(&add), &env6, &decl),
+            _timer_arg(Some(&add), &env6, &decl),
             Some(TimerArg::Int(43))
         );
         let un = Expr::Unary(Unary {
@@ -1226,10 +1172,7 @@ mod tests {
             op: "-".to_string(),
             operand: Some(int_num(5, "5")),
         });
-        assert_eq!(
-            _timer_arg_with(Some(&un), &env6, &decl),
-            Some(TimerArg::Int(-5))
-        );
+        assert_eq!(_timer_arg(Some(&un), &env6, &decl), Some(TimerArg::Int(-5)));
         let idx = Expr::Index(Index {
             node: Node {
                 line: 1,
@@ -1238,22 +1181,19 @@ mod tests {
             name: "sin".to_string(),
             args: vec![Some(int_num(1, "1"))],
         });
-        assert_eq!(
-            _timer_arg_with(Some(&idx), &env6, &decl),
-            Some(TimerArg::Float)
-        );
+        assert_eq!(_timer_arg(Some(&idx), &env6, &decl), Some(TimerArg::Float));
     }
 
     #[test]
     fn not_integer_and_constant_integer_match_python() {
-        assert!(_not_integer_type_with(Some(&*float_num(1.0, "1.0"))));
-        assert!(_not_integer_type_with(Some(&*name("nan"))));
-        assert!(!_not_integer_type_with(Some(&*int_num(1, "1"))));
-        assert!(_not_constant_integer_with(Some(&*int_num(
+        assert!(_not_integer_type(Some(&*float_num(1.0, "1.0"))));
+        assert!(_not_integer_type(Some(&*name("nan"))));
+        assert!(!_not_integer_type(Some(&*int_num(1, "1"))));
+        assert!(_not_constant_integer(Some(&*int_num(
             1_i64 << 31,
             "2147483648"
         ))));
-        assert!(!_not_constant_integer_with(Some(&*int_num(
+        assert!(!_not_constant_integer(Some(&*int_num(
             -(1_i64 << 31),
             "-2147483648"
         ))));
@@ -1267,16 +1207,16 @@ mod tests {
         assert_eq!(kinds.get(&1).map(String::as_str), Some("const_expr"));
         assert_eq!(kinds.len(), 59);
 
-        let pk_ap = _position_kinds_with(&[8, 2, 101], "AddPrecise", Some(cr6));
+        let pk_ap = _position_kinds(&[8, 2, 101], "AddPrecise", Some(cr6));
         assert_eq!(pk_ap.len(), 1);
         assert_eq!(pk_ap.get(&2).map(String::as_str), Some("const_expr"));
 
-        let pk_nf6 = _position_kinds_with(&[1, 2, 8], "NewFile", Some(cr6));
+        let pk_nf6 = _position_kinds(&[1, 2, 8], "NewFile", Some(cr6));
         assert_eq!(pk_nf6.len(), 2);
         assert_eq!(pk_nf6.get(&0).map(String::as_str), Some("const_expr"));
         assert_eq!(pk_nf6.get(&1).map(String::as_str), Some("expr"));
 
-        let pk_nf300 = _position_kinds_with(&[1, 2, 8], "NewFile", Some(cr300));
+        let pk_nf300 = _position_kinds(&[1, 2, 8], "NewFile", Some(cr300));
         assert_eq!(pk_nf300.len(), 3);
         assert_eq!(
             pk_nf300.get(&2).map(String::as_str),
@@ -1334,15 +1274,15 @@ mod tests {
             right: Some(rhs),
         });
         assert_eq!(
-            _undefined_names_with(Some(&expr), &view),
+            _undefined_names(Some(&expr), &view),
             vec![
                 UndefinedName::Dotted(DottedName("Undecl".to_string())),
                 UndefinedName::Plain("Nope".to_string()),
             ]
         );
         assert_eq!(
-            _undefined_names(Some(&*name("T.")), &names),
-            Vec::<String>::new()
+            _undefined_names(Some(&*name("T.")), &KnownView::from_set(&names)),
+            Vec::<UndefinedName>::new()
         );
     }
 
@@ -1386,7 +1326,7 @@ mod tests {
         let prog_ref = Rc::new(prog);
         let mut decl = BTreeSet::new();
         decl.insert("X".to_string());
-        set_arity_context_with(&prog_ref, Some(cr6), Some(decl));
+        set_arity_context(&prog_ref, Some(cr6), Some(decl));
 
         let str_lit = Expr::String(StringLit {
             node: Node {
@@ -1396,27 +1336,27 @@ mod tests {
             value: "x".to_string(),
         });
         assert_eq!(
-            _network_integer_problem_with("HTTPGET", Some(&str_lit), cr6).as_deref(),
+            _network_integer_problem("HTTPGET", Some(&str_lit), cr6).as_deref(),
             Some("network_constint")
         );
         assert_eq!(
-            _network_integer_problem_with("HTTPGET", Some(&*name("strc")), cr6).as_deref(),
+            _network_integer_problem("HTTPGET", Some(&*name("strc")), cr6).as_deref(),
             Some("network_constint")
         );
         assert_eq!(
-            _network_integer_problem_with("HTTPGET", Some(&*name("neg")), cr6).as_deref(),
+            _network_integer_problem("HTTPGET", Some(&*name("neg")), cr6).as_deref(),
             Some("Parameter TimeOut cannot be negative")
         );
         assert_eq!(
-            _network_integer_problem_with("TCPOPEN", Some(&*name("neg")), cr6).as_deref(),
+            _network_integer_problem("TCPOPEN", Some(&*name("neg")), cr6).as_deref(),
             Some("Size -5 cannot be negative")
         );
         assert_eq!(
-            _network_integer_problem_with("HTTPGET", Some(&*name("pos")), cr6),
+            _network_integer_problem("HTTPGET", Some(&*name("pos")), cr6),
             None
         );
-        assert!(!_timeout_wide_with(Some(&*int_num(10, "10")), cr6));
-        assert!(_timeout_wide_with(
+        assert!(!_timeout_wide(Some(&*int_num(10, "10")), cr6));
+        assert!(_timeout_wide(
             Some(&*int_num(1_i64 << 32, "4294967296")),
             cr6
         ));

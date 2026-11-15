@@ -17,42 +17,9 @@ use crate::syntax::{
 };
 
 const _DATA_KEYWORDS: &[&str] = &["DATA", "DATALONG"];
-const _WHOLE_EXPR_ECHO_LOGGERS: &[&str] = &["cr6", "cr1000x"];
+use super::part1::{_EXTRA_PREDEFINED_SYMBOLS, _WHOLE_EXPR_ECHO_LOGGERS};
+use super::part2::_CONTROL_KEYWORDS;
 const _ARITY_TRAILING_NEWLINE_LOGGERS: &[&str] = &["cr300", "cr350"];
-const _EXTRA_PREDEFINED_SYMBOLS: &[&str] = &["NAN", "INF"];
-const _CONTROL_KEYWORDS: &[&str] = &[
-    "CASE", "DO", "FOR", "FUNCTION", "IF", "SCAN", "SELECT", "SUB", "SUBSCAN", "WHILE",
-];
-// TODO(integrator-2): move to `instr_data` when `checker/instr_data.py` is ported.
-const _TABLE_ONLY_INSTRUCTIONS: &[&str] = &[
-    "CARDOUT",
-    "MQTTPUBLISHTABLE",
-    "GOESTABLE",
-    "GOESFIELD",
-    "TABLEFILE",
-    "TOTALIZE",
-    "AVERAGE",
-    "MAXIMUM",
-    "MINIMUM",
-    "SAMPLEMAXMIN",
-    "STDDEV",
-    "MOMENT",
-    "SAMPLE",
-    "HISTOGRAM",
-    "HISTOGRAM4D",
-    "COVARIANCE",
-    "RAINFLOW",
-    "LEVELCROSSING",
-    "WINDVECTOR",
-    "MEDIAN",
-    "SAMPLEFIELDCAL",
-    "FILLSTOP",
-    "DATATIME",
-    "OPENINTERVAL",
-    "DATAINTERVAL",
-    "FFT",
-    "DATAEVENT",
-];
 const _WRONG_TYPE: &str = "Structured Variable assignment illegal, wrong type";
 
 fn arity_min_safe(name: &str) -> Option<i64> {
@@ -176,37 +143,26 @@ fn arity_allowed(name: &str, nargs: i64) -> Option<&'static [usize]> {
     }
 }
 
-/// Port of `checker/expressions.py::check_data_params`.
-pub fn check_data_params(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_data_params (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_data_params`.
-pub fn check_data_params_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-) {
+/// Port of checker/expressions.py::check_data_params
+pub fn check_data_params(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     let ctx = context::of(program, Some(profile), None);
-    let _known_names = ctx.known_names();
-    // TODO(integrator-2): use `&_known_names.names` once `part2::KnownNames` exposes its set.
-    let known = BTreeSet::new();
+    let known = &ctx.known_names().names;
     for stmt in &program.statements {
         match &**stmt {
             Stmt::Instruction(inst)
                 if _DATA_KEYWORDS.contains(&pystr::upper(&inst.keyword).as_str()) =>
             {
-                _check_data_instruction_with(inst, &known, profile, diags);
+                _check_data_instruction(inst, known, profile, diags);
             }
             Stmt::Unparsed(unparsed) => {
-                _check_unparsed_data_with(unparsed, diags, profile, program);
+                _check_unparsed_data(unparsed, diags, profile, program);
             }
             _ => {}
         }
     }
 }
 
-/// Port of `checker/expressions.py::_data_param_text`.
+/// Port of checker/expressions.py::_data_param_text
 pub fn _data_param_text(stmt: &Instruction, i: i64) -> String {
     let mut text = super::part2::_arg_text(stmt, i);
     let last = i64::try_from(stmt.args.len()).unwrap_or(0) - 1;
@@ -216,17 +172,8 @@ pub fn _data_param_text(stmt: &Instruction, i: i64) -> String {
     text
 }
 
-/// Port of `checker/expressions.py::_check_data_instruction`.
+/// Port of checker/expressions.py::_check_data_instruction
 pub fn _check_data_instruction(
-    _stmt: &Instruction,
-    _known: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-) {
-    todo!("checker/expressions.py::_check_data_instruction (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_check_data_instruction`.
-pub fn _check_data_instruction_with(
     stmt: &Instruction,
     known: &BTreeSet<String>,
     profile: &Profile,
@@ -236,7 +183,13 @@ pub fn _check_data_instruction_with(
         let Some(arg) = arg else {
             continue;
         };
-        let undefined = super::part1::_undefined_names(Some(arg), known);
+        let undefined = super::part1::_undefined_names(
+            Some(arg),
+            &crate::checker::expressions::KnownView::from_set(known),
+        )
+        .into_iter()
+        .map(crate::checker::expressions::UndefinedName::into_string)
+        .collect::<Vec<_>>();
         let resolved_refs = super::part1::_variable_refs(Some(arg), known);
         if undefined.is_empty() && resolved_refs.is_empty() {
             continue;
@@ -268,19 +221,12 @@ pub fn _check_data_instruction_with(
     }
 }
 
-/// Port of `checker/expressions.py::_check_unparsed_data`.
-pub fn _check_unparsed_data(_stmt: &Unparsed, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::_check_unparsed_data (omitted: profile: untyped, program: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::_check_unparsed_data`.
-pub fn _check_unparsed_data_with(
+/// Port of checker/expressions.py::_check_unparsed_data
+pub fn _check_unparsed_data(
     stmt: &Unparsed,
     diags: &mut Diagnostics,
-    profile: &Profile,
-    program: &Program,
+    profile: &'static Profile,
+    program: &ProgramRef,
 ) {
     if !stmt
         .reason
@@ -306,9 +252,7 @@ pub fn _check_unparsed_data_with(
                     &stmt.base.node.file,
                 );
             } else {
-                // TODO(integrator-2): wire `cr3xx::part2::prose_known_with(program, profile)` and
-                // `cr3xx::part2::_leading_unknown_words_with(&text, &known, ...)` once ported.
-                let known = BTreeSet::new();
+                let known = cr3xx::part2::prose_known_with(program, profile);
                 for name in cr3xx::part2::_leading_unknown_words(&text, &known) {
                     diags.error_basic(
                         stmt.base.node.line,
@@ -332,13 +276,8 @@ pub fn _check_unparsed_data_with(
     }
 }
 
-/// Port of `checker/expressions.py::_call_arity_problem`.
-pub fn _call_arity_problem(_name: &str, _args: &[Option<ExprRef>]) -> Option<String> {
-    todo!("checker/expressions.py::_call_arity_problem (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_call_arity_problem`.
-pub fn _call_arity_problem_with(
+/// Port of checker/expressions.py::_call_arity_problem
+pub fn _call_arity_problem(
     name: &str,
     args: &[Option<ExprRef>],
     profile: &Profile,
@@ -358,11 +297,13 @@ pub fn _call_arity_problem_with(
         };
     }
     let nargs = record.nargs?;
-    // TODO(integrator-2): wire `part1::_network_integer_problem_with`, `_not_constant_integer_with`,
-    // `_not_integer_type_with`, `_timeout_wide_with`, `_timer_arg_with`, and thread-locals
-    // `_TIMER_CONTEXT` / `_TIMEOUT_GATE` once `part1` is ported.
-    if let Some(_option) = network_integer_arg(&upper) {
-        // Pending part1::_TIMER_CONTEXT and part1::_network_integer_problem_with
+    if let Some(option) = network_integer_arg(&upper)
+        && option < n
+        && super::part1::_TIMER_CONTEXT.with(|slot| slot.borrow().is_some())
+        && let Some(problem) =
+            super::_network_integer_problem(&upper, args[option].as_deref(), profile)
+    {
+        return Some(problem);
     }
     if function_const_integer_string_args(&upper)
         .iter()
@@ -370,13 +311,54 @@ pub fn _call_arity_problem_with(
     {
         return Some("constint".to_owned());
     }
-    let _integer_args: &[usize] = if upper == "SERIALOPEN" && n == 6 && !profile.single_pass {
+    let integer_args: &[usize] = if upper == "SERIALOPEN" && n == 6 && !profile.single_pass {
         &[3]
     } else {
         const_integer_bad_args(&upper)
     };
-    let _ = const_integer_type_args(&upper);
-    let _ = const_integer_type_args_always(&upper);
+    if integer_args
+        .iter()
+        .any(|&i| i < n && super::_not_constant_integer(args[i].as_deref()))
+    {
+        return Some("constint".to_owned());
+    }
+    if super::part1::_TIMEOUT_GATE.with(|slot| *slot.borrow() == Some(false))
+        && const_integer_type_args(&upper).iter().any(|&i| {
+            i < n
+                && (super::_not_integer_type(args[i].as_deref())
+                    || super::_timeout_wide(args[i].as_deref(), profile))
+        })
+    {
+        return Some("constint".to_owned());
+    }
+    if const_integer_type_args_always(&upper)
+        .iter()
+        .any(|&i| i < n && super::_not_integer_type(args[i].as_deref()))
+    {
+        return Some("constint".to_owned());
+    }
+    if upper == "TIMER" && n == 3 {
+        let problem = super::part1::_TIMER_CONTEXT.with(|slot| {
+            let slot = slot.borrow();
+            let ctx = slot.as_ref()?;
+            let kinds: Vec<_> = args[1..]
+                .iter()
+                .map(|a| super::_timer_arg(a.as_deref(), &ctx.env, &ctx.declared))
+                .collect();
+            if kinds.contains(&Some(super::TimerArg::Float)) {
+                return Some("constint".to_owned());
+            }
+            if let Some(super::TimerArg::Int(value)) = kinds[1]
+                && !(0..=4).contains(&value)
+            {
+                return Some("timer_option".to_owned());
+            }
+            None
+        });
+        if problem.is_some() {
+            return problem;
+        }
+    }
     if const_integer_overflow_string(&upper) == Some(nargs)
         && usize::try_from(nargs + 1).ok() == Some(n)
         && matches!(
@@ -422,17 +404,8 @@ pub fn _call_arity_problem_with(
     None
 }
 
-/// Port of `checker/expressions.py::_find_arity_problem`.
+/// Port of checker/expressions.py::_find_arity_problem
 pub fn _find_arity_problem(
-    _expr: Option<&Expr>,
-    _known: Option<BTreeSet<String>>,
-    _constants: &BTreeSet<String>,
-) -> Option<String> {
-    todo!("checker/expressions.py::_find_arity_problem (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_find_arity_problem`.
-pub fn _find_arity_problem_with(
     expr: Option<&Expr>,
     profile: &Profile,
     known: Option<&BTreeSet<String>>,
@@ -455,7 +428,7 @@ pub fn _find_arity_problem_with(
             if constants.contains(&pystr::upper(&ix.name)) {
                 return Some("indexed_const".to_owned());
             }
-            let direct = _call_arity_problem_with(&ix.name, &ix.args, profile);
+            let direct = _call_arity_problem(&ix.name, &ix.args, profile);
             if let Some(ref d) = direct
                 && let Some(known_set) = known
             {
@@ -463,16 +436,19 @@ pub fn _find_arity_problem_with(
                 while d != "few"
                     && !read.is_empty()
                     && !matches!(
-                        _call_arity_problem_with(&ix.name, read, profile).as_deref(),
+                        _call_arity_problem(&ix.name, read, profile).as_deref(),
                         None | Some("few")
                     )
                 {
                     read = &read[..read.len() - 1];
                 }
-                if read
-                    .iter()
-                    .any(|a| !super::part1::_undefined_names(a.as_deref(), known_set).is_empty())
-                {
+                if read.iter().any(|a| {
+                    !super::part1::_undefined_names(
+                        a.as_deref(),
+                        &crate::checker::expressions::KnownView::from_set(known_set),
+                    )
+                    .is_empty()
+                }) {
                     return Some("deferred".to_owned());
                 }
             }
@@ -480,27 +456,24 @@ pub fn _find_arity_problem_with(
                 return direct;
             }
             for a in &ix.args {
-                if let Some(found) =
-                    _find_arity_problem_with(a.as_deref(), profile, known, constants)
-                {
+                if let Some(found) = _find_arity_problem(a.as_deref(), profile, known, constants) {
                     return Some(found);
                 }
             }
             None
         }
-        Expr::Unary(u) => _find_arity_problem_with(u.operand.as_deref(), profile, known, constants),
-        Expr::Binary(b) => _find_arity_problem_with(b.left.as_deref(), profile, known, constants)
-            .or_else(|| _find_arity_problem_with(b.right.as_deref(), profile, known, constants)),
+        Expr::Unary(u) => _find_arity_problem(u.operand.as_deref(), profile, known, constants),
+        Expr::Binary(b) => _find_arity_problem(b.left.as_deref(), profile, known, constants)
+            .or_else(|| _find_arity_problem(b.right.as_deref(), profile, known, constants)),
         Expr::Member(m) => {
             if m.args.as_ref().is_some_and(|args| args.len() > 2) {
                 return Some("many_member".to_owned());
             }
-            _find_arity_problem_with(m.base.as_deref(), profile, known, constants)
+            _find_arity_problem(m.base.as_deref(), profile, known, constants)
         }
         Expr::ArrayLiteral(a) => {
             for item in &a.items {
-                if let Some(found) =
-                    _find_arity_problem_with(item.as_deref(), profile, known, constants)
+                if let Some(found) = _find_arity_problem(item.as_deref(), profile, known, constants)
                 {
                     return Some(found);
                 }
@@ -509,8 +482,7 @@ pub fn _find_arity_problem_with(
         }
         Expr::Juxtaposed(j) => {
             for item in &j.items {
-                if let Some(found) =
-                    _find_arity_problem_with(item.as_deref(), profile, known, constants)
+                if let Some(found) = _find_arity_problem(item.as_deref(), profile, known, constants)
                 {
                     return Some(found);
                 }
@@ -521,13 +493,8 @@ pub fn _find_arity_problem_with(
     }
 }
 
-/// Port of `checker/expressions.py::_arity_message`.
-pub fn _arity_message(_kind: &str, _text: &str, _at_eol: bool, _whole_statement: bool) -> String {
-    todo!("checker/expressions.py::_arity_message (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_arity_message`.
-pub fn _arity_message_with(
+/// Port of checker/expressions.py::_arity_message
+pub fn _arity_message(
     kind: &str,
     text: &str,
     profile: &Profile,
@@ -575,13 +542,8 @@ pub fn _arity_message_with(
     format!("{verb}{text}.")
 }
 
-/// Port of `checker/expressions.py::_is_bare_reference_problem`.
-pub fn _is_bare_reference_problem(_name: &str, _declared_variables: &BTreeSet<String>) -> bool {
-    todo!("checker/expressions.py::_is_bare_reference_problem (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_is_bare_reference_problem`.
-pub fn _is_bare_reference_problem_with(
+/// Port of checker/expressions.py::_is_bare_reference_problem
+pub fn _is_bare_reference_problem(
     name: &str,
     profile: &Profile,
     declared_variables: &BTreeSet<String>,
@@ -599,16 +561,8 @@ pub fn _is_bare_reference_problem_with(
     nargs > 0 || record.argspec != 0
 }
 
-/// Port of `checker/expressions.py::_find_bare_function_ref`.
+/// Port of checker/expressions.py::_find_bare_function_ref
 pub fn _find_bare_function_ref(
-    _expr: Option<&Expr>,
-    _declared_variables: &BTreeSet<String>,
-) -> bool {
-    todo!("checker/expressions.py::_find_bare_function_ref (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_find_bare_function_ref`.
-pub fn _find_bare_function_ref_with(
     expr: Option<&Expr>,
     profile: &Profile,
     declared_variables: &BTreeSet<String>,
@@ -617,40 +571,33 @@ pub fn _find_bare_function_ref_with(
         return false;
     };
     match expr {
-        Expr::Name(n) => _is_bare_reference_problem_with(&n.name, profile, declared_variables),
+        Expr::Name(n) => _is_bare_reference_problem(&n.name, profile, declared_variables),
         Expr::Index(ix) => ix
             .args
             .iter()
-            .any(|a| _find_bare_function_ref_with(a.as_deref(), profile, declared_variables)),
+            .any(|a| _find_bare_function_ref(a.as_deref(), profile, declared_variables)),
         Expr::Unary(u) => {
-            _find_bare_function_ref_with(u.operand.as_deref(), profile, declared_variables)
+            _find_bare_function_ref(u.operand.as_deref(), profile, declared_variables)
         }
         Expr::Binary(b) => {
-            _find_bare_function_ref_with(b.left.as_deref(), profile, declared_variables)
-                || _find_bare_function_ref_with(b.right.as_deref(), profile, declared_variables)
+            _find_bare_function_ref(b.left.as_deref(), profile, declared_variables)
+                || _find_bare_function_ref(b.right.as_deref(), profile, declared_variables)
         }
-        Expr::Member(m) => {
-            _find_bare_function_ref_with(m.base.as_deref(), profile, declared_variables)
-        }
+        Expr::Member(m) => _find_bare_function_ref(m.base.as_deref(), profile, declared_variables),
         Expr::ArrayLiteral(a) => a
             .items
             .iter()
-            .any(|item| _find_bare_function_ref_with(item.as_deref(), profile, declared_variables)),
+            .any(|item| _find_bare_function_ref(item.as_deref(), profile, declared_variables)),
         Expr::Juxtaposed(j) => j
             .items
             .iter()
-            .any(|item| _find_bare_function_ref_with(item.as_deref(), profile, declared_variables)),
+            .any(|item| _find_bare_function_ref(item.as_deref(), profile, declared_variables)),
         Expr::Number(_) | Expr::String(_) => false,
     }
 }
 
-/// Port of `checker/expressions.py::_bare_function_message`.
-pub fn _bare_function_message(_text: &str, _whole_statement: bool, _at_eol: bool) -> String {
-    todo!("checker/expressions.py::_bare_function_message (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_bare_function_message`.
-pub fn _bare_function_message_with(
+/// Port of checker/expressions.py::_bare_function_message
+pub fn _bare_function_message(
     text: &str,
     profile: &Profile,
     whole_statement: bool,
@@ -662,7 +609,7 @@ pub fn _bare_function_message_with(
     format!("Expression expects ( : {text}.")
 }
 
-/// Port of `checker/expressions.py::_struct_var_names`.
+/// Port of checker/expressions.py::_struct_var_names
 pub fn _struct_var_names(program: &Program) -> BTreeSet<String> {
     let types = structs::structure_members(program);
     if types.is_empty() {
@@ -675,7 +622,7 @@ pub fn _struct_var_names(program: &Program) -> BTreeSet<String> {
         .collect()
 }
 
-/// Port of `checker/expressions.py::_multi_indexed_struct`.
+/// Port of checker/expressions.py::_multi_indexed_struct
 pub fn _multi_indexed_struct(expr: Option<&Expr>, struct_vars: &BTreeSet<String>) -> bool {
     let Some(expr) = expr else {
         return false;
@@ -704,13 +651,8 @@ pub fn _multi_indexed_struct(expr: Option<&Expr>, struct_vars: &BTreeSet<String>
     }
 }
 
-/// Port of `checker/expressions.py::_hold`.
-pub fn _hold(diags: &mut Diagnostics, problem: &str) {
-    _hold_with(None, diags, problem);
-}
-
-/// Port of `checker/expressions.py::_hold`.
-pub fn _hold_with(held: Option<&mut Vec<DiagRef>>, diags: &mut Diagnostics, problem: &str) {
+/// Port of checker/expressions.py::_hold
+pub fn _hold(held: Option<&mut Vec<DiagRef>>, diags: &mut Diagnostics, problem: &str) {
     if problem == "many_member"
         && let Some(last) = diags.items.last_mut()
     {
@@ -722,15 +664,8 @@ pub fn _hold_with(held: Option<&mut Vec<DiagRef>>, diags: &mut Diagnostics, prob
     }
 }
 
-/// Port of `checker/expressions.py::check_function_arity`.
-pub fn check_function_arity(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check_function_arity (omitted: profile: untyped, held: list | None)"
-    )
-}
-
-/// Port of `checker/expressions.py::check_function_arity`.
-pub fn check_function_arity_with(
+/// Port of checker/expressions.py::check_function_arity
+pub fn check_function_arity(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -763,14 +698,12 @@ pub fn check_function_arity_with(
     let mut table_mine: Vec<DiagRef> = Vec::new();
     let mut in_table = false;
     let mut seen_timeint = false;
-    let _timeout_wide = intervals::wide_constants_with(program, profile);
-    // TODO(integrator-2): wire `part1::set_arity_context_with(program, profile, Some(&declared_variables))`
-    // and `part1::_TIMEOUT_WIDE` / `part1::_TIMEOUT_GATE` once `part1` is ported.
-    let arity_known: Option<BTreeSet<String>> = if _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name)
-    {
-        // TODO(integrator-2): use `ctx.known_names().names.clone()` once `part2::KnownNames` is ported.
-        let _ = ctx.known_names();
-        None
+    let _timeout_state = TimeoutStateGuard;
+    super::part1::_TIMEOUT_WIDE
+        .with(|slot| *slot.borrow_mut() = intervals::wide_constants_with(program, profile));
+    super::set_arity_context(program, Some(profile), Some(declared_variables.clone()));
+    let arity_known = if _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name) {
+        Some(ctx.known_names().names.clone())
     } else {
         None
     };
@@ -798,7 +731,7 @@ pub fn check_function_arity_with(
     let all_constants: BTreeSet<String> = predefined.union(&user_constants).cloned().collect();
 
     let arity = |expr: Option<&Expr>, constants: &BTreeSet<String>| -> Option<String> {
-        let problem = _find_arity_problem_with(expr, profile, arity_known.as_ref(), constants);
+        let problem = _find_arity_problem(expr, profile, arity_known.as_ref(), constants);
         if problem.as_deref() == Some("deferred") {
             None
         } else {
@@ -823,15 +756,18 @@ pub fn check_function_arity_with(
                 .cloned()
                 .collect()
         };
-        let (_gate, next_seen) =
+        let (gate, next_seen) =
             intervals::timeout_gate_with(seen_timeint, intervals::gate_text_with(stmt).as_deref());
         seen_timeint = next_seen;
+        super::part1::_TIMEOUT_GATE.with(|slot| *slot.borrow_mut() = gate);
 
         match &**stmt {
             Stmt::Instruction(inst) => {
                 let kw = pystr::upper(&inst.keyword);
                 in_table = kw == "DATATABLE" || (in_table && kw != "ENDTABLE");
-                let table_only = _TABLE_ONLY_INSTRUCTIONS.contains(&kw.as_str()) && !in_table;
+                let table_only = crate::checker::instr_data::TABLE_ONLY_INSTRUCTIONS
+                    .contains_key(kw.as_str())
+                    && !in_table;
                 let params_count = profile
                     .instructions()
                     .get(&kw)
@@ -844,7 +780,7 @@ pub fn check_function_arity_with(
                     if !table_only && _multi_indexed_struct(Some(arg), &struct_vars) {
                         diags.error_basic(
                             inst.base.node.line,
-                            &_arity_message_with(
+                            &_arity_message(
                                 "many",
                                 &super::part2::_arg_text(inst, i_i64),
                                 profile,
@@ -863,9 +799,9 @@ pub fn check_function_arity_with(
                     }
                     if kw != "ALIAS"
                         && kw != "UNITS"
-                        && _find_bare_function_ref_with(Some(arg), profile, &declared_variables)
+                        && _find_bare_function_ref(Some(arg), profile, &declared_variables)
                     {
-                        let msg = _bare_function_message_with(
+                        let msg = _bare_function_message(
                             &super::part2::_arg_text(inst, i_i64),
                             profile,
                             false,
@@ -880,12 +816,12 @@ pub fn check_function_arity_with(
                         &empty_set
                     };
                     if let Some(problem) =
-                        _find_arity_problem_with(Some(arg), profile, None, indexed_constants)
+                        _find_arity_problem(Some(arg), profile, None, indexed_constants)
                     {
                         if problem == "empty" {
                             diags.error_basic(
                                 inst.base.node.line,
-                                &_arity_message_with(
+                                &_arity_message(
                                     &problem,
                                     &super::part2::_arg_text(inst, i_i64),
                                     profile,
@@ -905,7 +841,7 @@ pub fn check_function_arity_with(
                         }
                         diags.error_basic(
                             inst.base.node.line,
-                            &_arity_message_with(
+                            &_arity_message(
                                 &problem,
                                 &super::part2::_arg_text(inst, i_i64),
                                 profile,
@@ -914,7 +850,7 @@ pub fn check_function_arity_with(
                             ),
                             &inst.base.node.file,
                         );
-                        _hold_with(held.as_deref_mut(), diags, &problem);
+                        _hold(held.as_deref_mut(), diags, &problem);
                         break;
                     }
                 }
@@ -922,11 +858,11 @@ pub fn check_function_arity_with(
             Stmt::Call(call) => {
                 if call.args.is_empty()
                     && !call.base.text.contains('(')
-                    && _is_bare_reference_problem_with(&call.name, profile, &declared_variables)
+                    && _is_bare_reference_problem(&call.name, profile, &declared_variables)
                 {
                     diags.error_basic(
                         call.base.node.line,
-                        &_bare_function_message_with(
+                        &_bare_function_message(
                             &call.base.text,
                             profile,
                             true,
@@ -943,12 +879,13 @@ pub fn check_function_arity_with(
                 } else {
                     &call.args
                 };
-                if call_exprs.iter().any(|a| {
-                    _find_bare_function_ref_with(a.as_deref(), profile, &declared_variables)
-                }) {
+                if call_exprs
+                    .iter()
+                    .any(|a| _find_bare_function_ref(a.as_deref(), profile, &declared_variables))
+                {
                     diags.error_basic(
                         call.base.node.line,
-                        &_bare_function_message_with(
+                        &_bare_function_message(
                             &call.base.text,
                             profile,
                             true,
@@ -966,7 +903,7 @@ pub fn check_function_arity_with(
                     let bad_i64 = i64::try_from(bad).unwrap_or(0);
                     diags.error_basic(
                         call.base.node.line,
-                        &_arity_message_with(
+                        &_arity_message(
                             "many",
                             &super::part2::_call_arg_text(&call.base.text, bad_i64),
                             profile,
@@ -980,7 +917,7 @@ pub fn check_function_arity_with(
                     }
                     continue;
                 }
-                let mut problem = _call_arity_problem_with(&call.name, &call.args, profile);
+                let mut problem = _call_arity_problem(&call.name, &call.args, profile);
                 let mut in_arg: Option<usize> = None;
                 if problem.is_none() {
                     for (k, a) in call_exprs.iter().enumerate() {
@@ -1025,15 +962,15 @@ pub fn check_function_arity_with(
                                 .to_owned();
                         diags.error_basic(
                             call.base.node.line,
-                            &_arity_message_with(&problem, &arg_text, profile, false, false),
+                            &_arity_message(&problem, &arg_text, profile, false, false),
                             &call.base.node.file,
                         );
-                        _hold_with(held.as_deref_mut(), diags, &problem);
+                        _hold(held.as_deref_mut(), diags, &problem);
                         continue;
                     }
                     diags.error_basic(
                         call.base.node.line,
-                        &_arity_message_with(
+                        &_arity_message(
                             &problem,
                             &call.base.text,
                             profile,
@@ -1042,7 +979,7 @@ pub fn check_function_arity_with(
                         ),
                         &call.base.node.file,
                     );
-                    _hold_with(held.as_deref_mut(), diags, &problem);
+                    _hold(held.as_deref_mut(), diags, &problem);
                 }
             }
             Stmt::If(if_stmt) => {
@@ -1060,13 +997,13 @@ pub fn check_function_arity_with(
                     {
                         diags.error_basic(
                             if_stmt.base.node.line,
-                            &_arity_message_with(&problem, &text, profile, true, false),
+                            &_arity_message(&problem, &text, profile, true, false),
                             &if_stmt.base.node.file,
                         );
                     } else if problem == "indexed_const" {
                         diags.error_basic(
                             if_stmt.base.node.line,
-                            &_arity_message_with(&problem, &text, profile, false, false),
+                            &_arity_message(&problem, &text, profile, false, false),
                             &if_stmt.base.node.file,
                         );
                     } else if problem == "constint" || problem == "network_constint" {
@@ -1086,7 +1023,7 @@ pub fn check_function_arity_with(
                             &format!("{verb}{text}."),
                             &if_stmt.base.node.file,
                         );
-                        _hold_with(held.as_deref_mut(), diags, &problem);
+                        _hold(held.as_deref_mut(), diags, &problem);
                         if struct_cond && let Some(last) = diags.items.last().cloned() {
                             mine.push(last);
                         }
@@ -1107,7 +1044,7 @@ pub fn check_function_arity_with(
                 } else if let Some(problem) = problem {
                     let in_range =
                         problem == "timer_option" || problem.ends_with(" cannot be negative");
-                    let message = _arity_message_with(&problem, text, profile, false, false);
+                    let message = _arity_message(&problem, text, profile, false, false);
                     diags.items.push(Rc::new(Diagnostic::basic(
                         "error",
                         cd.base.node.line,
@@ -1116,9 +1053,7 @@ pub fn check_function_arity_with(
                     )));
                     if in_range {
                         if known.is_none() {
-                            // TODO(integrator-2): use `ctx.known_names().names.clone()` once `part2::KnownNames` is ported.
-                            let _ = ctx.known_names();
-                            known = Some(BTreeSet::new());
+                            known = Some(ctx.known_names().names.clone());
                         }
                         if !const_unready_loaded {
                             const_unready_loaded = true;
@@ -1134,22 +1069,30 @@ pub fn check_function_arity_with(
                                     .collect()
                             })
                             .unwrap_or_default();
-                        let names = super::part1::_undefined_names(cd.value.as_deref(), &visible);
+                        let names = super::part1::_undefined_names(
+                            cd.value.as_deref(),
+                            &crate::checker::expressions::KnownView::from_set(&visible),
+                        )
+                        .into_iter()
+                        .map(crate::checker::expressions::UndefinedName::into_string)
+                        .collect::<Vec<_>>();
                         if !names.is_empty() {
-                            // TODO(integrator-2): pass `profile` to `part3::_report_const_names_with`.
-                            super::part3::_report_const_names(cd, names, diags);
+                            super::part3::_report_const_names(cd, &names, profile, diags);
                         }
                     }
                 }
             }
             Stmt::Assignment(assign) => {
                 if known.is_none() {
-                    // TODO(integrator-2): use `ctx.known_names().names.clone()` once `part2::KnownNames` is ported.
-                    let _ = ctx.known_names();
-                    known = Some(BTreeSet::new());
+                    known = Some(ctx.known_names().names.clone());
                 }
                 let known_ref = known.as_ref().unwrap_or(&empty_set);
-                if !super::part1::_undefined_names(assign.target.as_deref(), known_ref).is_empty() {
+                if !super::part1::_undefined_names(
+                    assign.target.as_deref(),
+                    &crate::checker::expressions::KnownView::from_set(known_ref),
+                )
+                .is_empty()
+                {
                     continue;
                 }
                 if _multi_indexed_struct(assign.target.as_deref(), &struct_vars) {
@@ -1168,7 +1111,7 @@ pub fn check_function_arity_with(
                     continue;
                 }
                 if let Some(target_message) =
-                    _function_target_message_with(assign, profile, &declared_variables)
+                    _function_target_message(assign, profile, &declared_variables)
                 {
                     diags.error_basic(
                         assign.base.node.line,
@@ -1177,14 +1120,10 @@ pub fn check_function_arity_with(
                     );
                     continue;
                 }
-                if _find_bare_function_ref_with(
-                    assign.value.as_deref(),
-                    profile,
-                    &declared_variables,
-                ) {
+                if _find_bare_function_ref(assign.value.as_deref(), profile, &declared_variables) {
                     diags.error_basic(
                         assign.base.node.line,
-                        &_bare_function_message_with(
+                        &_bare_function_message(
                             &assign.base.text,
                             profile,
                             true,
@@ -1218,7 +1157,7 @@ pub fn check_function_arity_with(
                     }
                 }
                 if let Some(problem) = problem {
-                    let msg = _arity_message_with(
+                    let msg = _arity_message(
                         &problem,
                         &assign.base.text,
                         profile,
@@ -1235,7 +1174,7 @@ pub fn check_function_arity_with(
                         "",
                         "",
                     )));
-                    _hold_with(held.as_deref_mut(), diags, &problem);
+                    _hold(held.as_deref_mut(), diags, &problem);
                     if struct_value && let Some(last) = diags.items.last().cloned() {
                         mine.push(last);
                     }
@@ -1274,16 +1213,8 @@ pub fn check_function_arity_with(
     }
 }
 
-/// Port of `checker/expressions.py::_function_target_message`.
+/// Port of checker/expressions.py::_function_target_message
 pub fn _function_target_message(
-    _stmt: &Assignment,
-    _declared: &BTreeSet<String>,
-) -> Option<String> {
-    todo!("checker/expressions.py::_function_target_message (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_function_target_message`.
-pub fn _function_target_message_with(
     stmt: &Assignment,
     profile: &Profile,
     declared: &BTreeSet<String>,
@@ -1307,8 +1238,8 @@ pub fn _function_target_message_with(
         ""
     };
     if let Expr::Name(n) = target {
-        if _is_bare_reference_problem_with(&n.name, profile, declared) {
-            return Some(_bare_function_message_with(
+        if _is_bare_reference_problem(&n.name, profile, declared) {
+            return Some(_bare_function_message(
                 &stmt.base.text,
                 profile,
                 true,
@@ -1325,9 +1256,9 @@ pub fn _function_target_message_with(
         };
     }
     if let Expr::Index(ix) = target {
-        let problem = _call_arity_problem_with(&ix.name, &ix.args, profile);
+        let problem = _call_arity_problem(&ix.name, &ix.args, profile);
         if matches!(problem.as_deref(), Some("few" | "many" | "empty")) {
-            return Some(_arity_message_with(
+            return Some(_arity_message(
                 problem.as_deref().unwrap_or(""),
                 &stmt.base.text,
                 profile,
@@ -1348,6 +1279,14 @@ pub fn _function_target_message_with(
         }
     }
     None
+}
+
+struct TimeoutStateGuard;
+impl Drop for TimeoutStateGuard {
+    fn drop(&mut self) {
+        super::part1::_TIMEOUT_GATE.with(|slot| *slot.borrow_mut() = None);
+        super::part1::_TIMEOUT_WIDE.with(|slot| slot.borrow_mut().clear());
+    }
 }
 
 #[cfg(test)]
@@ -1392,7 +1331,7 @@ mod tests {
                 let Some(Expr::Index(ix)) = a.value.as_deref() else {
                     panic!("expected Index");
                 };
-                results.push(_call_arity_problem_with(&ix.name, &ix.args, prof));
+                results.push(_call_arity_problem(&ix.name, &ix.args, prof));
             }
             assert_eq!(
                 results,
@@ -1414,7 +1353,7 @@ mod tests {
             let Some(Expr::Index(ix)) = a.value.as_deref() else {
                 panic!("expected Index");
             };
-            results.push(_call_arity_problem_with(&ix.name, &ix.args, cr6));
+            results.push(_call_arity_problem(&ix.name, &ix.args, cr6));
         }
         assert_eq!(
             results,
@@ -1447,7 +1386,7 @@ mod tests {
             _ => unreachable!(),
         };
         assert_eq!(
-            _find_arity_problem_with(expr0, cr6, None, &constants),
+            _find_arity_problem(expr0, cr6, None, &constants),
             Some("indexed_const".to_owned())
         );
 
@@ -1456,7 +1395,7 @@ mod tests {
             _ => unreachable!(),
         };
         assert_eq!(
-            _find_arity_problem_with(expr1, cr6, None, &constants),
+            _find_arity_problem(expr1, cr6, None, &constants),
             Some("many_member".to_owned())
         );
 
@@ -1465,7 +1404,7 @@ mod tests {
             _ => unreachable!(),
         };
         assert_eq!(
-            _find_arity_problem_with(expr2, cr6, None, &constants),
+            _find_arity_problem(expr2, cr6, None, &constants),
             Some("few".to_owned())
         );
     }
@@ -1476,52 +1415,52 @@ mod tests {
         let cr300 = profiles::get("cr300").expect("cr300 profile");
 
         assert_eq!(
-            _arity_message_with("few", "Foo(1)", cr6, true, true),
+            _arity_message("few", "Foo(1)", cr6, true, true),
             "Expression expects , : Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("many", "Foo(1)", cr6, true, true),
+            _arity_message("many", "Foo(1)", cr6, true, true),
             "No Matching, or out of place ) in expression: Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("empty", "Foo(1)", cr6, true, true),
+            _arity_message("empty", "Foo(1)", cr6, true, true),
             "Invalid, or out of place expression: Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("constint", "Foo(1)", cr6, true, true),
+            _arity_message("constint", "Foo(1)", cr6, true, true),
             "Parameter must be a constant integer: Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("incomplete", "Foo(1)", cr6, true, true),
+            _arity_message("incomplete", "Foo(1)", cr6, true, true),
             "Incomplete expression: Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("indexed_const", "Foo(1)", cr6, true, true),
+            _arity_message("indexed_const", "Foo(1)", cr6, true, true),
             "Incomplete expression: Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("timer_option", "Foo(1)", cr6, true, true),
+            _arity_message("timer_option", "Foo(1)", cr6, true, true),
             "Legal options are 0..4"
         );
         assert_eq!(
-            _arity_message_with("Scan cannot be negative", "Foo(1)", cr6, true, true),
+            _arity_message("Scan cannot be negative", "Foo(1)", cr6, true, true),
             "Scan cannot be negative"
         );
 
         assert_eq!(
-            _arity_message_with("few", "Foo(1)", cr300, true, true),
+            _arity_message("few", "Foo(1)", cr300, true, true),
             "Expression expects , : Foo(1)\n."
         );
         assert_eq!(
-            _arity_message_with("few", "Foo(1)", cr300, false, false),
+            _arity_message("few", "Foo(1)", cr300, false, false),
             "Expression expects , : Foo(1)."
         );
         assert_eq!(
-            _arity_message_with("empty", "Foo(1)", cr300, true, true),
+            _arity_message("empty", "Foo(1)", cr300, true, true),
             "Invalid, or out of place expression: Foo(1)\n."
         );
         assert_eq!(
-            _arity_message_with("empty", "Foo(1)", cr300, false, false),
+            _arity_message("empty", "Foo(1)", cr300, false, false),
             "Invalid, or out of place expression: Foo(1)."
         );
     }
@@ -1534,10 +1473,10 @@ mod tests {
         let mut declared = BTreeSet::new();
         declared.insert("SIN".to_owned());
 
-        assert!(_is_bare_reference_problem_with("Sin", cr6, &empty));
-        assert!(!_is_bare_reference_problem_with("Sin", cr6, &declared));
-        assert!(!_is_bare_reference_problem_with("Rnd", cr6, &empty));
-        assert!(_is_bare_reference_problem_with("EmailRelay", cr6, &empty));
+        assert!(_is_bare_reference_problem("Sin", cr6, &empty));
+        assert!(!_is_bare_reference_problem("Sin", cr6, &declared));
+        assert!(!_is_bare_reference_problem("Rnd", cr6, &empty));
+        assert!(_is_bare_reference_problem("EmailRelay", cr6, &empty));
 
         let (p, _) = parse_text(
             "BeginProg\nX = Randomize(Sin)\nEndProg\n",
@@ -1549,19 +1488,19 @@ mod tests {
             Stmt::Assignment(a) => a.value.as_deref(),
             _ => unreachable!(),
         };
-        assert!(_find_bare_function_ref_with(expr, cr6, &empty));
-        assert!(!_find_bare_function_ref_with(expr, cr6, &declared));
+        assert!(_find_bare_function_ref(expr, cr6, &empty));
+        assert!(!_find_bare_function_ref(expr, cr6, &declared));
 
         assert_eq!(
-            _bare_function_message_with("X = Sin", cr6, true, true),
+            _bare_function_message("X = Sin", cr6, true, true),
             "Expression expects ( : X = Sin."
         );
         assert_eq!(
-            _bare_function_message_with("X = Sin", cr300, true, true),
+            _bare_function_message("X = Sin", cr300, true, true),
             "Expression expects ( : X = Sin\n."
         );
         assert_eq!(
-            _bare_function_message_with("Sin", cr300, false, true),
+            _bare_function_message("Sin", cr300, false, true),
             "Expression expects ( : Sin."
         );
     }
@@ -1598,7 +1537,7 @@ mod tests {
             "<t>",
         );
         let mut held = Vec::new();
-        _hold_with(Some(&mut held), &mut diags, "many_member");
+        _hold(Some(&mut held), &mut diags, "many_member");
         assert_eq!(diags.items[0].phase, "held");
         assert_eq!(held.len(), 1);
         assert!(Rc::ptr_eq(&held[0], &diags.items[0]));
@@ -1645,7 +1584,7 @@ mod tests {
                 let Stmt::Assignment(a) = &**st else {
                     panic!("expected Assignment");
                 };
-                got.push(_function_target_message_with(a, prof, &empty));
+                got.push(_function_target_message(a, prof, &empty));
             }
             assert_eq!(got, expected);
         }

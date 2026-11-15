@@ -34,7 +34,7 @@ const CR3XX_SETTINGS_TABLE_PROPERTIES: &[&str] = &[
     "EVENTCOUNT",
     "EVENTEND",
 ];
-const CONST_TYPES: &[&str] = &["LONG", "FLOAT", "DOUBLE", "STRING", "BOOLEAN"];
+pub(crate) const _CONST_TYPES: &[&str] = &["LONG", "FLOAT", "DOUBLE", "STRING", "BOOLEAN"];
 
 static DO_LOOP_COND_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\b(?:While|Until)\b\s*(.*)$", 0));
@@ -43,13 +43,8 @@ fn is_whole_expr_echo_logger(profile: &Profile) -> bool {
     matches!(profile.name, "cr6" | "cr1000x")
 }
 
-/// Port of `checker/expressions.py::check_table_members`.
-pub fn check_table_members(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_table_members (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_table_members`.
-pub fn check_table_members_with(
+/// Port of checker/expressions.py::check_table_members
+pub fn check_table_members(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -69,10 +64,10 @@ pub fn check_table_members_with(
     if const_tables.is_empty() && data_table_names.is_empty() {
         return;
     }
-    let data_tables = pending_wiring::build_tables_with_fields(
-        &data_table_names,
-        pending_wiring::_data_table_fields(program, profile),
-    );
+    let data_tables = TablesWithFields {
+        tables: data_table_names.clone(),
+        fields: super::_data_table_fields(program, profile),
+    };
     let mut renamed: BTreeSet<String> = BTreeSet::new();
     let mut table: Option<String> = None;
     for st in &program.statements {
@@ -119,7 +114,7 @@ pub fn check_table_members_with(
         let exprs: Vec<Option<ExprRef>> = match &**stmt {
             Stmt::Assignment(a) => {
                 if let Some(k) = known
-                    && !pending_wiring::_undefined_names(a.target.as_deref(), k).is_empty()
+                    && !known_undefined_names(a.target.as_deref(), k).is_empty()
                 {
                     continue;
                 }
@@ -131,12 +126,9 @@ pub fn check_table_members_with(
             _ => Vec::new(),
         };
         for expr in exprs {
-            if let Some((tbl, member, index)) = pending_wiring::_table_member_problem(
-                expr.as_deref(),
-                const_tables,
-                &data_tables,
-                &absent,
-            ) {
+            if let Some((tbl, member, index)) =
+                super::_table_member_problem(expr.as_deref(), const_tables, &data_tables, &absent)
+            {
                 diags.error_basic(
                     stmt.line(),
                     &format!("Could not find {tbl}.{member}{index}."),
@@ -148,13 +140,8 @@ pub fn check_table_members_with(
     }
 }
 
-/// Port of `checker/expressions.py::_dotted_members`.
-pub fn _dotted_members(_expr: Option<&Expr>) {
-    todo!("checker/expressions.py::_dotted_members")
-}
-
-/// Port of `checker/expressions.py::_dotted_members`.
-pub fn _dotted_members_with(expr: Option<&Expr>) -> Vec<(String, Option<Member>)> {
+/// Port of checker/expressions.py::_dotted_members
+pub fn _dotted_members(expr: Option<&Expr>) -> Vec<(String, Option<Member>)> {
     let Some(expr) = expr else {
         return Vec::new();
     };
@@ -171,7 +158,7 @@ pub fn _dotted_members_with(expr: Option<&Expr>) -> Vec<(String, Option<Member>)
             }
         }
         Expr::Member(m) => {
-            let mut out = _dotted_members_with(m.base.as_deref());
+            let mut out = _dotted_members(m.base.as_deref());
             if let Some(base) = m.base.as_deref()
                 && let Expr::Name(n) = base
                 && !n.name.ends_with('.')
@@ -180,7 +167,7 @@ pub fn _dotted_members_with(expr: Option<&Expr>) -> Vec<(String, Option<Member>)
             }
             if let Some(args) = &m.args {
                 for a in args {
-                    out.extend(_dotted_members_with(a.as_deref()));
+                    out.extend(_dotted_members(a.as_deref()));
                 }
             }
             out
@@ -188,44 +175,34 @@ pub fn _dotted_members_with(expr: Option<&Expr>) -> Vec<(String, Option<Member>)
         Expr::Index(ix) => ix
             .args
             .iter()
-            .flat_map(|a| _dotted_members_with(a.as_deref()))
+            .flat_map(|a| _dotted_members(a.as_deref()))
             .collect(),
-        Expr::Unary(u) => _dotted_members_with(u.operand.as_deref()),
+        Expr::Unary(u) => _dotted_members(u.operand.as_deref()),
         Expr::Binary(b) => {
-            let mut out = _dotted_members_with(b.left.as_deref());
-            out.extend(_dotted_members_with(b.right.as_deref()));
+            let mut out = _dotted_members(b.left.as_deref());
+            out.extend(_dotted_members(b.right.as_deref()));
             out
         }
         Expr::ArrayLiteral(_) | Expr::Juxtaposed(_) => expr
             .array_items()
             .into_iter()
             .flatten()
-            .flat_map(|item| _dotted_members_with(item.as_deref()))
+            .flat_map(|item| _dotted_members(item.as_deref()))
             .collect(),
         Expr::Number(_) | Expr::String(_) => Vec::new(),
     }
 }
 
-/// Port of `checker/expressions.py::_unknown_status_member`.
-pub fn _unknown_status_member() -> bool {
-    todo!("checker/expressions.py::_unknown_status_member (omitted: m: untyped, profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_unknown_status_member`.
-pub fn _unknown_status_member_with(m: &Member, profile: &Profile) -> bool {
+/// Port of checker/expressions.py::_unknown_status_member
+pub fn _unknown_status_member(m: &Member, profile: &Profile) -> bool {
     let status_members = profile.status_members();
     !pystr::isdigit(pystr::slice(&m.member, Some(0), Some(1)))
         && !status_members.is_empty()
         && !status_members.contains(&pystr::upper(&m.member))
 }
 
-/// Port of `checker/expressions.py::_unknown_setting`.
-pub fn _unknown_setting() -> bool {
-    todo!("checker/expressions.py::_unknown_setting (omitted: m: untyped, profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_unknown_setting`.
-pub fn _unknown_setting_with(m: &Member, profile: &Profile) -> bool {
+/// Port of checker/expressions.py::_unknown_setting
+pub fn _unknown_setting(m: &Member, profile: &Profile) -> bool {
     if pystr::isdigit(pystr::slice(&m.member, Some(0), Some(1))) {
         return false;
     }
@@ -244,13 +221,8 @@ pub fn _unknown_setting_with(m: &Member, profile: &Profile) -> bool {
     !known_settings.contains(&upper)
 }
 
-/// Port of `checker/expressions.py::_unknown_public_member`.
-pub fn _unknown_public_member(_variables: &BTreeSet<String>) -> bool {
-    todo!("checker/expressions.py::_unknown_public_member (omitted: m: untyped)")
-}
-
-/// Port of `checker/expressions.py::_unknown_public_member`.
-pub fn _unknown_public_member_with(m: &Member, variables: &BTreeSet<String>) -> bool {
+/// Port of checker/expressions.py::_unknown_public_member
+pub fn _unknown_public_member(m: &Member, variables: &BTreeSet<String>) -> bool {
     if pystr::isdigit(pystr::slice(&m.member, Some(0), Some(1))) {
         return false;
     }
@@ -258,13 +230,8 @@ pub fn _unknown_public_member_with(m: &Member, variables: &BTreeSet<String>) -> 
     !variables.contains(&upper) && !TABLE_FIELDS.contains(&upper.as_str())
 }
 
-/// Port of `checker/expressions.py::check_status_member_reads_late`.
-pub fn check_status_member_reads_late(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_status_member_reads_late (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_status_member_reads_late`.
-pub fn check_status_member_reads_late_with(
+/// Port of checker/expressions.py::check_status_member_reads_late
+pub fn check_status_member_reads_late(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -276,23 +243,21 @@ pub fn check_status_member_reads_late_with(
     let variables: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|n| !pending_wiring::is_reserved_predefined_name(n, profile))
+        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name_with_profile(n, profile))
         .cloned()
         .collect();
     for stmt in &program.statements {
         let (exprs, target): (Vec<Option<ExprRef>>, usize) = match &**stmt {
             Stmt::Assignment(a) => (
                 vec![a.target.clone(), a.value.clone()],
-                _dotted_members_with(a.target.as_deref()).len(),
+                _dotted_members(a.target.as_deref()).len(),
             ),
             Stmt::If(i) => (vec![i.cond.clone()], 0),
             Stmt::Instruction(i) => (i.args.clone(), 0),
             Stmt::Call(c) => (c.args.clone(), 0),
             _ => continue,
         };
-        let all_members = exprs
-            .iter()
-            .flat_map(|e| _dotted_members_with(e.as_deref()));
+        let all_members = exprs.iter().flat_map(|e| _dotted_members(e.as_deref()));
         for (k, (base, m)) in all_members.enumerate() {
             let Some(m) = m else {
                 continue;
@@ -301,10 +266,10 @@ pub fn check_status_member_reads_late_with(
                 continue;
             }
             let upper = pystr::upper(&base);
-            if (upper == "STATUS" && _unknown_status_member_with(&m, profile))
-                || (upper == "PUBLIC" && _unknown_public_member_with(&m, &variables))
+            if (upper == "STATUS" && _unknown_status_member(&m, profile))
+                || (upper == "PUBLIC" && _unknown_public_member(&m, &variables))
             {
-                let idx_text = pending_wiring::_member_index_text(m.args.as_deref());
+                let idx_text = super::_member_index_text(m.args.as_deref());
                 diags.error_basic(
                     stmt.line(),
                     &format!(
@@ -318,13 +283,8 @@ pub fn check_status_member_reads_late_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_undefined_dotted_bases`.
-pub fn check_undefined_dotted_bases(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_undefined_dotted_bases (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_undefined_dotted_bases`.
-pub fn check_undefined_dotted_bases_with(
+/// Port of checker/expressions.py::check_undefined_dotted_bases
+pub fn check_undefined_dotted_bases(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -340,13 +300,12 @@ pub fn check_undefined_dotted_bases_with(
         {
             continue;
         }
-        let exprs = pending_wiring::_stmt_exprs(stmt);
+        let exprs = super::_stmt_exprs(stmt);
         let bases: Vec<String> = exprs
             .iter()
-            .flat_map(|e| _dotted_members_with(e.as_deref()))
+            .flat_map(|e| _dotted_members(e.as_deref()))
             .filter_map(|(b, m)| {
-                (m.is_some() && !pending_wiring::known_contains(known, &pystr::upper(&b)))
-                    .then_some(b)
+                (m.is_some() && !known.names.contains(&pystr::upper(&b))).then_some(b)
             })
             .collect();
         if bases.is_empty() {
@@ -355,7 +314,7 @@ pub fn check_undefined_dotted_bases_with(
         let base_uppers: BTreeSet<String> = bases.iter().map(|b| pystr::upper(b)).collect();
         let others: Vec<String> = exprs
             .iter()
-            .flat_map(|e| pending_wiring::_undefined_names_walk(e.as_deref(), known))
+            .flat_map(|e| known_undefined_name_walk_strings(e.as_deref(), known))
             .filter(|n| !base_uppers.contains(&pystr::upper(n)))
             .collect();
         let line = stmt.line();
@@ -392,7 +351,7 @@ pub fn check_undefined_dotted_bases_with(
             "",
         ))];
         if let Stmt::Assignment(a) = &**stmt
-            && !_dotted_members_with(a.target.as_deref()).is_empty()
+            && !_dotted_members(a.target.as_deref()).is_empty()
         {
             new_diags.push(Rc::new(Diagnostic::basic(
                 "error",
@@ -410,13 +369,8 @@ pub fn check_undefined_dotted_bases_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_digit_members`.
-pub fn check_digit_members(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_digit_members (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_digit_members`.
-pub fn check_digit_members_with(
+/// Port of checker/expressions.py::check_digit_members
+pub fn check_digit_members(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -425,11 +379,11 @@ pub fn check_digit_members_with(
     let mut variables: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|n| !pending_wiring::is_reserved_predefined_name(n, profile))
+        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name_with_profile(n, profile))
         .cloned()
         .collect();
-    let struct_types = pending_wiring::structure_members(program);
-    let kinds = pending_wiring::variable_kinds(program, &struct_types);
+    let struct_types = crate::checker::structs::structure_members(program);
+    let kinds = crate::checker::structs::variable_kinds(program, &struct_types);
     variables.retain(|n| !kinds.get(n).is_some_and(|k| k.starts_with("STRUCT")));
     for st in &program.statements {
         if let Stmt::SubDef(sd) = &**st {
@@ -491,18 +445,18 @@ pub fn check_digit_members_with(
         };
         let members: Vec<(String, Option<Member>)> = exprs
             .iter()
-            .flat_map(|e| _dotted_members_with(e.as_deref()))
+            .flat_map(|e| _dotted_members(e.as_deref()))
             .collect();
         if members.is_empty()
             || exprs
                 .iter()
-                .any(|e| !pending_wiring::_undefined_names(e.as_deref(), known).is_empty())
+                .any(|e| !known_undefined_names(e.as_deref(), known).is_empty())
         {
             continue;
         }
         let mut lines: Vec<String> = Vec::new();
         let target = if let Stmt::Assignment(a) = &**stmt {
-            _dotted_members_with(a.target.as_deref()).len()
+            _dotted_members(a.target.as_deref()).len()
         } else {
             0
         };
@@ -522,31 +476,31 @@ pub fn check_digit_members_with(
                 continue;
             };
             if upper == "SETTINGS"
-                && _unknown_setting_with(&m, profile)
+                && _unknown_setting(&m, profile)
                 && (!profile.single_pass
                     || (matches!(&**stmt, Stmt::Assignment(_) | Stmt::If(_))
                         && !CR3XX_SETTINGS_TABLE_PROPERTIES
                             .contains(&pystr::upper(&m.member).as_str())))
             {
-                let idx = pending_wiring::_member_index_text(m.args.as_deref());
+                let idx = super::_member_index_text(m.args.as_deref());
                 lines.push(format!("Could not find Settings.{}{idx}.", m.member));
             } else if upper == "STATUS"
                 && !profile.single_pass
-                && _unknown_status_member_with(&m, profile)
+                && _unknown_status_member(&m, profile)
             {
-                let idx = pending_wiring::_member_index_text(m.args.as_deref());
+                let idx = super::_member_index_text(m.args.as_deref());
                 lines.push(format!("Could not find Status.{}{idx}.", m.member));
             } else if data_tables.contains(&upper) {
                 if pystr::isdigit(pystr::slice(&m.member, Some(0), Some(1))) {
-                    let idx = pending_wiring::_member_index_text(m.args.as_deref());
+                    let idx = super::_member_index_text(m.args.as_deref());
                     lines.push(format!("Could not find {base}.{}{idx}.", m.member));
                 }
             } else if upper == "PUBLIC"
                 && k >= target
                 && !profile.single_pass
-                && _unknown_public_member_with(&m, &variables)
+                && _unknown_public_member(&m, &variables)
             {
-                let idx = pending_wiring::_member_index_text(m.args.as_deref());
+                let idx = super::_member_index_text(m.args.as_deref());
                 lines.push(format!("Could not find Public.{}{idx}.", m.member));
             } else if variables.contains(&upper) {
                 lines.push(if profile.single_pass {
@@ -563,7 +517,7 @@ pub fn check_digit_members_with(
             diags.error_basic(stmt.line(), line, stmt.file());
         }
         if let Stmt::Assignment(a) = &**stmt
-            && _dotted_members_with(a.target.as_deref())
+            && _dotted_members(a.target.as_deref())
                 .iter()
                 .any(|(_, m)| m.is_some())
         {
@@ -581,13 +535,8 @@ pub fn check_digit_members_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_const_family_args`.
-pub fn check_const_family_args(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_const_family_args (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_const_family_args`.
-pub fn check_const_family_args_with(
+/// Port of checker/expressions.py::check_const_family_args
+pub fn check_const_family_args(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -600,7 +549,9 @@ pub fn check_const_family_args_with(
     let mut variable_names: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|name| !pending_wiring::is_reserved_predefined_name(name, profile))
+        .filter(|name| {
+            !crate::checker::symbols::is_reserved_predefined_name_with_profile(name, profile)
+        })
         .cloned()
         .collect();
     for name in super::part2::_alias_names(program) {
@@ -617,12 +568,12 @@ pub fn check_const_family_args_with(
             continue;
         };
         if inst.args.iter().flatten().any(|a| {
-            pending_wiring::_find_arity_problem(Some(a), profile, None).is_some()
-                || pending_wiring::_find_bare_function_ref(Some(a), profile, &variable_names)
+            super::_find_arity_problem(Some(a), profile, None, &BTreeSet::new()).is_some()
+                || super::_find_bare_function_ref(Some(a), profile, &variable_names)
         }) {
             continue;
         }
-        let positions = pending_wiring::_position_kinds(&record.params, &inst.keyword, profile);
+        let positions = super::_position_kinds(&record.params, &inst.keyword, Some(profile));
         if !positions.is_empty() {
             let (params, later) = &scopes[&stmt_id(stmt)];
             let excluded: BTreeSet<String> = later
@@ -630,10 +581,11 @@ pub fn check_const_family_args_with(
                 .filter(|n| !variable_names.contains(*n))
                 .cloned()
                 .collect();
-            let scoped_known = pending_wiring::known_without(known, &excluded);
+            let scoped_known = known.without(&excluded);
             let scoped_vars: BTreeSet<String> = variable_names.union(params).cloned().collect();
-            pending_wiring::_report_statement(
+            super::_report_statement(
                 inst,
+                stmt_id(stmt),
                 &positions,
                 &scoped_known,
                 &scoped_vars,
@@ -647,15 +599,8 @@ pub fn check_const_family_args_with(
     }
 }
 
-/// Port of `checker/expressions.py::_names_before_invalid_compound`.
-pub fn _names_before_invalid_compound() -> Option<Vec<String>> {
-    todo!(
-        "checker/expressions.py::_names_before_invalid_compound (omitted: expr: untyped, known: untyped, read_only: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::_names_before_invalid_compound`.
-pub fn _names_before_invalid_compound_with(
+/// Port of checker/expressions.py::_names_before_invalid_compound
+pub fn _names_before_invalid_compound(
     expr: Option<&Expr>,
     known: &KnownNames,
     read_only: &BTreeSet<String>,
@@ -663,8 +608,7 @@ pub fn _names_before_invalid_compound_with(
     let expr = expr?;
     match expr {
         Expr::Binary(b) => {
-            if let Some(names) =
-                _names_before_invalid_compound_with(b.left.as_deref(), known, read_only)
+            if let Some(names) = _names_before_invalid_compound(b.left.as_deref(), known, read_only)
             {
                 return Some(names);
             }
@@ -677,21 +621,19 @@ pub fn _names_before_invalid_compound_with(
                     _ => true,
                 };
                 if invalid {
-                    return Some(pending_wiring::_undefined_names_str(target, known));
+                    return Some(known_undefined_name_strings(target, known));
                 }
             }
             if let Some(names) =
-                _names_before_invalid_compound_with(b.right.as_deref(), known, read_only)
+                _names_before_invalid_compound(b.right.as_deref(), known, read_only)
             {
-                let mut out = pending_wiring::_undefined_names_str(b.left.as_deref(), known);
+                let mut out = known_undefined_name_strings(b.left.as_deref(), known);
                 out.extend(names);
                 return Some(out);
             }
             None
         }
-        Expr::Unary(u) => {
-            _names_before_invalid_compound_with(u.operand.as_deref(), known, read_only)
-        }
+        Expr::Unary(u) => _names_before_invalid_compound(u.operand.as_deref(), known, read_only),
         Expr::Index(ix) => {
             let children: Vec<Option<&Expr>> = ix.args.iter().map(|a| a.as_deref()).collect();
             _names_before_invalid_compound_children(&children, known, read_only)
@@ -723,10 +665,10 @@ fn _names_before_invalid_compound_children(
     read_only: &BTreeSet<String>,
 ) -> Option<Vec<String>> {
     for (i, &child) in children.iter().enumerate() {
-        if let Some(names) = _names_before_invalid_compound_with(child, known, read_only) {
+        if let Some(names) = _names_before_invalid_compound(child, known, read_only) {
             let mut out = Vec::new();
             for &before in &children[..i] {
-                out.extend(pending_wiring::_undefined_names_str(before, known));
+                out.extend(known_undefined_name_strings(before, known));
             }
             out.extend(names);
             return Some(out);
@@ -735,16 +677,9 @@ fn _names_before_invalid_compound_children(
     None
 }
 
-/// Port of `checker/expressions.py::_report_invalid_compound`.
-pub fn _report_invalid_compound() -> bool {
-    todo!(
-        "checker/expressions.py::_report_invalid_compound (omitted: stmt: untyped, expr: untyped, text: untyped, known: untyped, read_only: untyped, profile: untyped, diags: untyped, whole_statement: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::_report_invalid_compound`.
+/// Port of checker/expressions.py::_report_invalid_compound
 #[allow(clippy::too_many_arguments)]
-pub fn _report_invalid_compound_with(
+pub fn _report_invalid_compound(
     stmt: &StmtRef,
     expr: Option<&Expr>,
     text: &str,
@@ -754,7 +689,7 @@ pub fn _report_invalid_compound_with(
     diags: &mut Diagnostics,
     whole_statement: bool,
 ) -> bool {
-    let Some(names) = _names_before_invalid_compound_with(expr, known, read_only) else {
+    let Some(names) = _names_before_invalid_compound(expr, known, read_only) else {
         return false;
     };
     if !names.is_empty() && !profile.single_pass {
@@ -793,20 +728,13 @@ pub fn _report_invalid_compound_with(
     true
 }
 
-/// Port of `checker/expressions.py::check`.
-pub fn check(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check (omitted: profile: untyped, env: consteval.Env, skip: frozenset)"
-    )
-}
-
-/// Port of `checker/expressions.py::check`.
-pub fn check_with<S: std::hash::BuildHasher>(
+/// Port of checker/expressions.py::check
+pub fn check(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
     env: &Env,
-    skip: &HashSet<usize, S>,
+    skip: &BTreeSet<usize>,
 ) {
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let known = ctx.known_names();
@@ -863,7 +791,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 excluded.insert(name.clone());
             }
         }
-        pending_wiring::known_without(known, &excluded)
+        known.without(&excluded)
     };
 
     let mut seen_avw200 = false;
@@ -881,8 +809,8 @@ pub fn check_with<S: std::hash::BuildHasher>(
         if kw == "SLOWSEQUENCE" && is_whole_expr_echo_logger(profile) {
             continue;
         }
-        let mut positions = pending_wiring::_position_kinds(&record.params, &inst.keyword, profile);
-        if kw == "SDMSIO4" && pending_wiring::_sdmsio4_count(inst, env) == Some(0) {
+        let mut positions = super::_position_kinds(&record.params, &inst.keyword, Some(profile));
+        if kw == "SDMSIO4" && super::_sdmsio4_count(inst, env) == Some(0) {
             positions.remove(&0);
         }
         if kw == "AVW200" && is_whole_expr_echo_logger(profile) {
@@ -896,7 +824,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
             && kw == "SERIALOPEN"
             && let Some(Some(arg0)) = inst.args.first()
             && is_whole_expr_echo_logger(profile)
-            && !pending_wiring::_undefined_names(Some(arg0), known).is_empty()
+            && !known_undefined_names(Some(arg0), known).is_empty()
         {
             continue;
         }
@@ -909,16 +837,17 @@ pub fn check_with<S: std::hash::BuildHasher>(
                     .filter(|n| !variable_names.contains(*n))
                     .cloned()
                     .collect();
-                let mut h = pending_wiring::known_without(known, &excluded);
+                let mut h = known.without(&excluded);
                 if kw == "REALTIME" {
                     h = visible_at(stmt);
                 }
                 (h, variable_names.union(params).cloned().collect())
             } else {
-                (pending_wiring::known_clone(known), variable_names.clone())
+                (known.clone(), variable_names.clone())
             };
-            pending_wiring::_report_statement(
+            super::_report_statement(
                 inst,
+                stmt_id(stmt),
                 &positions,
                 &here,
                 &here_variables,
@@ -934,8 +863,13 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 && diags.items[reported..]
                     .iter()
                     .all(|d| d.message.starts_with("Invalid symbol in expression: "))
-                && let Some(rewritten) =
-                    pending_wiring::matrix_undefined_operands(inst, program, env, known, profile)
+                && let Some(rewritten) = crate::checker::instr_rules::matrix_undefined_operands(
+                    inst,
+                    program,
+                    env,
+                    &known.names,
+                    profile,
+                )
             {
                 diags.items.truncate(reported);
                 for message in rewritten {
@@ -953,9 +887,9 @@ pub fn check_with<S: std::hash::BuildHasher>(
         let here = if profile.single_pass {
             visible_at(stmt)
         } else {
-            pending_wiring::known_clone(known)
+            known.clone()
         };
-        let names = pending_wiring::_undefined_names(if_stmt.cond.as_deref(), &here);
+        let names = known_undefined_names(if_stmt.cond.as_deref(), &here);
         let text = super::part2::_if_condition_text(stmt)
             .or_else(|| super::part2::_if_condition_text_no_then(stmt));
         let mut ro_scoped = read_only.clone();
@@ -963,7 +897,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
             ro_scoped.remove(p);
         }
         if let Some(ref t) = text
-            && _report_invalid_compound_with(
+            && _report_invalid_compound(
                 stmt,
                 if_stmt.cond.as_deref(),
                 t,
@@ -990,15 +924,15 @@ pub fn check_with<S: std::hash::BuildHasher>(
         }
         if let Some(ref t) = text
             && names.is_empty()
-            && pending_wiring::_over_indexed(
+            && super::_over_indexed(
                 if_stmt.cond.as_deref(),
                 dim_counts,
-                pending_wiring::_dim_limit(profile),
+                super::_dim_limit(profile),
             )
         {
             diags.error_basic(
                 stmt.line(),
-                &pending_wiring::dimensions_message(t, profile, false, false),
+                &super::dimensions_message(t, profile, false, false),
                 stmt.file(),
             );
             continue;
@@ -1009,8 +943,14 @@ pub fn check_with<S: std::hash::BuildHasher>(
         if names.is_empty() {
             continue;
         }
-        let (names_out, dims) =
-            pending_wiring::_names_and_dims(&here, Some(ds), stmt, &[], if_stmt.cond.as_deref());
+        let (names_out, dims) = super::_names_and_dims(
+            &here,
+            Some(ds),
+            Some(stmt_id(stmt)),
+            &[],
+            std::slice::from_ref(&if_stmt.cond),
+        )
+        .map_names();
         let before = diags.items.len();
         if is_whole_expr_echo_logger(profile) {
             diags.error_basic(
@@ -1022,14 +962,14 @@ pub fn check_with<S: std::hash::BuildHasher>(
             for name in &names_out {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::format_unresolved_maybe_dotted(profile, name),
+                    &format_unresolved_maybe_dotted(profile, name),
                     stmt.file(),
                 );
             }
             if dims {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::dimensions_message(&t, profile, false, false),
+                    &super::dimensions_message(&t, profile, false, false),
                     stmt.file(),
                 );
             }
@@ -1059,7 +999,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
         if dl.cond.is_none() {
             continue;
         }
-        let names = pending_wiring::_undefined_names(dl.cond.as_deref(), known);
+        let names = known_undefined_names(dl.cond.as_deref(), known);
         let cond_text = DO_LOOP_COND_RE
             .search(stmt.text())
             .and_then(|m| m.group(1).map(str::to_owned));
@@ -1068,7 +1008,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
             ro_scoped.remove(p);
         }
         if let Some(ref ct) = cond_text
-            && _report_invalid_compound_with(
+            && _report_invalid_compound(
                 stmt,
                 dl.cond.as_deref(),
                 ct,
@@ -1083,15 +1023,11 @@ pub fn check_with<S: std::hash::BuildHasher>(
         }
         if let Some(ref ct) = cond_text
             && names.is_empty()
-            && pending_wiring::_over_indexed(
-                dl.cond.as_deref(),
-                dim_counts,
-                pending_wiring::_dim_limit(profile),
-            )
+            && super::_over_indexed(dl.cond.as_deref(), dim_counts, super::_dim_limit(profile))
         {
             diags.error_basic(
                 stmt.line(),
-                &pending_wiring::dimensions_message(ct, profile, false, false),
+                &super::dimensions_message(ct, profile, false, false),
                 stmt.file(),
             );
             continue;
@@ -1112,16 +1048,16 @@ pub fn check_with<S: std::hash::BuildHasher>(
             for name in &names {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::format_unresolved_maybe_dotted(profile, name),
+                    &format_unresolved_maybe_dotted(profile, name),
                     stmt.file(),
                 );
             }
         }
     }
 
-    pending_wiring::_check_for_headers(program, profile, diags, known);
-    pending_wiring::_check_elseif_and_case(program, profile, diags, known);
-    pending_wiring::_check_function_statements(program, profile, diags, known);
+    super::_check_for_headers(program, profile, diags, known);
+    super::_check_elseif_and_case(program, profile, diags, known);
+    super::_check_function_statements(program, profile, diags, known);
 
     let struct_vars = super::part4::_struct_var_names(program);
     let functions: BTreeSet<String> = program
@@ -1143,32 +1079,24 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 && !c
                     .args
                     .iter()
-                    .any(|a| !pending_wiring::_undefined_names(a.as_deref(), known).is_empty())
+                    .any(|a| !known_undefined_names(a.as_deref(), known).is_empty())
                 && c.args.iter().any(|a| {
-                    pending_wiring::_over_indexed(
-                        a.as_deref(),
-                        dim_counts,
-                        pending_wiring::_dim_limit(profile),
-                    )
+                    super::_over_indexed(a.as_deref(), dim_counts, super::_dim_limit(profile))
                 })
             {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
+                    &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                     stmt.file(),
                 );
             }
             if let Some(ref tail) = c.tail_expr
-                && pending_wiring::_undefined_names(Some(tail), known).is_empty()
-                && pending_wiring::_over_indexed(
-                    Some(tail),
-                    dim_counts,
-                    pending_wiring::_dim_limit(profile),
-                )
+                && known_undefined_names(Some(tail), known).is_empty()
+                && super::_over_indexed(Some(tail), dim_counts, super::_dim_limit(profile))
             {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
+                    &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                     stmt.file(),
                 );
             }
@@ -1179,38 +1107,33 @@ pub fn check_with<S: std::hash::BuildHasher>(
         if suppressed_inline.contains(&stmt_id(stmt)) {
             continue;
         }
-        if !pending_wiring::_undefined_names(a.target.as_deref(), known).is_empty() {
+        if !known_undefined_names(a.target.as_deref(), known).is_empty() {
             continue;
         }
         if profile.single_pass {
             let visible = visible_at(stmt);
-            if !pending_wiring::known_eq(&visible, known) {
-                let exprs_pair = [a.target.as_deref(), a.value.as_deref()];
+            if visible.names != known.names {
+                let exprs_pair = [a.target.clone(), a.value.clone()];
                 let (early, dims) =
-                    pending_wiring::_names_and_dims_multi(&visible, None, stmt, &[], &exprs_pair);
+                    super::_names_and_dims(&visible, None, Some(stmt_id(stmt)), &[], &exprs_pair)
+                        .map_names();
                 if !early.is_empty()
                     && early.iter().any(|name| {
                         let up = pystr::upper(name.as_str());
-                        pending_wiring::known_contains(known, &up)
-                            && !pending_wiring::known_contains(&visible, &up)
+                        known.names.contains(&up) && !visible.names.contains(&up)
                     })
                 {
                     for name in &early {
                         diags.error_basic(
                             stmt.line(),
-                            &pending_wiring::format_unresolved_maybe_dotted(profile, name),
+                            &format_unresolved_maybe_dotted(profile, name),
                             stmt.file(),
                         );
                     }
                     if dims {
                         diags.error_basic(
                             stmt.line(),
-                            &pending_wiring::dimensions_message(
-                                stmt.text(),
-                                profile,
-                                true,
-                                stmt.at_eol(),
-                            ),
+                            &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                             stmt.file(),
                         );
                     }
@@ -1224,7 +1147,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
             continue;
         }
         if profile.single_pass
-            && pending_wiring::_function_target_message(a, profile, &BTreeSet::new()).is_some()
+            && super::_function_target_message(a, profile, &BTreeSet::new()).is_some()
         {
             continue;
         }
@@ -1232,7 +1155,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
         for p in &scopes[&stmt_id(stmt)].0 {
             ro_scoped.remove(p);
         }
-        if _report_invalid_compound_with(
+        if _report_invalid_compound(
             stmt,
             a.value.as_deref(),
             stmt.text(),
@@ -1244,7 +1167,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
         ) {
             continue;
         }
-        let names = pending_wiring::_undefined_names(a.value.as_deref(), known);
+        let names = known_undefined_names(a.value.as_deref(), known);
         let whole_echo = is_whole_expr_echo_logger(profile);
         if (profile.single_pass || !names.is_empty())
             && let Some(target_expr) = a.target.as_deref()
@@ -1252,14 +1175,14 @@ pub fn check_with<S: std::hash::BuildHasher>(
             && let Some(base_expr) = m.base.as_deref()
             && let Expr::Name(n) = base_expr
             && pystr::upper(&n.name) == "STATUS"
-            && _unknown_status_member_with(m, profile)
+            && _unknown_status_member(m, profile)
         {
             let base = if profile.single_pass {
                 n.name.as_str()
             } else {
                 "Status"
             };
-            let idx = pending_wiring::_member_index_text(m.args.as_deref());
+            let idx = super::_member_index_text(m.args.as_deref());
             diags.error_basic(
                 stmt.line(),
                 &format!("Could not find {base}.{member}{idx}.", member = m.member),
@@ -1269,7 +1192,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 for name in &names {
                     diags.error_basic(
                         stmt.line(),
-                        &pending_wiring::format_unresolved_maybe_dotted(profile, name),
+                        &format_unresolved_maybe_dotted(profile, name),
                         stmt.file(),
                     );
                 }
@@ -1282,7 +1205,7 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 continue;
             }
         }
-        if pending_wiring::_over_indexed(
+        if super::_over_indexed(
             a.target.as_deref(),
             dim_counts,
             if whole_echo { Some(3) } else { None },
@@ -1299,14 +1222,10 @@ pub fn check_with<S: std::hash::BuildHasher>(
             continue;
         }
         if names.is_empty() {
-            if pending_wiring::_over_indexed(
-                a.value.as_deref(),
-                dim_counts,
-                pending_wiring::_dim_limit(profile),
-            ) {
+            if super::_over_indexed(a.value.as_deref(), dim_counts, super::_dim_limit(profile)) {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
+                    &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                     stmt.file(),
                 );
             }
@@ -1323,27 +1242,33 @@ pub fn check_with<S: std::hash::BuildHasher>(
                 "",
             );
         } else {
-            let prior = [a.target.as_deref()];
-            let (mut resolved_names, dims) =
-                pending_wiring::_names_and_dims(known, Some(ds), stmt, &prior, a.value.as_deref());
-            if !dims && pending_wiring::_over_indexed(a.value.as_deref(), dim_counts, None) {
-                resolved_names = pending_wiring::_names_through_over_index(
-                    a.value.as_deref(),
-                    known,
-                    dim_counts,
-                );
+            let prior = [a.target.clone()];
+            let (mut resolved_names, dims) = super::_names_and_dims(
+                known,
+                Some(ds),
+                Some(stmt_id(stmt)),
+                &prior,
+                std::slice::from_ref(&a.value),
+            )
+            .map_names();
+            if !dims && super::_over_indexed(a.value.as_deref(), dim_counts, None) {
+                resolved_names =
+                    super::_names_through_over_index(a.value.as_deref(), &known.names, dim_counts)
+                        .into_iter()
+                        .map(super::UndefinedName::Plain)
+                        .collect();
             }
             for name in &resolved_names {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::format_unresolved_maybe_dotted(profile, name),
+                    &format_unresolved_maybe_dotted(profile, name),
                     stmt.file(),
                 );
             }
-            if dims || pending_wiring::_over_indexed(a.value.as_deref(), dim_counts, None) {
+            if dims || super::_over_indexed(a.value.as_deref(), dim_counts, None) {
                 diags.error_basic(
                     stmt.line(),
-                    &pending_wiring::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
+                    &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                     stmt.file(),
                 );
             }
@@ -1351,13 +1276,8 @@ pub fn check_with<S: std::hash::BuildHasher>(
     }
 }
 
-/// Port of `checker/expressions.py::check_consts`.
-pub fn check_consts(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_consts (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_consts`.
-pub fn check_consts_with(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
+/// Port of checker/expressions.py::check_consts
+pub fn check_consts(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     let ctx = context::of(program, Some(profile), None);
     let known = ctx.known_names();
     let unready = ctx.not_yet_declared();
@@ -1372,16 +1292,16 @@ pub fn check_consts_with(program: &ProgramRef, profile: &'static Profile, diags:
             continue;
         };
         if let Some(ref ty) = c.type_
-            && !CONST_TYPES.contains(&pystr::upper(ty).as_str())
+            && !_CONST_TYPES.contains(&pystr::upper(ty).as_str())
         {
             continue;
         }
         let empty = BTreeSet::new();
         let unready_set = unready.get(&stmt_id(stmt)).unwrap_or(&empty);
-        let visible = pending_wiring::known_without(known, unready_set);
+        let visible = known.without(unready_set);
         if let Some((start, end)) = c.value_span {
             let val_text = pystr::slice(stmt.text(), Some(start), Some(end));
-            if _report_invalid_compound_with(
+            if _report_invalid_compound(
                 stmt,
                 c.value.as_deref(),
                 val_text,
@@ -1394,11 +1314,16 @@ pub fn check_consts_with(program: &ProgramRef, profile: &'static Profile, diags:
                 continue;
             }
         }
-        let names = pending_wiring::_undefined_names_str(c.value.as_deref(), &visible);
+        let names = known_undefined_name_strings(c.value.as_deref(), &visible);
         let problem = if names.is_empty() {
             None
         } else {
-            pending_wiring::_find_arity_problem(c.value.as_deref(), profile, Some(&visible))
+            super::_find_arity_problem(
+                c.value.as_deref(),
+                profile,
+                Some(&visible.names),
+                &BTreeSet::new(),
+            )
         };
         let names_first = profile.single_pass
             && matches!(problem.as_deref(), Some("constint" | "network_constint"));
@@ -1407,17 +1332,12 @@ pub fn check_consts_with(program: &ProgramRef, profile: &'static Profile, diags:
         {
             continue;
         }
-        _report_const_names_with(c, &names, profile, diags);
+        _report_const_names(c, &names, profile, diags);
     }
 }
 
-/// Port of `checker/expressions.py::_report_const_names`.
-pub fn _report_const_names(_stmt: &ConstDecl, _names: Vec<String>, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::_report_const_names (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::_report_const_names`.
-pub fn _report_const_names_with(
+/// Port of checker/expressions.py::_report_const_names
+pub fn _report_const_names(
     stmt: &ConstDecl,
     names: &[String],
     profile: &Profile,
@@ -1447,258 +1367,39 @@ pub fn _report_const_names_with(
     }
 }
 
-/// Typed bridge to sibling functions whose `port` stub signatures omit parameters or return types.
-/// `@integrator-2`: replace each call here with the merged sibling signature.
-mod pending_wiring {
-    use std::collections::BTreeSet;
-
-    use crate::checker::context::DimCounts;
-    use crate::consteval::Env;
-    use crate::diagnostics::Diagnostics;
-    use crate::profiles::Profile;
-    use crate::syntax::{
-        Assignment, Expr, ExprRef, Instruction, OrderedMap, Program, Stmt, StmtRef,
-    };
-
-    use super::super::part2::{DimsState, KnownNames, TablesWithFields};
-
-    #[derive(Debug, Clone)]
-    pub enum MaybeDottedName {
-        Plain(String),
-        Dotted(crate::profiles::DottedName),
+fn known_undefined_names(expr: Option<&Expr>, known: &KnownNames) -> Vec<super::UndefinedName> {
+    super::_undefined_names(expr, &super::KnownView::from(known))
+}
+fn known_undefined_name_strings(expr: Option<&Expr>, known: &KnownNames) -> Vec<String> {
+    known_undefined_names(expr, known)
+        .into_iter()
+        .map(super::UndefinedName::into_string)
+        .collect()
+}
+fn known_undefined_name_walk_strings(expr: Option<&Expr>, known: &KnownNames) -> Vec<String> {
+    super::_undefined_names_walk(expr, &super::KnownView::from(known))
+        .into_iter()
+        .map(super::UndefinedName::into_string)
+        .collect()
+}
+fn format_unresolved_maybe_dotted(profile: &Profile, name: &super::UndefinedName) -> String {
+    match name {
+        super::UndefinedName::Plain(s) => profile.unresolved_symbol_message.format(s),
+        super::UndefinedName::Dotted(d) => profile.unresolved_symbol_message.format_dotted(d),
     }
-
-    impl MaybeDottedName {
-        pub fn as_str(&self) -> &str {
-            match self {
-                Self::Plain(s) => s,
-                Self::Dotted(d) => &d.0,
-            }
-        }
-    }
-
-    pub fn format_unresolved_maybe_dotted(profile: &Profile, name: &MaybeDottedName) -> String {
-        match name {
-            MaybeDottedName::Plain(s) => profile.unresolved_symbol_message.format(s),
-            MaybeDottedName::Dotted(d) => profile.unresolved_symbol_message.format_dotted(d),
-        }
-    }
-
-    pub fn build_tables_with_fields(
-        _names: &BTreeSet<String>,
-        _fields: OrderedMap<String, BTreeSet<String>>,
-    ) -> TablesWithFields {
-        todo!("wire TablesWithFields once part2 lands")
-    }
-
-    pub fn _data_table_fields(
-        _program: &Program,
-        _profile: &Profile,
-    ) -> OrderedMap<String, BTreeSet<String>> {
-        todo!("wire part2::_data_table_fields_with (omits profile & return type on port)")
-    }
-
-    pub fn _table_member_problem(
-        _expr: Option<&Expr>,
-        _const_tables: &OrderedMap<String, BTreeSet<String>>,
-        _data_tables: &TablesWithFields,
-        _absent: &BTreeSet<String>,
-    ) -> Option<(String, String, String)> {
-        todo!("wire part2::_table_member_problem_with (omits const_tables & return type on port)")
-    }
-
-    pub fn _undefined_names(_expr: Option<&Expr>, _known: &KnownNames) -> Vec<MaybeDottedName> {
-        todo!(
-            "wire part1::_undefined_names (takes &BTreeSet<String> on port instead of KnownNames)"
+}
+trait MapNames {
+    fn map_names(self) -> (Vec<super::UndefinedName>, bool);
+}
+impl MapNames for (Vec<String>, bool) {
+    fn map_names(self) -> (Vec<super::UndefinedName>, bool) {
+        (
+            self.0
+                .into_iter()
+                .map(super::UndefinedName::Plain)
+                .collect(),
+            self.1,
         )
-    }
-
-    pub fn _undefined_names_str(_expr: Option<&Expr>, _known: &KnownNames) -> Vec<String> {
-        todo!(
-            "wire part1::_undefined_names (takes &BTreeSet<String> on port instead of KnownNames)"
-        )
-    }
-
-    pub fn _undefined_names_walk(_expr: Option<&Expr>, _known: &KnownNames) -> Vec<String> {
-        todo!(
-            "wire part1::_undefined_names_walk (takes &BTreeSet<String> on port instead of KnownNames)"
-        )
-    }
-
-    pub fn _member_index_text(_args: Option<&[Option<ExprRef>]>) -> String {
-        todo!("wire part2::_member_index_text_with (omits args on port)")
-    }
-
-    pub fn _stmt_exprs(_stmt: &Stmt) -> Vec<Option<ExprRef>> {
-        todo!("wire part2::_stmt_exprs (returns () on port)")
-    }
-
-    pub fn is_reserved_predefined_name(_name: &str, _profile: &Profile) -> bool {
-        todo!("wire symbols::is_reserved_predefined_name_with (omits profile on port)")
-    }
-
-    pub fn structure_members(_program: &Program) -> OrderedMap<String, BTreeSet<String>> {
-        todo!("wire structs::_structure_members (returns () on port)")
-    }
-
-    pub fn variable_kinds(
-        _program: &Program,
-        _structs: &OrderedMap<String, BTreeSet<String>>,
-    ) -> OrderedMap<String, String> {
-        todo!("wire structs::_variable_kinds (omits structs & return type on port)")
-    }
-
-    pub fn known_contains(_known: &KnownNames, _name: &str) -> bool {
-        todo!("wire KnownNames::contains once part2 lands")
-    }
-
-    pub fn known_without(_known: &KnownNames, _names: &BTreeSet<String>) -> KnownNames {
-        todo!("wire KnownNames::without_with (omits names on port)")
-    }
-
-    pub fn known_clone(_known: &KnownNames) -> KnownNames {
-        todo!("wire KnownNames: Clone once part2 lands")
-    }
-
-    pub fn known_eq(_a: &KnownNames, _b: &KnownNames) -> bool {
-        todo!("wire KnownNames: PartialEq once part2 lands")
-    }
-
-    pub fn _find_arity_problem(
-        _expr: Option<&Expr>,
-        _profile: &Profile,
-        _known: Option<&KnownNames>,
-    ) -> Option<String> {
-        todo!("wire part4::_find_arity_problem_with (omits profile on port)")
-    }
-
-    pub fn _find_bare_function_ref(
-        _expr: Option<&Expr>,
-        _profile: &Profile,
-        _declared_variables: &BTreeSet<String>,
-    ) -> bool {
-        todo!("wire part4::_find_bare_function_ref_with (omits profile on port)")
-    }
-
-    pub fn _position_kinds(
-        _params: &[i64],
-        _keyword: &str,
-        _profile: &Profile,
-    ) -> OrderedMap<usize, String> {
-        todo!("wire part1::_position_kinds_with (omits profile on port)")
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn _report_statement(
-        _stmt: &Instruction,
-        _positions: &OrderedMap<usize, String>,
-        _known: &KnownNames,
-        _variable_names: &BTreeSet<String>,
-        _profile: &Profile,
-        _diags: &mut Diagnostics,
-        _families: &str,
-        _dim_counts: Option<&DimCounts>,
-        _ds: Option<&DimsState>,
-    ) -> bool {
-        todo!("wire part2::_report_statement_with (omits profile & takes Owned types on port)")
-    }
-
-    pub fn _sdmsio4_count(_stmt: &Instruction, _env: &Env) -> Option<i64> {
-        todo!("wire part5::_sdmsio4_count_with (omits env on port)")
-    }
-
-    pub fn matrix_undefined_operands(
-        _stmt: &Instruction,
-        _program: &Program,
-        _env: &Env,
-        _known: &KnownNames,
-        _profile: &Profile,
-    ) -> Option<Vec<String>> {
-        todo!("wire instr_rules::matrix_undefined_operands_with")
-    }
-
-    pub fn _dim_limit(_profile: &Profile) -> Option<i64> {
-        todo!("wire part2::_dim_limit_with (omits profile on port)")
-    }
-
-    pub fn _over_indexed(
-        _expr: Option<&Expr>,
-        _dim_counts: &DimCounts,
-        _limit: Option<i64>,
-    ) -> bool {
-        todo!("wire part2::_over_indexed (takes OrderedMap instead of DimCounts on port)")
-    }
-
-    pub fn dimensions_message(
-        _text: &str,
-        _profile: &Profile,
-        _whole_statement: bool,
-        _at_eol: bool,
-    ) -> String {
-        todo!("wire part2::dimensions_message_with (omits profile on port)")
-    }
-
-    pub fn _names_and_dims(
-        _known: &KnownNames,
-        _ds: Option<&DimsState>,
-        _stmt: &StmtRef,
-        _prior: &[Option<&Expr>],
-        _expr: Option<&Expr>,
-    ) -> (Vec<MaybeDottedName>, bool) {
-        todo!("wire part2::_names_and_dims_with (omits prior, expr, return type on port)")
-    }
-
-    pub fn _names_and_dims_multi(
-        _known: &KnownNames,
-        _ds: Option<&DimsState>,
-        _stmt: &StmtRef,
-        _prior: &[Option<&Expr>],
-        _exprs: &[Option<&Expr>],
-    ) -> (Vec<MaybeDottedName>, bool) {
-        todo!("wire part2::_names_and_dims_with (omits prior, exprs, return type on port)")
-    }
-
-    pub fn _names_through_over_index(
-        _expr: Option<&Expr>,
-        _known: &KnownNames,
-        _dim_counts: &DimCounts,
-    ) -> Vec<MaybeDottedName> {
-        todo!("wire part2::_names_through_over_index_with (omits dim_counts on port)")
-    }
-
-    pub fn _check_for_headers(
-        _program: &Program,
-        _profile: &Profile,
-        _diags: &mut Diagnostics,
-        _known: &KnownNames,
-    ) {
-        todo!("wire part5::_check_for_headers_with (omits profile & known on port)")
-    }
-
-    pub fn _check_elseif_and_case(
-        _program: &Program,
-        _profile: &Profile,
-        _diags: &mut Diagnostics,
-        _known: &KnownNames,
-    ) {
-        todo!("wire part5::_check_elseif_and_case_with (omits profile & known on port)")
-    }
-
-    pub fn _check_function_statements(
-        _program: &Program,
-        _profile: &Profile,
-        _diags: &mut Diagnostics,
-        _known: &KnownNames,
-    ) {
-        todo!("wire part5::_check_function_statements_with (omits profile & known on port)")
-    }
-
-    pub fn _function_target_message(
-        _stmt: &Assignment,
-        _profile: &Profile,
-        _declared: &BTreeSet<String>,
-    ) -> Option<String> {
-        todo!("wire part4::_function_target_message_with (omits profile on port)")
     }
 }
 
@@ -1708,8 +1409,8 @@ mod tests {
     use std::rc::Rc;
 
     use super::{
-        _dotted_members_with, _names_before_invalid_compound_with, _report_const_names_with,
-        _unknown_public_member_with, _unknown_setting_with, _unknown_status_member_with,
+        _dotted_members, _names_before_invalid_compound, _report_const_names,
+        _unknown_public_member, _unknown_setting, _unknown_status_member,
     };
     use crate::checker::expressions::part2::KnownNames;
     use crate::diagnostics::Diagnostics;
@@ -1762,7 +1463,7 @@ mod tests {
             left: Some(ab),
             right: Some(rhs),
         });
-        let got: Vec<(String, Option<String>)> = _dotted_members_with(Some(&expr))
+        let got: Vec<(String, Option<String>)> = _dotted_members(Some(&expr))
             .into_iter()
             .map(|(b, m)| (b, m.map(|mm| mm.member)))
             .collect();
@@ -1784,28 +1485,28 @@ mod tests {
         let bat = member_expr(Some(name_expr("Status")), "Battery", None);
         let nope = member_expr(Some(name_expr("Status")), "Nope", None);
         let num = member_expr(Some(name_expr("Status")), "1", None);
-        assert!(!_unknown_status_member_with(&bat, cr6));
-        assert!(_unknown_status_member_with(&nope, cr6));
-        assert!(!_unknown_status_member_with(&num, cr6));
-        assert!(!_unknown_status_member_with(&bat, cr300));
-        assert!(_unknown_status_member_with(&nope, cr300));
-        assert!(!_unknown_status_member_with(&num, cr300));
+        assert!(!_unknown_status_member(&bat, cr6));
+        assert!(_unknown_status_member(&nope, cr6));
+        assert!(!_unknown_status_member(&num, cr6));
+        assert!(!_unknown_status_member(&bat, cr300));
+        assert!(_unknown_status_member(&nope, cr300));
+        assert!(!_unknown_status_member(&num, cr300));
 
         let set_ok = member_expr(Some(name_expr("Settings")), "PakBusAddress", None);
         let set_bad = member_expr(Some(name_expr("Settings")), "Nope", None);
-        assert!(!_unknown_setting_with(&set_ok, cr6));
-        assert!(_unknown_setting_with(&set_bad, cr6));
+        assert!(!_unknown_setting(&set_ok, cr6));
+        assert!(_unknown_setting(&set_bad, cr6));
 
         let vars: BTreeSet<String> = ["FOO".to_owned()].into_iter().collect();
-        assert!(!_unknown_public_member_with(
+        assert!(!_unknown_public_member(
             &member_expr(None, "TimeStamp", None),
             &vars
         ));
-        assert!(!_unknown_public_member_with(
+        assert!(!_unknown_public_member(
             &member_expr(None, "Foo", None),
             &vars
         ));
-        assert!(_unknown_public_member_with(
+        assert!(_unknown_public_member(
             &member_expr(None, "Bar", None),
             &vars
         ));
@@ -1822,7 +1523,7 @@ mod tests {
             right: Some(name_expr("1")),
         });
         assert_eq!(
-            _names_before_invalid_compound_with(Some(&valid_compound), &known, &ro),
+            _names_before_invalid_compound(Some(&valid_compound), &known, &ro),
             None
         );
     }
@@ -1848,12 +1549,12 @@ mod tests {
         let names = vec!["Baz".to_owned(), "Qux".to_owned()];
 
         let mut d6 = Diagnostics::new();
-        _report_const_names_with(&stmt, &names, cr6, &mut d6);
+        _report_const_names(&stmt, &names, cr6, &mut d6);
         let m6: Vec<&str> = d6.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(m6, vec!["Invalid symbol in expression: Baz + Qux."]);
 
         let mut d3 = Diagnostics::new();
-        _report_const_names_with(&stmt, &names, cr300, &mut d3);
+        _report_const_names(&stmt, &names, cr300, &mut d3);
         let m3: Vec<&str> = d3.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(m3, vec!["Baz is not defined.", "Qux is not defined."]);
     }

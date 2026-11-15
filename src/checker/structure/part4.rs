@@ -1014,7 +1014,7 @@ pub fn _names_unresolved(known: &KnownView<'_>, stmt: &Instruction, sources: boo
     stmt.args.iter().enumerate().any(|(i, arg)| {
         arg.is_some()
             && !(skip && i == 1)
-            && !expressions::_undefined_names_with(arg.as_deref(), known).is_empty()
+            && !expressions::_undefined_names(arg.as_deref(), known).is_empty()
     })
 }
 
@@ -1163,7 +1163,7 @@ pub fn _undefined_table_source(
         {
             continue;
         }
-        if !expressions::_undefined_names_with(arg.as_deref(), known).is_empty() {
+        if !expressions::_undefined_names(arg.as_deref(), known).is_empty() {
             return Some(
                 pystr::strip(&expressions::_arg_text(
                     stmt,

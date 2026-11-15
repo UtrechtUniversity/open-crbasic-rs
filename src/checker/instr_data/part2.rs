@@ -1117,7 +1117,13 @@ pub fn _report_undefined_source_with(
         if key.and_then(|k| kinds.get(&k)).map(String::as_str) != Some("deferred_text") {
             continue;
         }
-        let names = expressions::_undefined_names(Some(arg), known);
+        let names = expressions::_undefined_names(
+            Some(arg),
+            &crate::checker::expressions::KnownView::from_set(known),
+        )
+        .into_iter()
+        .map(crate::checker::expressions::UndefinedName::into_string)
+        .collect::<Vec<_>>();
         if names.is_empty() {
             continue;
         }
@@ -1133,7 +1139,7 @@ pub fn _report_undefined_source_with(
             );
         }
         // TODO(integrator-2): switch to `expressions::_has_undefined_index` and
-        // `expressions::dimensions_message_with` once `expressions/part2` is wired.
+        // `expressions::dimensions_message` once `expressions/part2` is wired.
         if _has_undefined_index_local(Some(arg), known) {
             let idx = i64::try_from(i).unwrap_or(0);
             let raw = expressions::_arg_text(st, idx);

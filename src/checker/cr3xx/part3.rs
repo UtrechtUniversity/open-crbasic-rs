@@ -809,14 +809,13 @@ pub fn _arity_walk_with(
             if !known.names.contains(&upper) {
                 state.names.push(idx.name.clone());
             }
-            let problem = expressions::_call_arity_problem_with(&idx.name, &idx.args, profile);
+            let problem = expressions::_call_arity_problem(&idx.name, &idx.args, profile);
             let mut args = idx.args.as_slice();
             let mut stop = false;
             if problem.as_deref() == Some("many") {
                 let at = (0..args.len())
                     .find(|&k| {
-                        expressions::_call_arity_problem_with(&idx.name, &args[..=k], profile)
-                            .as_deref()
+                        expressions::_call_arity_problem(&idx.name, &args[..=k], profile).as_deref()
                             == Some("many")
                     })
                     .unwrap_or(args.len());
@@ -948,9 +947,9 @@ pub fn order_names_around_arity_with(
                     dotted_tables: kn.dotted_tables,
                 };
                 if !own.is_empty()
-                    && !expressions::_undefined_names_with(a.target.as_deref(), &kv).is_empty()
+                    && !expressions::_undefined_names(a.target.as_deref(), &kv).is_empty()
                 {
-                    let msg = expressions::_arity_message_with(
+                    let msg = expressions::_arity_message(
                         kind,
                         &a.base.text,
                         profile,

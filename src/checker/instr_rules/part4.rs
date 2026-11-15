@@ -117,7 +117,7 @@ pub fn check_emailrecv_destination(
 
     for stmt in &program.statements {
         if let Stmt::Assignment(assign) = stmt.as_ref()
-            && !expressions::_undefined_names_with(assign.target.as_deref(), &known_view).is_empty()
+            && !expressions::_undefined_names(assign.target.as_deref(), &known_view).is_empty()
         {
             continue;
         }
@@ -135,7 +135,7 @@ pub fn check_emailrecv_destination(
                 }
                 _ => {
                     let nested: Vec<&crate::syntax::Index> =
-                        expressions::_index_nodes_with(assign.value.as_deref())
+                        expressions::_index_nodes(assign.value.as_deref())
                             .into_iter()
                             .filter(|n| {
                                 _EMAIL_FUNCTIONS.contains(&pystr::upper(&n.name).as_str())
@@ -207,10 +207,10 @@ pub fn check_tcpopen_handle_type(
     for stmt in &program.statements {
         let calls: Vec<Vec<Option<ExprRef>>> = match stmt.as_ref() {
             Stmt::Call(call) if pystr::upper(&call.name) == "TCPOPEN" => vec![call.args.clone()],
-            _ => expressions::_stmt_exprs_with(stmt)
+            _ => expressions::_stmt_exprs(stmt)
                 .into_iter()
                 .flat_map(|e| {
-                    expressions::_index_nodes_with(e.as_deref())
+                    expressions::_index_nodes(e.as_deref())
                         .into_iter()
                         .filter(|ix| pystr::upper(&ix.name) == "TCPOPEN")
                         .map(|ix| ix.args.clone())
@@ -288,10 +288,10 @@ pub fn check_tcpopen_connections(
     for stmt in &ctx.flat().statements {
         let calls: Vec<Vec<Option<ExprRef>>> = match stmt.as_ref() {
             Stmt::Call(call) if pystr::upper(&call.name) == "TCPOPEN" => vec![call.args.clone()],
-            _ => expressions::_stmt_exprs_with(stmt)
+            _ => expressions::_stmt_exprs(stmt)
                 .into_iter()
                 .flat_map(|e| {
-                    expressions::_index_nodes_with(e.as_deref())
+                    expressions::_index_nodes(e.as_deref())
                         .into_iter()
                         .filter(|ix| pystr::upper(&ix.name) == "TCPOPEN")
                         .map(|ix| ix.args.clone())
@@ -1335,7 +1335,7 @@ pub fn check_dnp_update(
                 }
                 let flag = instr.args[5].as_deref();
                 if let Some(k) = known
-                    && expressions::_undefined_names_with(flag, &_p4_known_view(k)).is_empty()
+                    && expressions::_undefined_names(flag, &_p4_known_view(k)).is_empty()
                     && let Some(ref t) = typer
                 {
                     long_flag = _dnp_long_flag(flag, t, env_ref, profile, &routine_names);

@@ -301,10 +301,16 @@ pub fn check_members_with_profile(
             continue;
         };
         if assign.compound
-            || !expressions::part1::_undefined_names(assign.target.as_deref(), &known_names)
-                .is_empty()
-            || !expressions::part1::_undefined_names(assign.value.as_deref(), &known_names)
-                .is_empty()
+            || !expressions::part1::_undefined_names(
+                assign.target.as_deref(),
+                &crate::checker::expressions::KnownView::from_set(&known_names),
+            )
+            .is_empty()
+            || !expressions::part1::_undefined_names(
+                assign.value.as_deref(),
+                &crate::checker::expressions::KnownView::from_set(&known_names),
+            )
+            .is_empty()
         {
             continue;
         }

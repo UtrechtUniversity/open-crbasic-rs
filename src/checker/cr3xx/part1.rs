@@ -411,7 +411,7 @@ pub fn _non_numeric_with(
     let Ok(value) = consteval::value_of(expr, &env) else {
         return false;
     };
-    matches!(value, ConstValue::Str(_)) || expressions::part1::_not_constant_integer_with(expr)
+    matches!(value, ConstValue::Str(_)) || expressions::part1::_not_constant_integer(expr)
 }
 
 /// Port of `checker/cr3xx.py::_check_baud`.
@@ -569,7 +569,13 @@ pub fn check_with(
         else {
             continue;
         };
-        let names = expressions::part1::_undefined_names(Some(arg), known);
+        let names = expressions::part1::_undefined_names(
+            Some(arg),
+            &crate::checker::expressions::KnownView::from_set(known),
+        )
+        .into_iter()
+        .map(crate::checker::expressions::UndefinedName::into_string)
+        .collect::<Vec<_>>();
         if cr3 {
             for undefined_name in &names {
                 diags.error_basic(
@@ -613,7 +619,7 @@ pub fn check_with(
                 let bad_finite = port.as_ref().is_some_and(|p| {
                     consteval::is_finite_number(p)
                         && (!is_i32_range_const(p)
-                            || (cr3 && expressions::part1::_not_constant_integer_with(Some(arg))))
+                            || (cr3 && expressions::part1::_not_constant_integer(Some(arg))))
                 });
                 let bad_str = cr3 && matches!(port, Some(ConstValue::Str(_)));
                 if bad_finite || bad_str {
@@ -779,7 +785,7 @@ pub fn check_with(
             None
         };
         let bad_mode = check_mode
-            && (expressions::part1::_not_constant_integer_with(mode_arg_opt)
+            && (expressions::part1::_not_constant_integer(mode_arg_opt)
                 || !expressions::part1::_variable_refs(mode_arg_opt, variable_names).is_empty()
                 || mode_kind.is_some());
 
@@ -864,7 +870,7 @@ pub fn check_with(
         if profile.name == "cr300"
             && port.as_ref().is_some_and(|p| port_eq_i64(p, 11))
             && stmt.args.len() > 4
-            && !expressions::part1::_not_constant_integer_with(buf_arg)
+            && !expressions::part1::_not_constant_integer(buf_arg)
             && let Ok(size) = consteval::value_of(buf_arg, &env)
             && consteval::is_finite_number(&size)
         {

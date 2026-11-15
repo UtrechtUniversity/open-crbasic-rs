@@ -687,7 +687,10 @@ pub fn move_fieldnames_symbol_errors(program: &Program, diags: &mut Diagnostics)
                 .unwrap_or(diags.items.len())
         });
         let inserted = moved.len() + pair.len();
-        diags.items.splice(at..at, moved.into_iter().chain(pair));
+        let insertion = at.min(diags.items.len());
+        diags
+            .items
+            .splice(insertion..insertion, moved.into_iter().chain(pair));
         next_at.insert(oid, at + inserted);
     }
 }
@@ -738,7 +741,6 @@ pub fn check_fieldnames_with_known(
     } else {
         &["TABLESIZE", "BYTESPERRECORD"]
     };
-    let empty_known = BTreeSet::new();
     let mut known: Option<&BTreeSet<String>> = known_names;
     let mut in_table = false;
     for st in &program.statements {
@@ -801,12 +803,10 @@ pub fn check_fieldnames_with_known(
                     if _variable_refs(arg, &var_set).is_empty() {
                         continue;
                     }
-                    let k = *known.get_or_insert_with(|| {
-                        // TODO(integrator-2): use `&ctx.known_names().names` once `expressions::part2::_build_known_names` is ported.
-                        let _ = &ctx;
-                        &empty_known
-                    });
-                    if !_undefined_names(arg, k).is_empty() {
+                    let k = *known.get_or_insert_with(|| &ctx.known_names().names);
+                    if !_undefined_names(arg, &crate::checker::expressions::KnownView::from_set(k))
+                        .is_empty()
+                    {
                         continue;
                     }
                 }
@@ -1193,6 +1193,31 @@ mod tests {
                 (2, "FieldNames canot be NULL", "fieldnames_null"),
             ]
         );
+    }
+
+    #[test]
+    fn repeated_fieldnames_clamps_python_slice_insertion() {
+        let prog = parse_prog(
+            "DataTable(T,1,-1)\nSample(1,X,FP2)\nFieldNames(A)\nFieldNames(B)\nEndTable\n",
+            cr6(),
+        );
+        let mut diags = Diagnostics::new();
+        for (line, name) in [(3, "A"), (4, "B")] {
+            diags.error(
+                line,
+                &format!("Invalid symbol in expression: {name}."),
+                "test.cr6",
+                ShowFile::Bool(true),
+                0,
+                "invalid_symbol",
+                "tier_b_expr",
+            );
+        }
+        move_fieldnames_symbol_errors(&prog, &mut diags);
+        assert_eq!(diags.items.len(), 6);
+        assert!(diags.items.iter().all(|d| d.line == 2));
+        assert_eq!(diags.items[0].message, "Invalid symbol in expression: A.");
+        assert_eq!(diags.items[3].message, "Invalid symbol in expression: B.");
     }
 
     #[test]

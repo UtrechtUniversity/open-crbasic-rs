@@ -16,14 +16,10 @@ use crate::syntax::{
 };
 use crate::{pyre, pystr};
 
-// TODO(integrator-2): import these constants from `part1` / `instr_rules` once ported.
-const _WHOLE_EXPR_ECHO_LOGGERS: [&str; 2] = ["cr6", "cr1000x"];
-const _CONST_FAMILY_KINDS: [&str; 3] = ["const_expr", "const_expr_only", "datatype_kw"];
-const _CONST_ONLY_VARIABLE_REJECT_KINDS: [&str; 2] = ["const_expr", "const_expr_only"];
-const _EXTRA_PREDEFINED_SYMBOLS: [&str; 2] = ["NAN", "INF"];
-const _CONTROL_KEYWORDS: [&str; 10] = [
-    "CASE", "DO", "FOR", "FUNCTION", "IF", "SCAN", "SELECT", "SUB", "SUBSCAN", "WHILE",
-];
+use super::part1::{
+    _CONST_FAMILY_KINDS, _CONST_ONLY_VARIABLE_REJECT_KINDS, _EXTRA_PREDEFINED_SYMBOLS,
+    _WHOLE_EXPR_ECHO_LOGGERS,
+};
 const _DNP_FLAG_TYPE: &str = "Flag paramter must be of type LONG";
 
 fn is_whole_expr_echo_logger(profile: &Profile) -> bool {
@@ -81,13 +77,8 @@ fn multi_report_order(keyword: &str) -> Option<&'static [usize]> {
     }
 }
 
-/// Port of `checker/expressions.py::_names_through_over_index`.
-pub fn _names_through_over_index(expr: Option<&Expr>, known: &BTreeSet<String>) -> Vec<String> {
-    _names_through_over_index_with(expr, known, &DimCounts::default())
-}
-
-/// Full implementation of `checker/expressions.py::_names_through_over_index`.
-pub fn _names_through_over_index_with(
+/// Port of checker/expressions.py::_names_through_over_index
+pub fn _names_through_over_index(
     expr: Option<&Expr>,
     known: &BTreeSet<String>,
     dim_counts: &DimCounts,
@@ -124,7 +115,15 @@ pub fn _names_through_over_index_with(
                 })
             }
             _ => {
-                out.extend(super::part1::_undefined_names_walk(Some(e), known));
+                out.extend(
+                    super::part1::_undefined_names_walk(
+                        Some(e),
+                        &crate::checker::expressions::KnownView::from_set(known),
+                    )
+                    .into_iter()
+                    .map(crate::checker::expressions::UndefinedName::into_string)
+                    .collect::<Vec<_>>(),
+                );
                 false
             }
         }
@@ -135,13 +134,8 @@ pub fn _names_through_over_index_with(
     out
 }
 
-/// Port of `checker/expressions.py::_dim_limit`.
-pub fn _dim_limit() -> Option<i64> {
-    None
-}
-
-/// Full implementation of `checker/expressions.py::_dim_limit`.
-pub fn _dim_limit_with(profile: &Profile) -> Option<i64> {
+/// Port of checker/expressions.py::_dim_limit
+pub fn _dim_limit(profile: &Profile) -> Option<i64> {
     if is_whole_expr_echo_logger(profile) {
         Some(3)
     } else {
@@ -149,18 +143,8 @@ pub fn _dim_limit_with(profile: &Profile) -> Option<i64> {
     }
 }
 
-/// Port of `checker/expressions.py::_over_indexed`.
-pub fn _over_indexed(
-    expr: Option<&Expr>,
-    dim_counts: &OrderedMap<String, i64>,
-    limit: Option<i64>,
-) -> bool {
-    let empty_strings = BTreeSet::new();
-    _over_indexed_inner(expr, dim_counts, &empty_strings, limit)
-}
-
-/// Full implementation of `checker/expressions.py::_over_indexed`.
-pub fn _over_indexed_with(expr: Option<&Expr>, dim_counts: &DimCounts, limit: Option<i64>) -> bool {
+/// Port of checker/expressions.py::_over_indexed
+pub fn _over_indexed(expr: Option<&Expr>, dim_counts: &DimCounts, limit: Option<i64>) -> bool {
     _over_indexed_inner(expr, &dim_counts.counts, &dim_counts.strings, limit)
 }
 
@@ -203,7 +187,7 @@ fn _over_indexed_inner(
     }
 }
 
-/// Port of `checker/expressions.py::DimsState`.
+/// Port of checker/expressions.py::DimsState
 #[derive(Debug, Clone, Default)]
 pub struct DimsState {
     pub var_dims: OrderedMap<String, Option<i64>>,
@@ -212,9 +196,6 @@ pub struct DimsState {
 }
 
 impl DimsState {
-    /// Port of `checker/expressions.py::DimsState::__init__`.
-    pub fn __init__(&self) {}
-
     /// Full constructor for `DimsState`.
     pub fn new(
         var_dims: OrderedMap<String, Option<i64>>,
@@ -229,13 +210,8 @@ impl DimsState {
     }
 }
 
-/// Port of `checker/expressions.py::_stmt_exprs`.
-pub fn _stmt_exprs(stmt: &Stmt) {
-    let _ = _stmt_exprs_with(stmt);
-}
-
-/// Full implementation of `checker/expressions.py::_stmt_exprs`.
-pub fn _stmt_exprs_with(stmt: &Stmt) -> Vec<Option<ExprRef>> {
+/// Port of checker/expressions.py::_stmt_exprs
+pub fn _stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
     match stmt {
         Stmt::Assignment(a) => vec![a.target.clone(), a.value.clone()],
         Stmt::If(i) => vec![i.cond.clone()],
@@ -254,7 +230,7 @@ pub fn _stmt_exprs_with(stmt: &Stmt) -> Vec<Option<ExprRef>> {
     }
 }
 
-/// Port of `checker/expressions.py::_build_dims_state`.
+/// Port of checker/expressions.py::_build_dims_state
 pub fn _build_dims_state(ctx: &crate::checker::context::Context) -> DimsState {
     let profile = ctx.profile.expect("_build_dims_state requires profile");
     let known = if profile.single_pass {
@@ -314,8 +290,8 @@ pub fn _build_dims_state(ctx: &crate::checker::context::Context) -> DimsState {
     let mut state: [Option<i64>; 1] = [Some(0)];
     for stmt in &ordered {
         before.insert(stmt_id(stmt), state[0]);
-        for expr in _stmt_exprs_with(stmt) {
-            if _dims_walk_with(expr.as_ref(), known, &var_dims, &mut state) {
+        for expr in _stmt_exprs(stmt) {
+            if _dims_walk(expr.as_ref(), known, &var_dims, &mut state) {
                 break;
             }
         }
@@ -324,13 +300,8 @@ pub fn _build_dims_state(ctx: &crate::checker::context::Context) -> DimsState {
     DimsState::new(var_dims, Some(before), Some(ctx.dim_counts(true).clone()))
 }
 
-/// Port of `checker/expressions.py::_dims_walk`.
-pub fn _dims_walk(_expr: Option<&Expr>) -> bool {
-    false
-}
-
-/// Full implementation of `checker/expressions.py::_dims_walk`.
-pub fn _dims_walk_with(
+/// Port of checker/expressions.py::_dims_walk
+pub fn _dims_walk(
     expr: Option<&ExprRef>,
     known: Option<&KnownNames>,
     var_dims: &OrderedMap<String, Option<i64>>,
@@ -367,45 +338,35 @@ pub fn _dims_walk_with(
             }
             ix.args
                 .iter()
-                .any(|a| _dims_walk_with(a.as_ref(), known, var_dims, state))
+                .any(|a| _dims_walk(a.as_ref(), known, var_dims, state))
         }
-        Expr::Unary(u) => _dims_walk_with(u.operand.as_ref(), known, var_dims, state),
+        Expr::Unary(u) => _dims_walk(u.operand.as_ref(), known, var_dims, state),
         Expr::Binary(b) => {
-            _dims_walk_with(b.left.as_ref(), known, var_dims, state)
-                || _dims_walk_with(b.right.as_ref(), known, var_dims, state)
+            _dims_walk(b.left.as_ref(), known, var_dims, state)
+                || _dims_walk(b.right.as_ref(), known, var_dims, state)
         }
         Expr::Member(m) => {
-            _dims_walk_with(m.base.as_ref(), known, var_dims, state)
+            _dims_walk(m.base.as_ref(), known, var_dims, state)
                 || m.args
                     .as_deref()
                     .unwrap_or(&[])
                     .iter()
-                    .any(|a| _dims_walk_with(a.as_ref(), known, var_dims, state))
+                    .any(|a| _dims_walk(a.as_ref(), known, var_dims, state))
         }
         Expr::ArrayLiteral(a) => a
             .items
             .iter()
-            .any(|item| _dims_walk_with(item.as_ref(), known, var_dims, state)),
+            .any(|item| _dims_walk(item.as_ref(), known, var_dims, state)),
         Expr::Juxtaposed(j) => j
             .items
             .iter()
-            .any(|item| _dims_walk_with(item.as_ref(), known, var_dims, state)),
+            .any(|item| _dims_walk(item.as_ref(), known, var_dims, state)),
         Expr::Number(_) | Expr::String(_) => false,
     }
 }
 
-/// Port of `checker/expressions.py::_has_undefined_index`.
+/// Port of checker/expressions.py::_has_undefined_index
 pub fn _has_undefined_index(
-    _expr: Option<&Expr>,
-    _known: &BTreeSet<String>,
-    _ds: Option<&mut DimsState>,
-    _stmt: Option<&Stmt>,
-) -> bool {
-    false
-}
-
-/// Full implementation of `checker/expressions.py::_has_undefined_index`.
-pub fn _has_undefined_index_with(
     expr: Option<&ExprRef>,
     known: &KnownNames,
     ds: Option<&DimsState>,
@@ -420,20 +381,12 @@ pub fn _has_undefined_index_with(
     let var_dims = ds.map_or(&empty_var_dims, |d| &d.var_dims);
     prior
         .iter()
-        .any(|e| _dims_walk_with(e.as_ref(), Some(known), var_dims, &mut state))
-        || _dims_walk_with(expr, Some(known), var_dims, &mut state)
+        .any(|e| _dims_walk(e.as_ref(), Some(known), var_dims, &mut state))
+        || _dims_walk(expr, Some(known), var_dims, &mut state)
 }
 
-/// Port of `checker/expressions.py::_names_and_dims`.
+/// Port of checker/expressions.py::_names_and_dims
 pub fn _names_and_dims(
-    _known: &BTreeSet<String>,
-    _ds: Option<&mut DimsState>,
-    _stmt: Option<&Stmt>,
-) {
-}
-
-/// Full implementation of `checker/expressions.py::_names_and_dims`.
-pub fn _names_and_dims_with(
     known: &KnownNames,
     ds: Option<&DimsState>,
     stmt_id_opt: Option<usize>,
@@ -532,11 +485,19 @@ pub fn _names_and_dims_with(
     let mut combined = Vec::with_capacity(prior.len() + exprs.len());
     combined.extend(prior.iter().cloned());
     combined.extend(exprs.iter().cloned());
-    let dims = _has_undefined_index_with(None, known, ds, stmt_id_opt, &combined);
+    let dims = _has_undefined_index(None, known, ds, stmt_id_opt, &combined);
     if !dims {
         let out = exprs
             .iter()
-            .flat_map(|e| super::part1::_undefined_names(e.as_deref(), &known.names))
+            .flat_map(|e| {
+                super::part1::_undefined_names(
+                    e.as_deref(),
+                    &crate::checker::expressions::KnownView::from(known),
+                )
+                .into_iter()
+                .map(crate::checker::expressions::UndefinedName::into_string)
+                .collect::<Vec<_>>()
+            })
             .collect();
         return (out, false);
     }
@@ -549,7 +510,7 @@ pub fn _names_and_dims_with(
     let var_dims = ds.map_or(&empty_var_dims, |d| &d.var_dims);
 
     for e in prior {
-        _dims_walk_with(e.as_ref(), Some(known), var_dims, &mut state);
+        _dims_walk(e.as_ref(), Some(known), var_dims, &mut state);
     }
 
     let mut out = Vec::new();
@@ -561,13 +522,8 @@ pub fn _names_and_dims_with(
     (out, true)
 }
 
-/// Port of `checker/expressions.py::dimensions_message`.
-pub fn dimensions_message(text: &str, _whole_statement: bool, _at_eol: bool) -> String {
-    format!("Dimensions not declared: {text}.")
-}
-
-/// Full implementation of `checker/expressions.py::dimensions_message`.
-pub fn dimensions_message_with(
+/// Port of checker/expressions.py::dimensions_message
+pub fn dimensions_message(
     text: &str,
     profile: &Profile,
     whole_statement: bool,
@@ -581,7 +537,7 @@ pub fn dimensions_message_with(
     format!("Dimensions not declared: {text}{sep}.")
 }
 
-/// Port of `checker/expressions.py::_arg_text`.
+/// Port of checker/expressions.py::_arg_text
 pub fn _arg_text(stmt: &Instruction, i: i64) -> String {
     static SELECT_CASE: LazyLock<pyre::Regex> =
         LazyLock::new(|| pyre::Regex::new(r"(?i)\s*Select\s+Case(.*)$", 0));
@@ -615,7 +571,7 @@ pub fn _arg_text(stmt: &Instruction, i: i64) -> String {
     }
 }
 
-/// Port of `checker/expressions.py::_call_arg_text`.
+/// Port of checker/expressions.py::_call_arg_text
 pub fn _call_arg_text(text: &str, index: i64) -> String {
     let mut depth: i64 = 0;
     let mut quote = false;
@@ -647,7 +603,7 @@ pub fn _call_arg_text(text: &str, index: i64) -> String {
     String::new()
 }
 
-/// Port of `checker/expressions.py::_if_condition_text`.
+/// Port of checker/expressions.py::_if_condition_text
 pub fn _if_condition_text(stmt: &Stmt) -> Option<String> {
     static IF_COND_RE: LazyLock<pyre::Regex> =
         LazyLock::new(|| pyre::Regex::new(r"(?is)^\s*(?:Else)?If(?:\s|(?=\())(.*?)\bThen\b", 0));
@@ -662,7 +618,7 @@ pub fn _if_condition_text(stmt: &Stmt) -> Option<String> {
     m.and_then(|mat| mat.group(1)).map(str::to_owned)
 }
 
-/// Port of `checker/expressions.py::_if_condition_text_no_then`.
+/// Port of checker/expressions.py::_if_condition_text_no_then
 pub fn _if_condition_text_no_then(stmt: &Stmt) -> Option<String> {
     static THEN_RE: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"(?i)\bThen\b", 0));
     static IF_NO_THEN_RE: LazyLock<pyre::Regex> =
@@ -678,7 +634,11 @@ pub fn _if_condition_text_no_then(stmt: &Stmt) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Port of `checker/expressions.py::_build_known_names`.
+pub(crate) const _CONTROL_KEYWORDS: &[&str] = &[
+    "CASE", "DO", "FOR", "FUNCTION", "IF", "SCAN", "SELECT", "SUB", "SUBSCAN", "WHILE",
+];
+
+/// Port of checker/expressions.py::_build_known_names
 pub fn _build_known_names(ctx: &crate::checker::context::Context) -> KnownNames {
     let profile = ctx.profile.expect("_build_known_names requires profile");
     let program = &ctx.program;
@@ -746,9 +706,13 @@ pub fn _build_known_names(ctx: &crate::checker::context::Context) -> KnownNames 
             };
             let mut bad = !declared.contains(&src_name)
                 || src_args.is_some_and(|args| {
-                    args.iter()
-                        .flatten()
-                        .any(|a| !super::part1::_undefined_names(Some(&**a), &known).is_empty())
+                    args.iter().flatten().any(|a| {
+                        !super::part1::_undefined_names(
+                            Some(&**a),
+                            &crate::checker::expressions::KnownView::from_set(&known),
+                        )
+                        .is_empty()
+                    })
                 });
             if !bad
                 && declared.contains(&src_name)
@@ -856,13 +820,13 @@ pub fn _build_known_names(ctx: &crate::checker::context::Context) -> KnownNames 
 
     KnownNames::new(
         known,
-        _value_less_tables_with(ctx),
+        _value_less_tables(ctx),
         profile.single_pass,
         ctx.out_of_scope_nodes(&resolvable),
     )
 }
 
-/// Port of `checker/expressions.py::_unclosed_structure_variables`.
+/// Port of checker/expressions.py::_unclosed_structure_variables
 pub fn _unclosed_structure_variables(program: &Program) -> BTreeSet<String> {
     let mut open_type: Option<String> = None;
     let mut unclosed = BTreeSet::new();
@@ -895,7 +859,7 @@ pub fn _unclosed_structure_variables(program: &Program) -> BTreeSet<String> {
     unclosed
 }
 
-/// Port of `checker/expressions.py::KnownNames`.
+/// Port of checker/expressions.py::KnownNames
 #[derive(Debug, Clone, Default)]
 pub struct KnownNames {
     pub names: BTreeSet<String>,
@@ -905,9 +869,6 @@ pub struct KnownNames {
 }
 
 impl KnownNames {
-    /// Port of `checker/expressions.py::KnownNames::__init__`.
-    pub fn __init__(&self, _dotted_tables: bool) {}
-
     /// Full constructor for `KnownNames`.
     pub fn new(
         names: BTreeSet<String>,
@@ -923,15 +884,9 @@ impl KnownNames {
         }
     }
 
-    /// Port of `checker/expressions.py::KnownNames::without`.
+    /// Port of checker/expressions.py::KnownNames::without
     #[must_use]
-    pub fn without(&self) -> KnownNames {
-        self.clone()
-    }
-
-    /// Full implementation of `checker/expressions.py::KnownNames::without`.
-    #[must_use]
-    pub fn without_names(&self, names: &BTreeSet<String>) -> KnownNames {
+    pub fn without(&self, names: &BTreeSet<String>) -> KnownNames {
         if names.is_empty() {
             return self.clone();
         }
@@ -944,20 +899,15 @@ impl KnownNames {
     }
 }
 
-/// Port of `checker/expressions.py::_alias_names`.
+/// Port of checker/expressions.py::_alias_names
 pub fn _alias_names(program: &Program) -> BTreeSet<String> {
     context::of(&Rc::new(program.clone()), None, None)
         .alias_names()
         .clone()
 }
 
-/// Port of `checker/expressions.py::_value_less_tables`.
-pub fn _value_less_tables(ctx: &crate::checker::context::Context) {
-    let _ = _value_less_tables_with(ctx);
-}
-
-/// Full implementation of `checker/expressions.py::_value_less_tables`.
-pub fn _value_less_tables_with(ctx: &crate::checker::context::Context) -> BTreeSet<String> {
+/// Port of checker/expressions.py::_value_less_tables
+pub fn _value_less_tables(ctx: &crate::checker::context::Context) -> BTreeSet<String> {
     let program = &ctx.program;
     let profile = ctx.profile;
     let mut tables: BTreeSet<String> = BTreeSet::new();
@@ -996,7 +946,7 @@ pub fn _value_less_tables_with(ctx: &crate::checker::context::Context) -> BTreeS
     tables.difference(&others).cloned().collect()
 }
 
-/// Port of `checker/expressions.py::_failed_consts`.
+/// Port of checker/expressions.py::_failed_consts
 pub fn _failed_consts(
     ctx: &crate::checker::context::Context,
     known: &BTreeSet<String>,
@@ -1018,13 +968,12 @@ pub fn _failed_consts(
         .collect();
 
     let mut failed: BTreeSet<String> = BTreeSet::new();
-    if profile.is_some() {
+    if let Some(profile) = profile {
         let empty = BTreeSet::new();
         for (_, c) in &consts {
-            // TODO(integrator-2): pass `profile` to `_find_arity_problem` and
-            // `_find_bare_function_ref` once `p4-expr-4` adds `*_with` / profile params.
-            if super::part4::_find_arity_problem(c.value.as_deref(), None, &empty).is_some()
-                || super::part4::_find_bare_function_ref(c.value.as_deref(), &empty)
+            if super::part4::_find_arity_problem(c.value.as_deref(), profile, None, &empty)
+                .is_some()
+                || super::part4::_find_bare_function_ref(c.value.as_deref(), profile, &empty)
             {
                 failed.insert(pystr::upper(&c.name));
             }
@@ -1052,7 +1001,12 @@ pub fn _failed_consts(
                 .filter(|n| !failed.contains(*n) && !unready_for_c.is_some_and(|u| u.contains(*n)))
                 .cloned()
                 .collect();
-            if !super::part1::_undefined_names(c.value.as_deref(), &effective).is_empty() {
+            if !super::part1::_undefined_names(
+                c.value.as_deref(),
+                &crate::checker::expressions::KnownView::from_set(&effective),
+            )
+            .is_empty()
+            {
                 failed.insert(name);
                 changed = true;
             }
@@ -1062,23 +1016,9 @@ pub fn _failed_consts(
     failed
 }
 
-/// Port of `checker/expressions.py::_report_statement`.
-pub fn _report_statement(
-    _stmt: &Instruction,
-    _positions: &OrderedMap<usize, String>,
-    _known: &BTreeSet<String>,
-    _variable_names: &BTreeSet<String>,
-    _diags: &mut Diagnostics,
-    _families: &str,
-    _dim_counts: Option<OrderedMap<String, i64>>,
-    _ds: Option<&mut DimsState>,
-) -> bool {
-    false
-}
-
-/// Full implementation of `checker/expressions.py::_report_statement`.
+/// Port of checker/expressions.py::_report_statement
 #[allow(clippy::too_many_arguments)]
-pub fn _report_statement_with(
+pub fn _report_statement(
     stmt: &Instruction,
     stmt_id: usize,
     positions: &OrderedMap<usize, String>,
@@ -1099,12 +1039,18 @@ pub fn _report_statement_with(
         }
         let arg = stmt.args[i].as_ref();
         let arg_expr = arg.map(|e| &**e);
-        // TODO(integrator-2): pass `known: &KnownNames` once `part1::_undefined_names` takes it.
-        let mut names = super::part1::_undefined_names(arg_expr, &known.names);
+
+        let mut names = super::part1::_undefined_names(
+            arg_expr,
+            &crate::checker::expressions::KnownView::from(known),
+        )
+        .into_iter()
+        .map(crate::checker::expressions::UndefinedName::into_string)
+        .collect::<Vec<_>>();
         let mut dims = false;
         if !names.is_empty() && !whole_echo {
             let (n, d) =
-                _names_and_dims_with(known, ds, Some(stmt_id), &stmt.args[..i], &[arg.cloned()]);
+                _names_and_dims(known, ds, Some(stmt_id), &stmt.args[..i], &[arg.cloned()]);
             names = n;
             dims = d;
         }
@@ -1154,7 +1100,7 @@ pub fn _report_statement_with(
                 let arg_t = _arg_text(stmt, i_i64);
                 diags.error_basic(
                     stmt.base.node.line,
-                    &dimensions_message_with(pystr::strip(&arg_t), profile, false, true),
+                    &dimensions_message(pystr::strip(&arg_t), profile, false, true),
                     &stmt.base.node.file,
                 );
                 if is_const_family {
@@ -1188,7 +1134,7 @@ pub fn _report_statement_with(
         }
 
         if let Some(dc) = dim_counts
-            && _over_indexed_with(arg_expr, dc, _dim_limit_with(profile))
+            && _over_indexed(arg_expr, dc, _dim_limit(profile))
         {
             let text = _arg_text(stmt, i_i64);
             let shown = if kw == "SELECT" {
@@ -1198,7 +1144,7 @@ pub fn _report_statement_with(
             };
             diags.error_basic(
                 stmt.base.node.line,
-                &dimensions_message_with(shown, profile, false, true),
+                &dimensions_message(shown, profile, false, true),
                 &stmt.base.node.file,
             );
             if !whole_echo && i + 1 < stmt.args.len() && stmt.args[i + 1].is_some() {
@@ -1295,13 +1241,8 @@ pub fn _report_statement_with(
     false
 }
 
-/// Port of `checker/expressions.py::_member_index_text`.
-pub fn _member_index_text() -> String {
-    "(1)".to_owned()
-}
-
-/// Full implementation of `checker/expressions.py::_member_index_text`.
-pub fn _member_index_text_with(args: Option<&[Option<ExprRef>]>) -> String {
+/// Port of checker/expressions.py::_member_index_text
+pub fn _member_index_text(args: Option<&[Option<ExprRef>]>) -> String {
     let Some(args) = args else {
         return "(1)".to_owned();
     };
@@ -1321,16 +1262,8 @@ pub fn _member_index_text_with(args: Option<&[Option<ExprRef>]>) -> String {
     }
 }
 
-/// Port of `checker/expressions.py::_table_member_problem`.
+/// Port of checker/expressions.py::_table_member_problem
 pub fn _table_member_problem(
-    _expr: Option<&Expr>,
-    _data_tables: &BTreeSet<String>,
-    _absent: &BTreeSet<String>,
-) {
-}
-
-/// Full implementation of `checker/expressions.py::_table_member_problem`.
-pub fn _table_member_problem_with(
     expr: Option<&Expr>,
     const_tables: &OrderedMap<String, BTreeSet<String>>,
     data_tables: &TablesWithFields,
@@ -1359,7 +1292,7 @@ pub fn _table_member_problem_with(
                     return Some((
                         bn.name.clone(),
                         m.member.clone(),
-                        _member_index_text_with(m.args.as_deref()),
+                        _member_index_text(m.args.as_deref()),
                     ));
                 }
                 if data_tables.tables.contains(&table)
@@ -1368,23 +1301,23 @@ pub fn _table_member_problem_with(
                     return Some((
                         bn.name.clone(),
                         m.member.clone(),
-                        _member_index_text_with(m.args.as_deref()),
+                        _member_index_text(m.args.as_deref()),
                     ));
                 }
             }
             for arg in m.args.as_deref().unwrap_or(&[]).iter().flatten() {
                 if let Some(found) =
-                    _table_member_problem_with(Some(arg), const_tables, data_tables, absent)
+                    _table_member_problem(Some(arg), const_tables, data_tables, absent)
                 {
                     return Some(found);
                 }
             }
-            _table_member_problem_with(m.base.as_deref(), const_tables, data_tables, absent)
+            _table_member_problem(m.base.as_deref(), const_tables, data_tables, absent)
         }
         Expr::Index(ix) => {
             for arg in ix.args.iter().flatten() {
                 if let Some(found) =
-                    _table_member_problem_with(Some(arg), const_tables, data_tables, absent)
+                    _table_member_problem(Some(arg), const_tables, data_tables, absent)
                 {
                     return Some(found);
                 }
@@ -1392,23 +1325,17 @@ pub fn _table_member_problem_with(
             None
         }
         Expr::Unary(u) => {
-            _table_member_problem_with(u.operand.as_deref(), const_tables, data_tables, absent)
+            _table_member_problem(u.operand.as_deref(), const_tables, data_tables, absent)
         }
         Expr::Binary(b) => {
-            _table_member_problem_with(b.left.as_deref(), const_tables, data_tables, absent)
-                .or_else(|| {
-                    _table_member_problem_with(
-                        b.right.as_deref(),
-                        const_tables,
-                        data_tables,
-                        absent,
-                    )
-                })
+            _table_member_problem(b.left.as_deref(), const_tables, data_tables, absent).or_else(
+                || _table_member_problem(b.right.as_deref(), const_tables, data_tables, absent),
+            )
         }
         Expr::ArrayLiteral(a) => {
             for item in a.items.iter().flatten() {
                 if let Some(found) =
-                    _table_member_problem_with(Some(item), const_tables, data_tables, absent)
+                    _table_member_problem(Some(item), const_tables, data_tables, absent)
                 {
                     return Some(found);
                 }
@@ -1418,7 +1345,7 @@ pub fn _table_member_problem_with(
         Expr::Juxtaposed(j) => {
             for item in j.items.iter().flatten() {
                 if let Some(found) =
-                    _table_member_problem_with(Some(item), const_tables, data_tables, absent)
+                    _table_member_problem(Some(item), const_tables, data_tables, absent)
                 {
                     return Some(found);
                 }
@@ -1429,22 +1356,20 @@ pub fn _table_member_problem_with(
     }
 }
 
-/// Port of `checker/expressions.py::_TablesWithFields`.
+/// Port of checker/expressions.py::_TablesWithFields
 #[derive(Debug, Clone, Default)]
 pub struct TablesWithFields {
     pub tables: BTreeSet<String>,
     pub fields: OrderedMap<String, BTreeSet<String>>,
 }
 
-/// Port of `checker/expressions.py::_data_table_fields`.
-pub fn _data_table_fields(_program: &Program) {}
-
-/// Full implementation of `checker/expressions.py::_data_table_fields`.
-pub fn _data_table_fields_with(
+/// Port of checker/expressions.py::_data_table_fields
+pub fn _data_table_fields(
     _program: &Program,
     _profile: &Profile,
 ) -> OrderedMap<String, BTreeSet<String>> {
-    // TODO(integrator-2): wire `tables::build_tables` once `tables` part3 is ported.
+    // TODO(wire): tables::build_tables_with needs a real BuildTablesHooks adapter;
+    // no adapter is implemented yet, so table field discovery remains unavailable.
     OrderedMap::new()
 }
 
@@ -1454,11 +1379,10 @@ mod tests {
     use std::rc::Rc;
 
     use super::{
-        _alias_names, _arg_text, _call_arg_text, _dim_limit_with, _dims_walk_with,
-        _has_undefined_index_with, _if_condition_text, _if_condition_text_no_then,
-        _member_index_text_with, _names_and_dims_with, _over_indexed_with, _stmt_exprs_with,
-        _table_member_problem_with, _unclosed_structure_variables, _value_less_tables_with,
-        DimsState, KnownNames, TablesWithFields, dimensions_message_with,
+        _alias_names, _arg_text, _call_arg_text, _dim_limit, _dims_walk, _has_undefined_index,
+        _if_condition_text, _if_condition_text_no_then, _member_index_text, _names_and_dims,
+        _over_indexed, _stmt_exprs, _table_member_problem, _unclosed_structure_variables,
+        _value_less_tables, DimsState, KnownNames, TablesWithFields, dimensions_message,
     };
     use crate::checker::context::{self, DimCounts};
     use crate::profiles;
@@ -1521,18 +1445,18 @@ mod tests {
     fn dim_limit_and_dimensions_message_match_python() {
         let cr6 = profiles::get("cr6").unwrap();
         let cr300 = profiles::get("cr300").unwrap();
-        assert_eq!(_dim_limit_with(cr6), Some(3));
-        assert_eq!(_dim_limit_with(cr300), None);
+        assert_eq!(_dim_limit(cr6), Some(3));
+        assert_eq!(_dim_limit(cr300), None);
         assert_eq!(
-            dimensions_message_with("X", cr6, true, true),
+            dimensions_message("X", cr6, true, true),
             "Dimensions not declared: X."
         );
         assert_eq!(
-            dimensions_message_with("X", cr300, true, true),
+            dimensions_message("X", cr300, true, true),
             "Dimensions not declared: X\n."
         );
         assert_eq!(
-            dimensions_message_with("X", cr300, true, false),
+            dimensions_message("X", cr300, true, false),
             "Dimensions not declared: X."
         );
     }
@@ -1560,14 +1484,10 @@ mod tests {
             ],
         );
 
-        assert!(_over_indexed_with(Some(&*r_2), &dc, _dim_limit_with(cr300)));
-        assert!(!_over_indexed_with(
-            Some(&*s_3),
-            &dc,
-            _dim_limit_with(cr300)
-        ));
-        assert!(!_over_indexed_with(Some(&*s_3), &dc, _dim_limit_with(cr6)));
-        assert!(_over_indexed_with(Some(&*s_4), &dc, _dim_limit_with(cr6)));
+        assert!(_over_indexed(Some(&*r_2), &dc, _dim_limit(cr300)));
+        assert!(!_over_indexed(Some(&*s_3), &dc, _dim_limit(cr300)));
+        assert!(!_over_indexed(Some(&*s_3), &dc, _dim_limit(cr6)));
+        assert!(_over_indexed(Some(&*s_4), &dc, _dim_limit(cr6)));
     }
 
     #[test]
@@ -1629,12 +1549,12 @@ mod tests {
 
     #[test]
     fn member_index_text_and_table_member_problem_match_python() {
-        assert_eq!(_member_index_text_with(None), "(1)");
-        assert_eq!(_member_index_text_with(Some(&[])), "(1)");
-        assert_eq!(_member_index_text_with(Some(&[None])), "(1)");
-        assert_eq!(_member_index_text_with(Some(&[Some(num_f(2.9))])), "(2)");
-        assert_eq!(_member_index_text_with(Some(&[Some(num_i(-1))])), "");
-        assert_eq!(_member_index_text_with(Some(&[Some(name_expr("I"))])), "");
+        assert_eq!(_member_index_text(None), "(1)");
+        assert_eq!(_member_index_text(Some(&[])), "(1)");
+        assert_eq!(_member_index_text(Some(&[None])), "(1)");
+        assert_eq!(_member_index_text(Some(&[Some(num_f(2.9))])), "(2)");
+        assert_eq!(_member_index_text(Some(&[Some(num_i(-1))])), "");
+        assert_eq!(_member_index_text(Some(&[Some(name_expr("I"))])), "");
 
         let mut const_tables = OrderedMap::new();
         let mut ct_fields = BTreeSet::new();
@@ -1660,7 +1580,7 @@ mod tests {
             args: None,
         });
         assert_eq!(
-            _table_member_problem_with(Some(&m_bad), &const_tables, &dtf, &absent),
+            _table_member_problem(Some(&m_bad), &const_tables, &dtf, &absent),
             Some(("Tbl".to_owned(), "NoSuchField".to_owned(), "(1)".to_owned()))
         );
 
@@ -1671,7 +1591,7 @@ mod tests {
             args: None,
         });
         assert_eq!(
-            _table_member_problem_with(Some(&m_digit), &const_tables, &dtf, &absent),
+            _table_member_problem(Some(&m_digit), &const_tables, &dtf, &absent),
             None
         );
 
@@ -1682,7 +1602,7 @@ mod tests {
             args: Some(vec![Some(num_i(2))]),
         });
         assert_eq!(
-            _table_member_problem_with(Some(&m_ct), &const_tables, &dtf, &absent),
+            _table_member_problem(Some(&m_ct), &const_tables, &dtf, &absent),
             Some(("Ct".to_owned(), "Bad".to_owned(), "(1)".to_owned()))
         );
     }
@@ -1722,11 +1642,11 @@ mod tests {
         let ctx6 = context::of(&prog_dt, Some(cr6), None);
         let ctx300 = context::of(&prog_dt, Some(cr300), None);
         assert_eq!(
-            _value_less_tables_with(&ctx6),
+            _value_less_tables(&ctx6),
             BTreeSet::from(["PUBLIC".to_owned(), "STATUS".to_owned(), "T".to_owned()])
         );
         assert_eq!(
-            _value_less_tables_with(&ctx300),
+            _value_less_tables(&ctx300),
             BTreeSet::from([
                 "PUBLIC".to_owned(),
                 "SETTINGS".to_owned(),
@@ -1759,14 +1679,14 @@ mod tests {
         }));
         let call = index_expr("Battery", vec![Some(sum)]);
 
-        assert!(_has_undefined_index_with(
+        assert!(_has_undefined_index(
             Some(&call),
             &known,
             Some(&ds),
             Some(42),
             &[],
         ));
-        let (names, dims) = _names_and_dims_with(&known, Some(&ds), Some(42), &[], &[Some(call)]);
+        let (names, dims) = _names_and_dims(&known, Some(&ds), Some(42), &[], &[Some(call)]);
         assert!(dims);
         assert_eq!(names, vec!["Nope".to_owned()]);
 
@@ -1774,7 +1694,7 @@ mod tests {
         let mut vd = OrderedMap::new();
         vd.insert("ARR".to_owned(), Some(2));
         let arr_ref = name_expr("Arr");
-        assert!(!_dims_walk_with(Some(&arr_ref), None, &vd, &mut state));
+        assert!(!_dims_walk(Some(&arr_ref), None, &vd, &mut state));
         assert_eq!(state[0], Some(2));
 
         let assign = Stmt::Assignment(Assignment {
@@ -1782,9 +1702,9 @@ mod tests {
             value: Some(num_i(1)),
             ..Assignment::default()
         });
-        assert_eq!(_stmt_exprs_with(&assign).len(), 2);
+        assert_eq!(_stmt_exprs(&assign).len(), 2);
 
-        let kn2 = known.without_names(&BTreeSet::from(["BATTERY".to_owned()]));
+        let kn2 = known.without(&BTreeSet::from(["BATTERY".to_owned()]));
         assert!(kn2.names.is_empty());
 
         let alias_stmt = Rc::new(Stmt::Instruction(Instruction {

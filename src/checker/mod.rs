@@ -619,19 +619,23 @@ pub fn _check_with_context(
     ctx: &Rc<context::Context>,
 ) {
     _run_pass("expressions::set_arity_context", "", || {
-        expressions::set_arity_context(program, Some(ctx.declared_variable_names().clone()));
+        expressions::set_arity_context(
+            program,
+            Some(profile),
+            Some(ctx.declared_variable_names().clone()),
+        );
     });
     _run_pass("structure::check_pass1", "pass1", || {
         structure::check_pass1(program, profile, diags, Some(env));
     });
     _run_pass("expressions::check_consts", "pass1", || {
-        expressions::check_consts(program, diags);
+        expressions::check_consts(program, profile, diags);
     });
     _run_pass("instr_data::check_constant_destinations", "pass1", || {
         instr_data::check_constant_destinations(program, profile, diags);
     });
     _run_pass("expressions::check_const_family_args", "pass1", || {
-        expressions::check_const_family_args(ctx.flat(), diags);
+        expressions::check_const_family_args(ctx.flat(), profile, diags);
     });
     _run_pass("instr_measure::check_pass1_values", "pass1", || {
         instr_measure::check_pass1_values(program, profile, diags);
@@ -646,13 +650,13 @@ pub fn _check_with_context(
         instr_rules::check_const_int_args(program, profile, diags, env);
     });
     _run_pass("expressions::check_function_call_counts", "pass1", || {
-        expressions::check_function_call_counts(program, diags);
+        expressions::check_function_call_counts(program, profile, diags);
     });
     _run_pass("expressions::check_recursive_functions", "pass1", || {
-        expressions::check_recursive_functions(program, diags);
+        expressions::check_recursive_functions(program, profile, diags);
     });
     _run_pass("expressions::check_data_params", "pass1", || {
-        expressions::check_data_params(program, diags);
+        expressions::check_data_params(program, profile, diags);
     });
     _run_pass("cr3xx::check", "pass1", || {
         cr3xx::check(program, diags);
@@ -703,7 +707,7 @@ pub fn _check_with_context(
         var_types::check_pointer_deref(program, diags);
     });
     _run_pass("expressions::check_function_arity", "pass1", || {
-        expressions::check_function_arity(ctx.flat(), diags);
+        expressions::check_function_arity(ctx.flat(), profile, diags, None);
     });
 
     if !profile.single_pass && !diags.has_errors() {
@@ -917,28 +921,28 @@ pub fn _check_with_context(
                     || unreached_off.contains(&(d.file.clone(), d.line))))
         });
 
-        let _placement_rej = _placement_rejected(&flat, profile, diags);
+        let placement_rej = _placement_rejected(&flat, profile, diags);
         _run_pass("expressions::check", "tier_b_generic", || {
-            expressions::check(&flat, diags);
+            expressions::check(&flat, profile, diags, env, &placement_rej);
         });
         _run_pass(
             "expressions::check_timedcontrol_constants",
             "tier_b_generic",
             || {
-                expressions::check_timedcontrol_constants(&flat, diags);
+                expressions::check_timedcontrol_constants(&flat, profile, diags);
             },
         );
         _run_pass("expressions::check_table_members", "tier_b_generic", || {
-            expressions::check_table_members(&flat, diags);
+            expressions::check_table_members(&flat, profile, diags);
         });
         _run_pass("expressions::check_digit_members", "tier_b_generic", || {
-            expressions::check_digit_members(&flat, diags);
+            expressions::check_digit_members(&flat, profile, diags);
         });
         _run_pass(
             "expressions::check_undefined_dotted_bases",
             "tier_b_generic",
             || {
-                expressions::check_undefined_dotted_bases(&flat, diags);
+                expressions::check_undefined_dotted_bases(&flat, profile, diags);
             },
         );
         _run_pass(
@@ -996,7 +1000,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_instruction_index_bounds(&flat, aside);
+                    expressions::check_instruction_index_bounds(&flat, profile, aside, env);
                 },
             );
             _run_aside("instr_rules::run_rules(bounds)", "bounds", diags, |aside| {
@@ -1039,7 +1043,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_splitstr_whole_array(&flat, aside);
+                    expressions::check_splitstr_whole_array(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1047,7 +1051,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_splitstr_element_reps(&flat, aside);
+                    expressions::check_splitstr_element_reps(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1055,7 +1059,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_sdmsio4_count(&flat, aside);
+                    expressions::check_sdmsio4_count(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1063,7 +1067,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_calibrate_size(&flat, aside);
+                    expressions::check_calibrate_size(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1071,7 +1075,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_subcall_element_bounds(&flat, aside);
+                    expressions::check_subcall_element_bounds(&flat, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1273,7 +1277,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_instruction_index_bounds(program, aside);
+                    expressions::check_instruction_index_bounds(program, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1289,7 +1293,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_status_member_reads_late(program, aside);
+                    expressions::check_status_member_reads_late(program, profile, aside);
                 },
             );
             _run_aside(
@@ -1297,7 +1301,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_splitstr_whole_array(program, aside);
+                    expressions::check_splitstr_whole_array(program, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1305,7 +1309,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_splitstr_element_reps(program, aside);
+                    expressions::check_splitstr_element_reps(program, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1313,7 +1317,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_calibrate_size(program, aside);
+                    expressions::check_calibrate_size(program, profile, aside, env);
                 },
             );
             _run_aside(
@@ -1321,7 +1325,7 @@ pub fn _check_with_context(
                 "bounds",
                 diags,
                 |aside| {
-                    expressions::check_subcall_element_bounds(program, aside);
+                    expressions::check_subcall_element_bounds(program, profile, aside, env);
                 },
             );
             _run_aside(

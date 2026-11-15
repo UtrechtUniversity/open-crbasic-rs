@@ -771,16 +771,13 @@ pub fn drop_shortfall_with_names_with(
         }
         match stmt {
             Stmt::Instruction(inst) => inst.args.iter().any(|e| {
-                !expressions::part1::_undefined_names_with(e.as_deref(), &known_view).is_empty()
+                !expressions::part1::_undefined_names(e.as_deref(), &known_view).is_empty()
             }),
             Stmt::Assignment(assign) => {
-                !expressions::part1::_undefined_names_with(assign.target.as_deref(), &known_view)
+                !expressions::part1::_undefined_names(assign.target.as_deref(), &known_view)
                     .is_empty()
-                    || !expressions::part1::_undefined_names_with(
-                        assign.value.as_deref(),
-                        &known_view,
-                    )
-                    .is_empty()
+                    || !expressions::part1::_undefined_names(assign.value.as_deref(), &known_view)
+                        .is_empty()
             }
             _ => false,
         }

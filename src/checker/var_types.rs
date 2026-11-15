@@ -806,7 +806,11 @@ pub fn _ctype_illegal_with(
     }
     let kind = args[1].as_deref();
     if let Some(k) = known
-        && !expressions::part1::_undefined_names(args[0].as_deref(), k).is_empty()
+        && !expressions::part1::_undefined_names(
+            args[0].as_deref(),
+            &crate::checker::expressions::KnownView::from_set(k),
+        )
+        .is_empty()
     {
         return true;
     }
@@ -849,9 +853,8 @@ pub fn check_ctype_with(program: &ProgramRef, profile: &'static Profile, diags: 
             legal.insert(v);
         }
     }
-    // TODO(integrator): pass `known` from `context::of(program, Some(profile), None).known_names()`
-    // when `KnownNames` and `expressions::part1::_undefined_names` are ported.
-    let known: Option<&BTreeSet<String>> = None;
+    let ctx = context::of(program, Some(profile), None);
+    let known = (!profile.single_pass).then(|| &ctx.known_names().names);
     for stmt in &program.statements {
         let mut tops = Vec::new();
         statement_expressions(stmt, &mut tops);

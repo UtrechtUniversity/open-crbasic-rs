@@ -1095,7 +1095,7 @@ pub fn _block_keyword_call(stmt: &Stmt) -> bool {
         Stmt::ElseIf(s) => s.cond.as_deref(),
         _ => return false,
     };
-    expressions::_index_nodes_with(expr)
+    expressions::_index_nodes(expr)
         .iter()
         .any(|i| _CALLED_BLOCK_KEYWORDS.contains(&pystr::upper(&i.name).as_str()))
 }

@@ -49,11 +49,6 @@ fn const_is_positive(val: &ConstValue) -> bool {
     }
 }
 
-/// Port of `checker/expressions.py::check_function_call_counts`.
-pub fn check_function_call_counts(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_function_call_counts (omitted: profile: untyped)")
-}
-
 #[allow(clippy::too_many_arguments)]
 fn visit_call_count_stmt(
     stmt: &Stmt,
@@ -76,7 +71,11 @@ fn visit_call_count_stmt(
                     _ => false,
                 };
             if kind.is_some()
-                && !super::_undefined_names(a.target.as_deref(), known).is_empty()
+                && !super::_undefined_names(
+                    a.target.as_deref(),
+                    &crate::checker::expressions::KnownView::from_set(known),
+                )
+                .is_empty()
                 && !target_single_pass_known
             {
                 kind = None;
@@ -176,8 +175,8 @@ fn visit_call_count_stmt(
     }
 }
 
-/// Port of `checker/expressions.py::check_function_call_counts` (full signature).
-pub fn check_function_call_counts_with(
+/// Port of checker/expressions.py::check_function_call_counts
+pub fn check_function_call_counts(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -194,14 +193,11 @@ pub fn check_function_call_counts_with(
         return;
     }
     let ctx = context::of(program, Some(profile), None);
-    let _known_names = ctx.known_names();
-    // TODO(integrator-2): use ctx.known_names() once KnownNames is ported in part2.rs.
-    let known_set = BTreeSet::new();
-    let known = &known_set;
+    let known = &ctx.known_names().names;
     let mut missing: usize = 1;
 
     let problem = |expr: Option<&Expr>, missing: &mut usize| -> Option<&'static str> {
-        for node in _index_nodes_with(expr) {
+        for node in _index_nodes(expr) {
             let Some(fn_def) = functions.get(&pystr::upper(&node.name)) else {
                 continue;
             };
@@ -261,13 +257,8 @@ pub fn check_function_call_counts_with(
     }
 }
 
-/// Port of `checker/expressions.py::_index_nodes`.
-pub fn _index_nodes(_expr: Option<&Expr>) {
-    todo!("checker/expressions.py::_index_nodes")
-}
-
-/// Port of `checker/expressions.py::_index_nodes` (returning collected `Index` nodes).
-pub fn _index_nodes_with(expr: Option<&Expr>) -> Vec<&Index> {
+/// Port of checker/expressions.py::_index_nodes
+pub fn _index_nodes(expr: Option<&Expr>) -> Vec<&Index> {
     let mut out = Vec::new();
     collect_index_nodes(expr, &mut out);
     out
@@ -312,21 +303,16 @@ static _FOR_HEADER_RE: LazyLock<pyre::Regex> =
 static NEXT_SCAN_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*Next\s+(Sub)?Scan\b", 0));
 
-/// Port of `checker/expressions.py::_check_for_headers`.
-pub fn _check_for_headers(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::_check_for_headers (omitted: profile: untyped, known: untyped)")
-}
-
-/// Port of `checker/expressions.py::_check_for_headers` (full signature).
-pub fn _check_for_headers_with(
+/// Port of checker/expressions.py::_check_for_headers
+pub fn _check_for_headers(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
-    known: &BTreeSet<String>,
+    known: &super::KnownNames,
 ) {
     let ctx = context::of(program, Some(profile), None);
-    let _ds = ctx.dims_state();
-    let dim_counts = &ctx.dim_counts(true).counts;
+    let ds = ctx.dims_state();
+    let dim_counts = ctx.dim_counts(true);
     let mut pending: Vec<(&StmtRef, String)> = Vec::new();
     let whole_echo = is_whole_expr_echo_logger(profile);
     for stmt in &program.statements {
@@ -350,33 +336,36 @@ pub fn _check_for_headers_with(
         };
         let m = _FOR_HEADER_RE.match_(stmt.text());
         let parts = [
-            (for_stmt.var.as_deref(), m.as_ref().and_then(|m| m.group(1))),
-            (
-                for_stmt.start.as_deref(),
-                m.as_ref().and_then(|m| m.group(2)),
-            ),
-            (for_stmt.end.as_deref(), m.as_ref().and_then(|m| m.group(3))),
-            (
-                for_stmt.step.as_deref(),
-                m.as_ref().and_then(|m| m.group(4)),
-            ),
+            (for_stmt.var.as_ref(), m.as_ref().and_then(|m| m.group(1))),
+            (for_stmt.start.as_ref(), m.as_ref().and_then(|m| m.group(2))),
+            (for_stmt.end.as_ref(), m.as_ref().and_then(|m| m.group(3))),
+            (for_stmt.step.as_ref(), m.as_ref().and_then(|m| m.group(4))),
         ];
         let mut var_text = String::new();
         for (i, (expr, text)) in parts.into_iter().enumerate() {
             let names = if expr.is_some() {
-                super::_undefined_names(expr, known)
+                super::_undefined_names(
+                    expr.map(|e| &**e),
+                    &crate::checker::expressions::KnownView::from(known),
+                )
+                .into_iter()
+                .map(crate::checker::expressions::UndefinedName::into_string)
+                .collect::<Vec<_>>()
             } else {
                 Vec::new()
             };
             if names.is_empty() {
-                // TODO(integrator-2): pass profile to _dim_limit and dimensions_message.
                 if i > 0
                     && let Some(text) = text
-                    && super::_over_indexed(expr, dim_counts, super::_dim_limit())
+                    && super::_over_indexed(
+                        expr.map(|e| &**e),
+                        dim_counts,
+                        super::_dim_limit(profile),
+                    )
                 {
                     diags.error_basic(
                         stmt.line(),
-                        &super::dimensions_message(text, false, stmt.at_eol()),
+                        &super::dimensions_message(text, profile, false, stmt.at_eol()),
                         stmt.file(),
                     );
                 }
@@ -403,14 +392,14 @@ pub fn _check_for_headers_with(
                         stmt.file(),
                     );
                 }
-                // TODO(integrator-2): pass ds and profile to _has_undefined_index / dimensions_message.
+
                 if i == 0
                     && let Some(text) = text
-                    && super::_has_undefined_index(expr, known, None, Some(stmt))
+                    && super::_has_undefined_index(expr, known, Some(ds), Some(stmt_id(stmt)), &[])
                 {
                     diags.error_basic(
                         stmt.line(),
-                        &super::dimensions_message(text, false, stmt.at_eol()),
+                        &super::dimensions_message(text, profile, false, stmt.at_eol()),
                         stmt.file(),
                     );
                 }
@@ -429,23 +418,16 @@ static CASE_ELSE_RE: LazyLock<pyre::Regex> =
 static CASE_TAIL_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*Case\s(.*)$", 0));
 
-/// Port of `checker/expressions.py::_check_elseif_and_case`.
-pub fn _check_elseif_and_case(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::_check_elseif_and_case (omitted: profile: untyped, known: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::_check_elseif_and_case` (full signature).
-pub fn _check_elseif_and_case_with(
+/// Port of checker/expressions.py::_check_elseif_and_case
+pub fn _check_elseif_and_case(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
-    known: &BTreeSet<String>,
+    known: &super::KnownNames,
 ) {
     let ctx = context::of(program, Some(profile), None);
-    let _ds = ctx.dims_state();
-    let dim_counts = &ctx.dim_counts(true).counts;
+    let ds = ctx.dims_state();
+    let dim_counts = ctx.dim_counts(true);
     let whole_echo = is_whole_expr_echo_logger(profile);
     let mut orphans: Vec<bool> = Vec::new();
     let mut open_ifs: usize = 0;
@@ -464,11 +446,21 @@ pub fn _check_elseif_and_case_with(
                 .first()
                 .and_then(Option::as_deref)
                 .is_some_and(|first| {
-                    let undef = super::_undefined_names(Some(first), known);
-                    // TODO(integrator-2): pass profile to _dim_limit.
+                    let undef = super::_undefined_names(
+                        Some(first),
+                        &crate::checker::expressions::KnownView::from(known),
+                    )
+                    .into_iter()
+                    .map(crate::checker::expressions::UndefinedName::into_string)
+                    .collect::<Vec<_>>();
+
                     (!whole_echo && !undef.is_empty())
                         || (undef.is_empty()
-                            && super::_over_indexed(Some(first), dim_counts, super::_dim_limit()))
+                            && super::_over_indexed(
+                                Some(first),
+                                dim_counts,
+                                super::_dim_limit(profile),
+                            ))
                 });
             orphans.push(is_orphan);
             continue;
@@ -490,20 +482,26 @@ pub fn _check_elseif_and_case_with(
             if whole_echo && open_ifs == 0 {
                 continue;
             }
-            let names = super::_undefined_names(elseif_stmt.cond.as_deref(), known);
+            let names = super::_undefined_names(
+                elseif_stmt.cond.as_deref(),
+                &crate::checker::expressions::KnownView::from(known),
+            )
+            .into_iter()
+            .map(crate::checker::expressions::UndefinedName::into_string)
+            .collect::<Vec<_>>();
             let text = super::_if_condition_text(stmt);
-            // TODO(integrator-2): pass profile to _dim_limit and dimensions_message.
+
             if let Some(ref text) = text
                 && names.is_empty()
                 && super::_over_indexed(
                     elseif_stmt.cond.as_deref(),
                     dim_counts,
-                    super::_dim_limit(),
+                    super::_dim_limit(profile),
                 )
             {
                 diags.error_basic(
                     stmt.line(),
-                    &super::dimensions_message(text, false, stmt.at_eol()),
+                    &super::dimensions_message(text, profile, false, stmt.at_eol()),
                     stmt.file(),
                 );
                 continue;
@@ -528,12 +526,17 @@ pub fn _check_elseif_and_case_with(
                         stmt.file(),
                     );
                 }
-                // TODO(integrator-2): pass ds and profile to _has_undefined_index / dimensions_message.
-                if super::_has_undefined_index(elseif_stmt.cond.as_deref(), known, None, Some(stmt))
-                {
+
+                if super::_has_undefined_index(
+                    elseif_stmt.cond.as_ref(),
+                    known,
+                    Some(ds),
+                    Some(stmt_id(stmt)),
+                    &[],
+                ) {
                     diags.error_basic(
                         stmt.line(),
-                        &super::dimensions_message(&text, false, stmt.at_eol()),
+                        &super::dimensions_message(&text, profile, false, stmt.at_eol()),
                         stmt.file(),
                     );
                 }
@@ -557,8 +560,20 @@ pub fn _check_elseif_and_case_with(
                 CaseItem::Range(lo, hi) => (Some(lo.as_ref()), Some(hi.as_ref())),
                 CaseItem::Is(_, e) => (None, Some(e.as_ref())),
             };
-            let low = super::_undefined_names(lower, known);
-            let high = super::_undefined_names(upper, known);
+            let low = super::_undefined_names(
+                lower,
+                &crate::checker::expressions::KnownView::from(known),
+            )
+            .into_iter()
+            .map(crate::checker::expressions::UndefinedName::into_string)
+            .collect::<Vec<_>>();
+            let high = super::_undefined_names(
+                upper,
+                &crate::checker::expressions::KnownView::from(known),
+            )
+            .into_iter()
+            .map(crate::checker::expressions::UndefinedName::into_string)
+            .collect::<Vec<_>>();
             if !low.is_empty() && outside == 0 && names.is_empty() {
                 outside = index + 1;
             }
@@ -569,7 +584,7 @@ pub fn _check_elseif_and_case_with(
             if let Some(cm) = CASE_TAIL_RE.match_(stmt.text())
                 && let Some(tail) = cm.group(1)
             {
-                let limit = super::_dim_limit(); // TODO(integrator-2): pass profile
+                let limit = super::_dim_limit(profile);
                 let has_over = case_stmt.items.iter().any(|item| match item {
                     CaseItem::Value(e) | CaseItem::Is(_, e) => {
                         super::_over_indexed(Some(e), dim_counts, limit)
@@ -582,7 +597,7 @@ pub fn _check_elseif_and_case_with(
                 if has_over {
                     diags.error_basic(
                         stmt.line(),
-                        &super::dimensions_message(tail, false, stmt.at_eol()),
+                        &super::dimensions_message(tail, profile, false, stmt.at_eol()),
                         stmt.file(),
                     );
                 }
@@ -616,21 +631,15 @@ pub fn _check_elseif_and_case_with(
     }
 }
 
-/// Port of `checker/expressions.py::_check_function_statements`.
-pub fn _check_function_statements(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::_check_function_statements (omitted: profile: untyped, known: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::_check_function_statements` (full signature).
-pub fn _check_function_statements_with(
+/// Port of checker/expressions.py::_check_function_statements
+pub fn _check_function_statements(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
-    known: &BTreeSet<String>,
+    known: &super::KnownNames,
 ) {
-    let _ds = context::of(program, Some(profile), None).dims_state();
+    let ctx = context::of(program, Some(profile), None);
+    let ds = ctx.dims_state();
     let mut first_on_line: HashMap<(i64, String), usize> = HashMap::new();
     for stmt in &program.statements {
         first_on_line
@@ -647,7 +656,7 @@ pub fn _check_function_statements_with(
         let mut args: Vec<Option<ExprRef>> = call.args.clone();
         if pystr::upper(&call.name) == "SERIALOPEN"
             && is_whole_expr_echo_logger(profile)
-            && super::super::cr3xx::bare_unknown_delay(call, known)
+            && super::super::cr3xx::bare_unknown_delay(call, &known.names)
             && args.len() > 3
         {
             args.remove(3);
@@ -655,7 +664,15 @@ pub fn _check_function_statements_with(
         let names: Vec<String> = args
             .iter()
             .flatten()
-            .flat_map(|a| super::_undefined_names(Some(a), known))
+            .flat_map(|a| {
+                super::_undefined_names(
+                    Some(a),
+                    &crate::checker::expressions::KnownView::from(known),
+                )
+                .into_iter()
+                .map(crate::checker::expressions::UndefinedName::into_string)
+                .collect::<Vec<_>>()
+            })
             .collect();
         let stmt_ptr = stmt_id(stmt);
         let is_first = first_on_line
@@ -678,11 +695,9 @@ pub fn _check_function_statements_with(
             );
             continue;
         }
-        // TODO(integrator-2): wire _names_and_dims(known, ds, stmt, (), *stmt.args) -> (Vec<String>, bool).
-        let (names, dims): (Vec<String>, bool) = {
-            super::_names_and_dims(known, None, Some(stmt));
-            (Vec::new(), false)
-        };
+
+        let (names, dims) =
+            super::_names_and_dims(known, Some(ds), Some(stmt_id(stmt)), &[], &call.args);
         for name in &names {
             diags.error_basic(
                 stmt.line(),
@@ -691,10 +706,9 @@ pub fn _check_function_statements_with(
             );
         }
         if dims {
-            // TODO(integrator-2): pass profile to dimensions_message.
             diags.error_basic(
                 stmt.line(),
-                &super::dimensions_message(stmt.text(), true, stmt.at_eol()),
+                &super::dimensions_message(stmt.text(), profile, true, stmt.at_eol()),
                 stmt.file(),
             );
         }
@@ -731,15 +745,8 @@ fn bounds_probed(code: i64) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Port of `checker/expressions.py::check_instruction_index_bounds`.
-pub fn check_instruction_index_bounds(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check_instruction_index_bounds (omitted: profile: untyped, env: consteval.Env)"
-    )
-}
-
-/// Port of `checker/expressions.py::check_instruction_index_bounds` (full signature).
-pub fn check_instruction_index_bounds_with(
+/// Port of checker/expressions.py::check_instruction_index_bounds
+pub fn check_instruction_index_bounds(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -860,15 +867,8 @@ pub fn check_instruction_index_bounds_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_splitstr_element_reps`.
-pub fn check_splitstr_element_reps(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check_splitstr_element_reps (omitted: profile: untyped, env: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::check_splitstr_element_reps` (full signature).
-pub fn check_splitstr_element_reps_with(
+/// Port of checker/expressions.py::check_splitstr_element_reps
+pub fn check_splitstr_element_reps(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -932,13 +932,8 @@ pub fn check_splitstr_element_reps_with(
     }
 }
 
-/// Port of `checker/expressions.py::_sdmsio4_count`.
-pub fn _sdmsio4_count(_stmt: &Instruction) -> Option<i64> {
-    todo!("checker/expressions.py::_sdmsio4_count (omitted: env: untyped)")
-}
-
-/// Port of `checker/expressions.py::_sdmsio4_count` (full signature).
-pub fn _sdmsio4_count_with(stmt: &Instruction, env: &Env) -> Option<i64> {
+/// Port of checker/expressions.py::_sdmsio4_count
+pub fn _sdmsio4_count(stmt: &Instruction, env: &Env) -> Option<i64> {
     if stmt.args.len() < 8 || stmt.args[7].is_none() {
         return None;
     }
@@ -948,13 +943,8 @@ pub fn _sdmsio4_count_with(stmt: &Instruction, env: &Env) -> Option<i64> {
     const_as_exact_int(&n)
 }
 
-/// Port of `checker/expressions.py::check_sdmsio4_count`.
-pub fn check_sdmsio4_count(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_sdmsio4_count (omitted: profile: untyped, env: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_sdmsio4_count` (full signature).
-pub fn check_sdmsio4_count_with(
+/// Port of checker/expressions.py::check_sdmsio4_count
+pub fn check_sdmsio4_count(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -968,7 +958,7 @@ pub fn check_sdmsio4_count_with(
         if pystr::upper(&inst.keyword) != "SDMSIO4" || inst.args.is_empty() {
             continue;
         }
-        let Some(n) = _sdmsio4_count_with(inst, env) else {
+        let Some(n) = _sdmsio4_count(inst, env) else {
             continue;
         };
         if n < 1 {
@@ -1007,13 +997,8 @@ pub fn check_sdmsio4_count_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_timedcontrol_constants`.
-pub fn check_timedcontrol_constants(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_timedcontrol_constants (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_timedcontrol_constants` (full signature).
-pub fn check_timedcontrol_constants_with(
+/// Port of checker/expressions.py::check_timedcontrol_constants
+pub fn check_timedcontrol_constants(
     program: &Program,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1034,7 +1019,7 @@ pub fn check_timedcontrol_constants_with(
         }
         for (i, what) in [(0, "Size"), (1, "Interval")] {
             if let Some(Some(arg)) = inst.args.get(i)
-                && !_names_in_with(Some(arg.as_ref())).is_subset(&consts)
+                && !_names_in(Some(arg.as_ref())).is_subset(&consts)
             {
                 diags.error_basic(
                     stmt.line(),
@@ -1046,13 +1031,8 @@ pub fn check_timedcontrol_constants_with(
     }
 }
 
-/// Port of `checker/expressions.py::_names_in`.
-pub fn _names_in() -> BTreeSet<String> {
-    todo!("checker/expressions.py::_names_in (omitted: expr: untyped)")
-}
-
-/// Port of `checker/expressions.py::_names_in` (full signature).
-pub fn _names_in_with(expr: Option<&Expr>) -> BTreeSet<String> {
+/// Port of checker/expressions.py::_names_in
+pub fn _names_in(expr: Option<&Expr>) -> BTreeSet<String> {
     let Some(expr) = expr else {
         return BTreeSet::new();
     };
@@ -1061,28 +1041,23 @@ pub fn _names_in_with(expr: Option<&Expr>) -> BTreeSet<String> {
         Expr::Index(ix) => {
             let mut out = BTreeSet::from([pystr::upper(&ix.name)]);
             for a in ix.args.iter().flatten() {
-                out.extend(_names_in_with(Some(a.as_ref())));
+                out.extend(_names_in(Some(a.as_ref())));
             }
             out
         }
-        Expr::Unary(u) => _names_in_with(u.operand.as_deref()),
+        Expr::Unary(u) => _names_in(u.operand.as_deref()),
         Expr::Binary(b) => {
-            let mut out = _names_in_with(b.left.as_deref());
-            out.extend(_names_in_with(b.right.as_deref()));
+            let mut out = _names_in(b.left.as_deref());
+            out.extend(_names_in(b.right.as_deref()));
             out
         }
-        Expr::Member(m) => _names_in_with(m.base.as_deref()),
+        Expr::Member(m) => _names_in(m.base.as_deref()),
         _ => BTreeSet::new(),
     }
 }
 
-/// Port of `checker/expressions.py::check_calibrate_size`.
-pub fn check_calibrate_size(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_calibrate_size (omitted: profile: untyped, env: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_calibrate_size` (full signature).
-pub fn check_calibrate_size_with(
+/// Port of checker/expressions.py::check_calibrate_size
+pub fn check_calibrate_size(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1132,15 +1107,8 @@ pub fn check_calibrate_size_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_splitstr_whole_array`.
-pub fn check_splitstr_whole_array(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check_splitstr_whole_array (omitted: profile: untyped, env: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::check_splitstr_whole_array` (full signature).
-pub fn check_splitstr_whole_array_with(
+/// Port of checker/expressions.py::check_splitstr_whole_array
+pub fn check_splitstr_whole_array(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1207,15 +1175,8 @@ pub fn check_splitstr_whole_array_with(
     }
 }
 
-/// Port of `checker/expressions.py::check_subcall_element_bounds`.
-pub fn check_subcall_element_bounds(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/expressions.py::check_subcall_element_bounds (omitted: profile: untyped, env: untyped)"
-    )
-}
-
-/// Port of `checker/expressions.py::check_subcall_element_bounds` (full signature).
-pub fn check_subcall_element_bounds_with(
+/// Port of checker/expressions.py::check_subcall_element_bounds
+pub fn check_subcall_element_bounds(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1275,13 +1236,8 @@ pub fn check_subcall_element_bounds_with(
 static END_ROUTINE_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*End\s+(Function|Sub)\b", 0));
 
-/// Port of `checker/expressions.py::check_recursive_functions`.
-pub fn check_recursive_functions(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/expressions.py::check_recursive_functions (omitted: profile: untyped)")
-}
-
-/// Port of `checker/expressions.py::check_recursive_functions` (full signature).
-pub fn check_recursive_functions_with(
+/// Port of checker/expressions.py::check_recursive_functions
+pub fn check_recursive_functions(
     program: &Program,
     _profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -1324,7 +1280,7 @@ pub fn check_recursive_functions_with(
             _ => {}
         }
         if exprs.into_iter().any(|e| {
-            _index_nodes_with(e)
+            _index_nodes(e)
                 .into_iter()
                 .any(|node| &pystr::upper(&node.name) == cur)
         }) {
@@ -1365,7 +1321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_index_nodes_with() {
+    fn test_index_nodes() {
         let inner = Rc::new(Expr::Index(Index {
             node: Node::new(1, ""),
             name: "B".to_string(),
@@ -1392,7 +1348,7 @@ mod tests {
                 }))),
             }))),
         });
-        let names: Vec<&str> = _index_nodes_with(Some(&outer))
+        let names: Vec<&str> = _index_nodes(Some(&outer))
             .into_iter()
             .map(|ix| ix.name.as_str())
             .collect();
@@ -1400,7 +1356,7 @@ mod tests {
     }
 
     #[test]
-    fn test_names_in_with() {
+    fn test_names_in() {
         let expr = Expr::Binary(Binary {
             node: Node::new(1, ""),
             op: "+".to_string(),
@@ -1422,7 +1378,7 @@ mod tests {
                 args: None,
             }))),
         });
-        let names = _names_in_with(Some(&expr));
+        let names = _names_in(Some(&expr));
         assert_eq!(
             names,
             BTreeSet::from(["ARR".to_string(), "IDX".to_string(), "TBL".to_string()])
@@ -1436,7 +1392,7 @@ mod tests {
             cr6(),
         );
         let env = Env::new(cr6());
-        check_instruction_index_bounds_with(&prog, cr6(), &mut diags, &env);
+        check_instruction_index_bounds(&prog, cr6(), &mut diags, &env);
         assert_eq!(
             err_msgs(&diags),
             vec!["Variable A out of bounds.", "Variable A out of bounds."]
@@ -1446,11 +1402,11 @@ mod tests {
             "Public X\nBeginProg\n  Battery(X(2))\n  Battery(X(1,1))\nEndProg\n",
             cr6(),
         );
-        check_instruction_index_bounds_with(&prog6, cr6(), &mut diags6, &Env::new(cr6()));
+        check_instruction_index_bounds(&prog6, cr6(), &mut diags6, &Env::new(cr6()));
         assert_eq!(err_msgs(&diags6), vec!["Variable X out of bounds."]);
 
         let (prog3, mut diags3) = parse("Public X\nBeginProg\n  Battery(X(2))\nEndProg\n", cr300());
-        check_instruction_index_bounds_with(&prog3, cr300(), &mut diags3, &Env::new(cr300()));
+        check_instruction_index_bounds(&prog3, cr300(), &mut diags3, &Env::new(cr300()));
         assert_eq!(err_msgs(&diags3), Vec::<String>::new());
     }
 
@@ -1460,7 +1416,7 @@ mod tests {
             "Public F(3)\nPublic S(3) As String * 10\nBeginProg\n  SplitStr(F(2),\"a\",\"\",3,0)\n  SplitStr(S(2),\"a\",\"\",3,0)\nEndProg\n",
             cr6(),
         );
-        check_splitstr_element_reps_with(&prog, cr6(), &mut diags, &Env::new(cr6()));
+        check_splitstr_element_reps(&prog, cr6(), &mut diags, &Env::new(cr6()));
         assert_eq!(err_msgs(&diags), vec!["Variable F out of bounds."]);
     }
 
@@ -1470,7 +1426,7 @@ mod tests {
             "Public D(4)\nPublic X\nBeginProg\n  SDMSIO4(D(2),0,0,0,0,0,0,4)\n  SDMSIO4(X,0,0,0,0,0,0,2)\nEndProg\n",
             cr6(),
         );
-        check_sdmsio4_count_with(&prog, cr6(), &mut diags, &Env::new(cr6()));
+        check_sdmsio4_count(&prog, cr6(), &mut diags, &Env::new(cr6()));
         assert_eq!(
             err_msgs(&diags),
             vec!["Variable D out of bounds.", "Variable X out of bounds."]
@@ -1483,14 +1439,14 @@ mod tests {
             "Public N\nConst C = 5\nBeginProg\n  TimedControl(N, C, 1, 0, 0, 0)\nEndProg\n",
             cr6(),
         );
-        check_timedcontrol_constants_with(&prog, cr6(), &mut diags);
+        check_timedcontrol_constants(&prog, cr6(), &mut diags);
         assert_eq!(err_msgs(&diags), vec!["Size must be a constant."]);
 
         let (prog3, mut diags3) = parse(
             "Public N\nConst C = 5\nBeginProg\n  TimedControl(N, C, 1, 0, 0, 0)\nEndProg\n",
             cr300(),
         );
-        check_timedcontrol_constants_with(&prog3, cr300(), &mut diags3);
+        check_timedcontrol_constants(&prog3, cr300(), &mut diags3);
         assert_eq!(err_msgs(&diags3), Vec::<String>::new());
     }
 
@@ -1500,14 +1456,14 @@ mod tests {
             "Public A(5)\nPublic B(50)\nBeginProg\n  Calibrate(A)\n  Calibrate(B)\nEndProg\n",
             cr6(),
         );
-        check_calibrate_size_with(&prog6, cr6(), &mut diags6, &Env::new(cr6()));
+        check_calibrate_size(&prog6, cr6(), &mut diags6, &Env::new(cr6()));
         assert_eq!(err_msgs(&diags6), vec!["Variable A out of bounds."]);
 
         let (prog3, mut diags3) = parse(
             "Public B(50)\nBeginProg\n  Calibrate(B)\nEndProg\n",
             cr300(),
         );
-        check_calibrate_size_with(&prog3, cr300(), &mut diags3, &Env::new(cr300()));
+        check_calibrate_size(&prog3, cr300(), &mut diags3, &Env::new(cr300()));
         assert_eq!(err_msgs(&diags3), vec!["Variable B out of bounds."]);
     }
 
@@ -1517,7 +1473,7 @@ mod tests {
             "Public S(5)\nBeginProg\n  SplitStr(S(),\"a\",\"\",6,0)\n  SplitStr(S(),\"a\",\"\",1/0,0)\nEndProg\n",
             cr300(),
         );
-        check_splitstr_whole_array_with(&prog, cr300(), &mut diags, &Env::new(cr300()));
+        check_splitstr_whole_array(&prog, cr300(), &mut diags, &Env::new(cr300()));
         assert_eq!(
             err_msgs(&diags),
             vec!["Variable S out of bounds.", "Variable S out of bounds."]
@@ -1530,7 +1486,7 @@ mod tests {
             "Public P(9)\nSub S1(x)\nEndSub\nBeginProg\n  S1(P(10))\n  S1(P(0))\n  S1(P(-1))\nEndProg\n",
             cr6(),
         );
-        check_subcall_element_bounds_with(&prog, cr6(), &mut diags, &Env::new(cr6()));
+        check_subcall_element_bounds(&prog, cr6(), &mut diags, &Env::new(cr6()));
         assert_eq!(
             err_msgs(&diags),
             vec!["Variable P out of bounds.", "Variable P out of bounds."]
@@ -1543,7 +1499,7 @@ mod tests {
             "Function F(a)\n  F = F(a) + 1\n  F = 1\nEndFunction\nSub S()\n  S()\nEndSub\n",
             cr6(),
         );
-        check_recursive_functions_with(&prog, cr6(), &mut diags);
+        check_recursive_functions(&prog, cr6(), &mut diags);
         assert_eq!(err_msgs(&diags), vec!["Cannot recursively call functions."]);
     }
 }

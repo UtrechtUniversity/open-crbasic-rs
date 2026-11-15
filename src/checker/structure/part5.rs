@@ -797,7 +797,7 @@ pub fn _logical_assign_state(
         .unwrap_or_default();
     let mut known = ctx.known_names().clone();
     known.names.extend(local.iter().cloned());
-    let undefined = expressions::part1::_undefined_names_with(
+    let undefined = expressions::part1::_undefined_names(
         u.expr.as_deref(),
         &KnownView {
             names: &known.names,

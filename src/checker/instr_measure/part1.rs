@@ -1362,14 +1362,9 @@ pub fn check_pass1_values_with(
             continue;
         }
         let has_problem = stmt.args.iter().flatten().any(|a| {
-            expressions::part4::_find_arity_problem_with(
-                Some(a.as_ref()),
-                profile,
-                None,
-                &empty_consts,
-            )
-            .is_some()
-                || expressions::part4::_find_bare_function_ref_with(
+            expressions::part4::_find_arity_problem(Some(a.as_ref()), profile, None, &empty_consts)
+                .is_some()
+                || expressions::part4::_find_bare_function_ref(
                     Some(a.as_ref()),
                     profile,
                     &variable_names,

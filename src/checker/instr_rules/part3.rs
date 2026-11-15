@@ -117,7 +117,7 @@ pub fn check_precision_variable(
             continue;
         }
         let arg = stmt.args[i].as_deref();
-        if !expressions::_undefined_names_with(arg, &_p3_known_view(known)).is_empty()
+        if !expressions::_undefined_names(arg, &_p3_known_view(known)).is_empty()
             || !expressions::_variable_refs(arg, variable_names).is_empty()
         {
             continue;
@@ -360,8 +360,7 @@ pub fn check_avgrun_options(
         let instances = number(at_arg);
         if constant
             && instances.is_none()
-            && !expressions::_undefined_names_with(at_arg, &_p3_known_view(ctx.known_names()))
-                .is_empty()
+            && !expressions::_undefined_names(at_arg, &_p3_known_view(ctx.known_names())).is_empty()
         {
             constant = false;
         }

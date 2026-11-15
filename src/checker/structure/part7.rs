@@ -24,14 +24,14 @@ use super::part2::{_leftover_message, _out_of_place};
 use super::part4::_leftover_first_name_known;
 use super::part8::{_group_end, _group_items};
 use crate::checker::expressions::part1::{
-    _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names_with, KnownView, UndefinedName,
+    _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names, KnownView, UndefinedName,
 };
 use crate::checker::expressions::part2::{
-    _dim_limit_with, _has_undefined_index_with, _names_and_dims_with, _over_indexed_with,
-    DimsState, KnownNames, dimensions_message_with,
+    _dim_limit, _has_undefined_index, _names_and_dims, _over_indexed, DimsState, KnownNames,
+    dimensions_message,
 };
 use crate::checker::expressions::part4::{
-    _bare_function_message_with, _call_arity_problem_with, _find_bare_function_ref_with,
+    _bare_function_message, _call_arity_problem, _find_bare_function_ref,
 };
 use crate::checker::{context, ess, instr_rules, symbols};
 use crate::consteval::{self, Env};
@@ -228,7 +228,7 @@ pub fn _report_call_arg_names(
         dotted_tables: known.dotted_tables,
     };
     let undefined = |e: Option<&Expr>| {
-        _undefined_names_with(e, &view)
+        _undefined_names(e, &view)
             .into_iter()
             .map(UndefinedName::into_string)
             .collect::<Vec<_>>()
@@ -263,7 +263,7 @@ pub fn _report_call_arg_names(
             }
         } else {
             let builtin = profile.functions().contains(&pystr::upper(&stmt.name));
-            if builtin && _call_arity_problem_with(&stmt.name, &stmt.args, profile).is_some() {
+            if builtin && _call_arity_problem(&stmt.name, &stmt.args, profile).is_some() {
                 return;
             }
             let tail = if builtin || stmt.tail_expr.is_some() {
@@ -273,12 +273,12 @@ pub fn _report_call_arg_names(
                     stmt.args.clone()
                 };
                 let (names, dims) =
-                    _names_and_dims_with(known, ds, Some(stmt_id(stmt_ref)), &[], &exprs);
+                    _names_and_dims(known, ds, Some(stmt_id(stmt_ref)), &[], &exprs);
                 report_unique(names, diags);
                 if dims {
                     diags.error_basic(
                         node.line,
-                        &dimensions_message_with(text, profile, true, at_eol),
+                        &dimensions_message(text, profile, true, at_eol),
                         &node.file,
                     );
                     return;
@@ -322,7 +322,7 @@ pub fn _report_call_arg_names(
                 &node.file,
             );
         } else {
-            let (names, dims) = _names_and_dims_with(
+            let (names, dims) = _names_and_dims(
                 known,
                 None,
                 Some(stmt_id(stmt_ref)),
@@ -333,7 +333,7 @@ pub fn _report_call_arg_names(
             if dims {
                 diags.error_basic(
                     node.line,
-                    &dimensions_message_with(text, profile, true, at_eol),
+                    &dimensions_message(text, profile, true, at_eol),
                     &node.file,
                 );
             }
@@ -360,8 +360,7 @@ pub fn _report_call_arg_names(
         return;
     }
     if is_function && !whole {
-        let (names, dims) =
-            _names_and_dims_with(known, None, Some(stmt_id(stmt_ref)), &[], &stmt.args);
+        let (names, dims) = _names_and_dims(known, None, Some(stmt_id(stmt_ref)), &[], &stmt.args);
         for name in names {
             diags.error_basic(
                 node.line,
@@ -372,7 +371,7 @@ pub fn _report_call_arg_names(
         if dims {
             diags.error_basic(
                 node.line,
-                &dimensions_message_with(text, profile, true, at_eol),
+                &dimensions_message(text, profile, true, at_eol),
                 &node.file,
             );
         }
@@ -416,7 +415,7 @@ pub fn _report_call_arg_names(
                 && let Some(counts) = ds
                     .and_then(|d| d.dim_counts.as_ref())
                     .filter(|c| !c.counts.is_empty())
-                && _over_indexed_with(arg.as_deref(), counts, _dim_limit_with(profile))
+                && _over_indexed(arg.as_deref(), counts, _dim_limit(profile))
             {
                 let echo = if Some(i) == last_tail {
                     pystr::lstrip(&raw)
@@ -425,7 +424,7 @@ pub fn _report_call_arg_names(
                 };
                 diags.error_basic(
                     node.line,
-                    &dimensions_message_with(echo, profile, nl, nl),
+                    &dimensions_message(echo, profile, nl, nl),
                     &node.file,
                 );
             }
@@ -462,10 +461,10 @@ pub fn _report_call_arg_names(
                 &node.file,
             );
         }
-        if _has_undefined_index_with(arg.as_ref(), known, None, None, &[]) {
+        if _has_undefined_index(arg.as_ref(), known, None, None, &[]) {
             diags.error_basic(
                 node.line,
-                &dimensions_message_with(echo, profile, nl, nl),
+                &dimensions_message(echo, profile, nl, nl),
                 &node.file,
             );
         }
@@ -793,7 +792,7 @@ pub fn _check_assignment_pass2(
         out_of_scope: &known.out_of_scope,
         dotted_tables: known.dotted_tables,
     };
-    let target_names = _undefined_names_with(stmt.target.as_deref(), &view);
+    let target_names = _undefined_names(stmt.target.as_deref(), &view);
     let node = &stmt.base.node;
     let text = &stmt.base.text;
     let at_eol = stmt.base.at_eol.get();
@@ -809,7 +808,7 @@ pub fn _check_assignment_pass2(
         }
         if let Some(Expr::Index(target)) = stmt.target.as_deref()
             && ((!known.names.contains(&pystr::upper(&target.name))
-                && _has_undefined_index_with(
+                && _has_undefined_index(
                     stmt.target.as_ref(),
                     known,
                     ds,
@@ -823,7 +822,7 @@ pub fn _check_assignment_pass2(
             let plain_target = target_names
                 .iter()
                 .any(|t| !matches!(t, UndefinedName::Dotted(_)));
-            for name in _undefined_names_with(stmt.value.as_deref(), &view) {
+            for name in _undefined_names(stmt.value.as_deref(), &view) {
                 if plain_target && matches!(name, UndefinedName::Dotted(_)) {
                     continue;
                 }
@@ -833,7 +832,7 @@ pub fn _check_assignment_pass2(
                     &node.file,
                 );
             }
-            if _has_undefined_index_with(
+            if _has_undefined_index(
                 stmt.value.as_ref(),
                 known,
                 ds,
@@ -842,14 +841,13 @@ pub fn _check_assignment_pass2(
             ) {
                 diags.error_basic(
                     node.line,
-                    &dimensions_message_with(text, profile, true, at_eol),
+                    &dimensions_message(text, profile, true, at_eol),
                     &node.file,
                 );
-            } else if _find_bare_function_ref_with(stmt.value.as_deref(), profile, &BTreeSet::new())
-            {
+            } else if _find_bare_function_ref(stmt.value.as_deref(), profile, &BTreeSet::new()) {
                 diags.error_basic(
                     node.line,
-                    &_bare_function_message_with(text, profile, true, at_eol),
+                    &_bare_function_message(text, profile, true, at_eol),
                     &node.file,
                 );
             }
@@ -876,7 +874,7 @@ pub fn _check_assignment_pass2(
         }
         return None;
     }
-    if !_undefined_names_with(stmt.value.as_deref(), &view).is_empty() {
+    if !_undefined_names(stmt.value.as_deref(), &view).is_empty() {
         if before_beginprog && !profile.is_some_and(|p| p.single_pass) {
             diags.error_basic(
                 node.line,
@@ -953,8 +951,7 @@ pub fn _report_numeric_sub_name(
     );
 }
 
-/// Port of checker/structure.py::_CONST_TYPES
-const _CONST_TYPES: &[&str] = &["LONG", "FLOAT", "DOUBLE", "STRING", "BOOLEAN"];
+use crate::checker::expressions::_CONST_TYPES;
 
 /// Port of checker/structure.py::_bad_const_type
 pub fn _bad_const_type(stmt: &ConstDecl) -> Option<String> {
