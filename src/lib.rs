@@ -9,4 +9,6 @@ pub mod parser;
 pub mod profiles;
 pub mod pyre;
 pub mod pystr;
+pub mod source;
+pub mod sources;
 pub mod syntax;
