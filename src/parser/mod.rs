@@ -2,6 +2,7 @@
 
 #![allow(dead_code, unused_imports, clippy::used_underscore_items)]
 
+pub mod decls;
 pub mod exprs;
 pub mod helpers;
 pub mod stmts;
@@ -12,9 +13,11 @@ use std::rc::Rc;
 
 use crate::consteval;
 use crate::diagnostics::Diagnostics;
+use crate::lexer;
 use crate::profiles::Profile;
 use crate::syntax::{
-    ExprRef, LineSpan, LogicalLine, OrderedMap, Program, ProgramRef, Stmt, Token, VarDecl,
+    ExprRef, LineSpan, LogicalLine, OrderedMap, Program, ProgramRef, Stmt, Token, TokenValue,
+    VarDecl,
 };
 
 /// Port of `parser.py::_Parser`
@@ -58,58 +61,11 @@ impl Parser<'_> {
         }
     }
 
-    // ---- Chunk 3 stubs (decls.rs) ----
-    pub fn _parse_const(
-        &mut self,
-        _p: &mut helpers::TokStream,
-        _line: i64,
-        _file: &str,
-    ) -> Result<Stmt, helpers::ParseError> {
-        todo!("Chunk 3: _parse_const")
-    }
-
-    pub fn _parse_declaration(
-        &mut self,
-        _p: &mut helpers::TokStream,
-        _line: i64,
-        _file: &str,
-        _kind: &str,
-    ) -> Result<Stmt, helpers::ParseError> {
-        todo!("Chunk 3: _parse_declaration")
-    }
-
-    pub fn _numeric_name(_p: &mut helpers::TokStream) -> Option<String> {
-        todo!("Chunk 3: _numeric_name")
-    }
-
-    pub fn _parse_dim(
-        &mut self,
-        _p: &mut helpers::TokStream,
-        _line: i64,
-        _file: &str,
-    ) -> Result<ExprRef, helpers::ParseError> {
-        todo!("Chunk 3: _parse_dim")
-    }
-
-    pub fn _parse_vardecl(
-        &mut self,
-        _p: &mut helpers::TokStream,
-        _line: i64,
-        _file: &str,
-    ) -> Result<Rc<VarDecl>, helpers::ParseError> {
-        todo!("Chunk 3: _parse_vardecl")
-    }
-
-    pub fn _parse_alias(
-        &mut self,
-        _p: &mut helpers::TokStream,
-        _line: i64,
-        _file: &str,
-    ) -> Result<Stmt, helpers::ParseError> {
-        todo!("Chunk 3: _parse_alias")
-    }
-
     // ---- Chunk 4 stubs (driver.rs) ----
+    pub fn _parse_text_segment(&mut self, _seg_text_raw: &str, _line: i64, _file: &str) -> Stmt {
+        todo!("Chunk 4: _parse_text_segment")
+    }
+
     pub fn _parse_segment(
         &mut self,
         _seg: Vec<Token>,
@@ -119,6 +75,27 @@ impl Parser<'_> {
     ) -> Stmt {
         todo!("Chunk 4: _parse_segment")
     }
+}
+
+pub(crate) fn tokenize_for_parser(text: &str, line: i64) -> Result<Vec<Token>, lexer::LexError> {
+    let line_u = usize::try_from(line.max(0)).unwrap_or(0);
+    let toks = lexer::tokenize(text, line_u)?;
+    Ok(toks
+        .into_iter()
+        .map(|t| Token {
+            kind: t.kind,
+            text: t.text,
+            upper: t.upper,
+            col: i64::try_from(t.col).unwrap_or(0),
+            line: i64::try_from(t.line).unwrap_or(0),
+            value: match t.value {
+                lexer::TokenValue::None => TokenValue::None,
+                lexer::TokenValue::Int(n) => TokenValue::Int(n),
+                lexer::TokenValue::Float(f) => TokenValue::Float(f),
+                lexer::TokenValue::Str(s) => TokenValue::Str(s),
+            },
+        })
+        .collect())
 }
 
 /// Port of `parser.py::_profile_for`
