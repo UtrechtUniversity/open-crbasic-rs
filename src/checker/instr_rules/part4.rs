@@ -1,16 +1,20 @@
 //! Port of `checker/instr_rules.py` (lines 2312-3084).
 
 #![allow(dead_code, unused_variables, unused_imports)]
+#![allow(clippy::used_underscore_items)]
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
 use crate::syntax::{
     Assignment, Call, Case, ConstDecl, Declaration, Expr, ExprRef, Index, Instruction, Juxtaposed,
-    Member, Number, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed, VarDecl,
+    Member, Number, NumberValue, OrderedMap, Program, ProgramRef, Stmt, StmtRef, SubDef, Unparsed,
+    VarDecl,
 };
+use crate::{pyre, pystr};
 
 /// Port of `checker/instr_rules.py::check_emailrecv_destination`.
 pub fn check_emailrecv_destination(
@@ -52,13 +56,74 @@ pub fn check_terminal_conflicts(_program: &Program, _profile: &Profile, _diags: 
 }
 
 /// Port of `checker/instr_rules.py::_port_number`.
-pub fn _port_number(_arg: Option<&Expr>) -> Option<i64> {
-    todo!("checker/instr_rules.py::_port_number")
+pub fn _port_number(arg: Option<&Expr>) -> Option<i64> {
+    static PORT_NAME: LazyLock<pyre::Regex> = LazyLock::new(|| pyre::Regex::new(r"([CU])(\d+)", 0));
+
+    match arg? {
+        Expr::Name(name) => {
+            let upper = pystr::upper(&name.name);
+            let parsed = PORT_NAME.fullmatch(&upper)?;
+            let base = if parsed.group(1)? == "C" { 100 } else { 200 };
+            // Any overflow remains outside the supported port sets.
+            Some(
+                pystr::parse_int(parsed.group(2)?)
+                    .unwrap_or(i64::MAX)
+                    .saturating_add(base),
+            )
+        }
+        Expr::Number(number) => match &number.value {
+            NumberValue::Int(value) => Some(*value),
+            NumberValue::Float(value) if pystr::is_integer(*value) => {
+                pystr::py_int_from_f64(*value)
+            }
+            NumberValue::BigInt(value) => pystr::py_int_from_f64(pystr::parse_float(value)?),
+            NumberValue::Float(_) => None,
+        },
+        _ => None,
+    }
 }
 
 /// Port of `checker/instr_rules.py::check_spi_open_order`.
-pub fn check_spi_open_order(_program: &Program, _profile: &Profile, _diags: &mut Diagnostics) {
-    todo!("checker/instr_rules.py::check_spi_open_order")
+pub fn check_spi_open_order(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
+    let valid: &[i64] = match profile.name {
+        "cr6" => &[101, 201, 205, 209],
+        "cr1000x" => &[101, 105],
+        _ => return,
+    };
+    let mut opened = BTreeSet::new();
+    for stmt in &program.statements {
+        let Stmt::Instruction(instr) = stmt.as_ref() else {
+            continue;
+        };
+        let kw = pystr::upper(&instr.keyword);
+        if kw == "SPIOPEN" {
+            let Some(port) = _port_number(instr.args.first().and_then(Option::as_deref)) else {
+                return;
+            };
+            if port < 100 && profile.name == "cr6" {
+                return;
+            }
+            if valid.contains(&port) {
+                opened.insert(port);
+            }
+        } else if matches!(kw.as_str(), "SPIREAD" | "SPIWRITE")
+            && let [port, _, _] = instr.args.as_slice()
+            && let Some(port) = _port_number(port.as_deref())
+            && valid.contains(&port)
+            && !opened.contains(&port)
+        {
+            let name = if kw == "SPIREAD" {
+                "SPIRead"
+            } else {
+                "SPIWrite"
+            };
+            diags.error_basic(
+                stmt.line(),
+                &format!("SPIOpen must precede {name}."),
+                stmt.file(),
+            );
+        }
+    }
 }
 
 /// Port of `checker/instr_rules.py::_dnp_long`.

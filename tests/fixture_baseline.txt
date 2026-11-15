@@ -22,3 +22,4 @@ r7_include_existing_ext.json
 r9_chr_arg.json
 samplefieldcal_a.json
 samplefieldcal_b.json
+spi_open_order.json

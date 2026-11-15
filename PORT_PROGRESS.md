@@ -4,7 +4,7 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave: continue P4 with SPI open-order checks in `instr_rules` part 4.
+Next wave: continue P4. The SPI open-order round is implemented.
 
 The first live verdict replay matched Python on 25,964 of 77,293 cases and all cases in 20 of
 613 files. CLI probes matched Python's stdout, message-file bytes and exit status in 14 of
@@ -33,6 +33,13 @@ profile and variable names, and `_check_pick_consts` needs its full parameter li
 P4 SampleFieldCal round: ported the FieldCal/FieldCalStrain prerequisite check. The two
 SampleFieldCal fixture files matched all 24 cases, and `samplefieldcal_a.json` became the 22nd
 baseline file. Full verdict parity reached 26,130 of 77,293 cases.
+
+P4 SPI round: ported terminal and numeric SPI port matching and the requirement that
+`SPIOpen` precede `SPIRead` and `SPIWrite`. Connected SPI and I2C terminal checks to the
+implemented Long conversion and constant-name collection. All 10 SPI open-order cases
+matched Python, including cases that report both an invalid port and an open-order error.
+Verdict parity rose by 278 cases to 26,408 of 77,293, and `spi_open_order.json` became the
+23rd baseline file.
 
 Operating notes (learned in wave 1):
 - A wave of 4 agents (3 Sonnet, 1 Haiku) used about 40% of a 5-hour window. Launch a wave of 3
