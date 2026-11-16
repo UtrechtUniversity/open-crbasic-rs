@@ -4,24 +4,25 @@ Spec: open-crbasic `c547b85` (1.2.1), sibling checkout `../open-crbasic`. Scope:
 only (stdout, message file, exit status; all four loggers). Plan and rules: `AGENTS.md`
 "Porting rules". Status: `todo | running | merged | failed`. H = Haiku, S = Sonnet.
 
-Next wave (state at 2026-11-16 00:35 CET): nothing is left to port, only to wire. Wiring is
-strictly one task at a time because it edits callers across files. Wired and verified on
-`port`: instr_rules (`2deee67`), structure (`d714d5b`), expressions (`e37d558`), instr_data
-(`797a6ba`), instr_measure (`bcf3724`), cr3xx (`e950b2f`); each left a `handoffs/wire-*.md`.
-The Codex window ran out at 00:19 CET (back at 03:08 CET). Running: the last wiring task
-(tables, then intervals, storage, scan_time, warnings, var_types, symbols, structs, longconv,
-ess, `cr3xx/part2.rs`, then `mode.rs` and `compiler.rs`), one Sonnet agent, worktree
-`.claude/worktrees/wire-rest`, branch `wire-rest`, uncommitted; its `HANDOFF.md` says where it
-is. If it is found stopped: verify (check set, no baseline file lost), commit what compiles
-and passes, and re-launch for the rest (counts: `grep -c 'todo!(' -r src | grep -v ':0$'`).
-Wiring rules: for each `todo!()` skeleton stub that has a `*_with` sibling, delete the stub,
-rename the sibling to the Python name, and give every caller the real arguments (take them
-from the Python call site); drop the private `_pN_*` copies; resolve what `handoffs/*.md` list.
-Gate: check set, no baseline file lost; record the parity number.
-After that, convergence on the 56 fixture files that still differ (P5): bucket by file and
-first differing line, one fixer per bucket, at most 2 Codex workers at a time on disjoint
-source files; then station and fuzz corpora and CLI bytes; then close-out (P6; delete
-`handoffs/`).
+State at 2026-11-16: the port is complete for its scope. On `port`, check set green (281 unit
+tests); verdict parity 77,293 of 77,293 cases, 613 of 613 fixture files (all in the baseline);
+goldens 77,903 of 77,903; `tools/crbc_compare.py` 305 of 305 runs equal (station programs under
+four loggers plus fuzz reproducers: stdout, exit status, message-file bytes). No `todo!()` left.
+No known differences from Python are recorded.
+
+Left over, none of it blocking: three `TODO(P1)` notes in `diagnostics.rs` (plain string
+matching where the rules ask for `pyre`/`pystr`); one `_with` sibling,
+`cr3xx/part2.rs::_leading_unknown_words_with` (Python optional arguments); `compiler.rs::_finish`
+has a `TODO(wire)` for `-u` and the signature, both out of scope; the CI workflow change
+(`cargo test --release`, `crbc_compare.py`) has not run on GitHub; `port` is not pushed or
+rebased onto `main`; old task branches and the five external `swarm-*` worktrees still exist.
+
+Convergence fixes (P5, `4a0e653` and the commit after it): real known names in `structs` and
+`intervals`; undefined names keep Python's `DottedName` marker up to the message
+(`profiles::NameArg`); `Sample(..,UINT1)` with an unknown source; `SDI12Recorder` NAN fill through
+an alias; `FTPClient` PutGetOption for integer literals beyond `i64`; moved `FieldNames`
+diagnostics go through `Diagnostic::replace` (position recomputed); `check_settings_fields` reads
+the real diagnostics; a bare program file name resolves `Include` files in the current directory.
 
 After the cr3xx wiring, check set green on `port`: 281 unit tests, verdict parity 74,821 of
 77,293, 557 of 613 files fully passing (baseline ratcheted), goldens 77,903 of 77,903.
@@ -118,6 +119,6 @@ Operating notes (learned in wave 1):
 | P2-c1..2 | `checker/__init__.py` (817) | `src/checker/mod.rs` | S | merged | `06b9037`; 3 unit tests |
 | P3-h | `ess` 81, `longconv` 133, `symbols` 157, `structs` 236, `terminals` 427, `storage` 456, `mode.py` 143, `tdf.py` structs | one file each | H | merged | P3-h1..4 (`1266faa`, `43f16a0`, `c5cd931`, `d504604`), `tdf.rs` (`126277f`) merged; 15 unit tests |
 | P3-s | `var_types` 553, `intervals` 679, `scan_time` 580, `warnings` 666, `compiler.py` 324, `cli.py` verdict path | one file each | S | merged | P3-s1..5 (`4511f1f`, `7c61220`, `aac8de2`, `01bd124`, `126277f`) merged; 27 unit tests. P3-s6 adds `crbc`, connects the existing mode implementation and runs actual compiler verdicts in the fixture harness. |
-| P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | running | Ported `_unparsed_opener` and `_leftover_first_name_known` in structure part 4. `check_end_blocks` needs the `_block_word` argument slice and the `calltable_targets` implementation. Merged `tables/part1.rs` (`50306d4`), `part2.rs` (`7018ecd`), `part3.rs` (`43616c1`) — `tables.py` 1-2177 ported; needs cross-part wiring + `TdfField`/`TdfTable` attrs. Merged `checker/expressions/part1.rs` (`4390d10`), `part2.rs` (`98327e1`), `part3.rs` (`b721666`), `part4.rs` (`f4e1e1f`), `part5.rs` (`f1034a7`) — `expressions.py` 1-3758 ported; needs cross-part wiring. Merged `checker/instr_data/part1.rs` (`d3c8237`), `part2.rs` (`3dcd871`), `part3.rs` (`6f5ebda`) — `instr_data.py` 1-1963 ported; needs cross-part wiring + `checker/mod.rs:1003,1011,1265`. Merged `checker/cr3xx/part1.rs` (`41b8a15`), `part2.rs` (`fdf9e81`), `part3.rs` (`e75caf8`), `part4.rs` (`9521fd8`) — `cr3xx.py` 1-2364 ported; needs cross-part wiring + `checker/mod.rs` wiring. Merged `checker/instr_measure/part1.rs` (`b79749e`, `instr_measure.py:1-753`; `*_with` helpers + cross-part wiring). |
-| P5 | convergence: bucket (H), fix per bucket (S), station + fuzz + CLI bytes (S) | | H/S | todo | |
-| P6 | README, AGENTS status, CI | | H | todo | |
+| P4 | `structure` 6309 (9), `expressions` 3758 (5), `instr_rules` 3737 (5), `cr3xx` 2364 (4), `instr_data` 1963 (3), `instr_measure` 1803 (3), `tables.py` 2177 (3) | module directories | S | merged | Ported `_unparsed_opener` and `_leftover_first_name_known` in structure part 4. `check_end_blocks` needs the `_block_word` argument slice and the `calltable_targets` implementation. Merged `tables/part1.rs` (`50306d4`), `part2.rs` (`7018ecd`), `part3.rs` (`43616c1`) — `tables.py` 1-2177 ported; needs cross-part wiring + `TdfField`/`TdfTable` attrs. Merged `checker/expressions/part1.rs` (`4390d10`), `part2.rs` (`98327e1`), `part3.rs` (`b721666`), `part4.rs` (`f4e1e1f`), `part5.rs` (`f1034a7`) — `expressions.py` 1-3758 ported; needs cross-part wiring. Merged `checker/instr_data/part1.rs` (`d3c8237`), `part2.rs` (`3dcd871`), `part3.rs` (`6f5ebda`) — `instr_data.py` 1-1963 ported; needs cross-part wiring + `checker/mod.rs:1003,1011,1265`. Merged `checker/cr3xx/part1.rs` (`41b8a15`), `part2.rs` (`fdf9e81`), `part3.rs` (`e75caf8`), `part4.rs` (`9521fd8`) — `cr3xx.py` 1-2364 ported; needs cross-part wiring + `checker/mod.rs` wiring. Merged `checker/instr_measure/part1.rs` (`b79749e`, `instr_measure.py:1-753`; `*_with` helpers + cross-part wiring). |
+| P5 | convergence: bucket, fix per bucket, station + fuzz + CLI bytes | `tools/crbc_compare.py` | orchestrator | merged | 15 files, 8 root causes; done inline, no subagents |
+| P6 | README, AGENTS status, CI | `README.md`, `Cargo.toml`, `ci.yml` | orchestrator | merged | `handoffs/` deleted; CI change not yet observed on GitHub |

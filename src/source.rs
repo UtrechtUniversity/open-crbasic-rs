@@ -842,7 +842,14 @@ pub fn load_program(
     let default_source = DiskSource;
     let src = source.unwrap_or(&default_source);
     let mut loader = Loader::new(
-        path.parent().map(Path::to_path_buf),
+        // (Python: `Path("x.CR6").parent` is `.`, Rust's is the empty path, which is no directory)
+        path.parent().map(|p| {
+            if p.as_os_str().is_empty() {
+                PathBuf::from(".")
+            } else {
+                p.to_path_buf()
+            }
+        }),
         &mut diags,
         own_ext,
         pull_init,
