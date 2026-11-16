@@ -1158,12 +1158,14 @@ pub fn _check_with_context(
             },
         );
         if !profile.single_pass {
+            // The rule only reads `diags` (for the `CallTable` stop line); the aside runner holds it mutably.
+            let mut tmp = Diagnostics::new();
+            tmp.items.clone_from(&diags.items);
             _run_aside(
                 "instr_rules::check_settings_fields",
                 "fields",
                 diags,
                 |aside| {
-                    let mut tmp = Diagnostics::new();
                     instr_rules::check_settings_fields(
                         &flat,
                         profile,
@@ -1252,12 +1254,14 @@ pub fn _check_with_context(
             .iter()
             .all(|d| COULD_NOT_FIND_KINDS.contains(&d.kind.as_str()))
     {
+        // The rule only reads `diags` (for the `CallTable` stop line); the aside runner holds it mutably.
+        let mut tmp = Diagnostics::new();
+        tmp.items.clone_from(&diags.items);
         _run_aside(
             "instr_rules::check_settings_fields",
             "fields",
             diags,
             |aside| {
-                let mut tmp = Diagnostics::new();
                 instr_rules::check_settings_fields(
                     ctx.flat(),
                     profile,

@@ -349,7 +349,6 @@ pub fn _check_for_headers(
                     &crate::checker::expressions::KnownView::from(known),
                 )
                 .into_iter()
-                .map(crate::checker::expressions::UndefinedName::into_string)
                 .collect::<Vec<_>>()
             } else {
                 Vec::new()
@@ -451,7 +450,6 @@ pub fn _check_elseif_and_case(
                         &crate::checker::expressions::KnownView::from(known),
                     )
                     .into_iter()
-                    .map(crate::checker::expressions::UndefinedName::into_string)
                     .collect::<Vec<_>>();
 
                     (!whole_echo && !undef.is_empty())
@@ -487,7 +485,6 @@ pub fn _check_elseif_and_case(
                 &crate::checker::expressions::KnownView::from(known),
             )
             .into_iter()
-            .map(crate::checker::expressions::UndefinedName::into_string)
             .collect::<Vec<_>>();
             let text = super::_if_condition_text(stmt);
 
@@ -552,7 +549,7 @@ pub fn _check_elseif_and_case(
         if orphans.last().copied() == Some(true) {
             diags.error_basic(stmt.line(), "Case outside Select.", stmt.file());
         }
-        let mut names: Vec<String> = Vec::new();
+        let mut names: Vec<super::UndefinedName> = Vec::new();
         let mut outside: usize = 0;
         for (index, item) in case_stmt.items.iter().enumerate() {
             let (lower, upper) = match item {
@@ -565,14 +562,12 @@ pub fn _check_elseif_and_case(
                 &crate::checker::expressions::KnownView::from(known),
             )
             .into_iter()
-            .map(crate::checker::expressions::UndefinedName::into_string)
             .collect::<Vec<_>>();
             let high = super::_undefined_names(
                 upper,
                 &crate::checker::expressions::KnownView::from(known),
             )
             .into_iter()
-            .map(crate::checker::expressions::UndefinedName::into_string)
             .collect::<Vec<_>>();
             if !low.is_empty() && outside == 0 && names.is_empty() {
                 outside = index + 1;
@@ -661,7 +656,7 @@ pub fn _check_function_statements(
         {
             args.remove(3);
         }
-        let names: Vec<String> = args
+        let names: Vec<super::UndefinedName> = args
             .iter()
             .flatten()
             .flat_map(|a| {
@@ -670,7 +665,6 @@ pub fn _check_function_statements(
                     &crate::checker::expressions::KnownView::from(known),
                 )
                 .into_iter()
-                .map(crate::checker::expressions::UndefinedName::into_string)
                 .collect::<Vec<_>>()
             })
             .collect();

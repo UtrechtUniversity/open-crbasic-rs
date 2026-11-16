@@ -176,7 +176,6 @@ pub fn timeout_gate(seen: bool, text: Option<&str>) -> (Option<bool>, bool) {
 /// Port of `checker/intervals.py::check`.
 pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics, env: &Env) {
     let wide = wide_constants(program, profile);
-    let mut known_cache: Option<&KnownNames> = None;
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let positions: HashMap<usize, usize> = program
         .statements
@@ -188,7 +187,6 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
     let mut blocked_table = false;
     let mut scan: Option<(i64, i64)> = None;
     let mut seen = false;
-    let empty_known = BTreeSet::new();
 
     for stmt in &program.statements {
         let (gate, next_seen) = timeout_gate(seen, Some(stmt.text()));
@@ -205,11 +203,10 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
             && kw == "DATATABLE"
         {
             in_table = true;
-            let _ = *known_cache.get_or_insert_with(|| ctx.known_names());
             blocked_table = i.args.iter().skip(1).flatten().any(|a| {
                 !expressions::_undefined_names(
                     Some(a),
-                    &crate::checker::expressions::KnownView::from_set(&empty_known),
+                    &crate::checker::expressions::KnownView::from(ctx.known_names()),
                 )
                 .is_empty()
             });
@@ -245,7 +242,7 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
             }
             let cname = pystr::upper(call.name());
             if cname == "TIMER" {
-                let known = *known_cache.get_or_insert_with(|| ctx.known_names());
+                let known = ctx.known_names();
                 let (owner, before) = _timer_context(stmt, &call, known, profile.single_pass);
                 let table_only = matches!(
                     &*owner,
@@ -288,7 +285,13 @@ pub fn _put_get_option(args: &[Option<ExprRef>], env: &Env) -> Option<i64> {
     let value = consteval::value_of(args[5].as_deref(), env).ok()?;
     let option = match value {
         ConstValue::Str(_) => return None,
-        ConstValue::BigInt(_) => _INT_MIN,
+        // ponytail: the digits are compared as the nearest f64, exact except within half an
+        // ulp of the float32 maximum.
+        ConstValue::BigInt(s) => match s.parse::<f64>() {
+            Ok(v) if v < 0.0 => return None,
+            Ok(v) if v > _F32_MAX => _INT_MAX,
+            _ => _INT_MIN,
+        },
         ConstValue::Int(v) => {
             if v < _INT_MIN {
                 return None;
@@ -482,17 +485,12 @@ pub fn _undefined_sibling(
     program: &ProgramRef,
     profile: &'static Profile,
 ) -> bool {
-    let _known = context::of(program, Some(profile), None).known_names();
-    let empty_known = BTreeSet::new();
+    let ctx = context::of(program, Some(profile), None);
+    let known = crate::checker::expressions::KnownView::from(ctx.known_names());
     args.iter().enumerate().any(|(j, a)| {
         j != i
-            && a.as_deref().is_some_and(|e| {
-                !expressions::_undefined_names(
-                    Some(e),
-                    &crate::checker::expressions::KnownView::from_set(&empty_known),
-                )
-                .is_empty()
-            })
+            && a.as_deref()
+                .is_some_and(|e| !expressions::_undefined_names(Some(e), &known).is_empty())
     })
 }
 
@@ -553,8 +551,6 @@ pub fn fold_timeout_expressions(
         }
     };
 
-    let mut known_loaded = false;
-    let empty_known = BTreeSet::new();
     let mut seen = false;
     let mut family_error = false;
     let mut added: Vec<DiagRef> = Vec::new();
@@ -612,17 +608,11 @@ pub fn fold_timeout_expressions(
                     || counted.iter().any(|d| position(d) < line_first)
                     || (k > line_first && counted.iter().any(|d| position(d) == line_first));
                 if !before && profile.single_pass {
-                    if !known_loaded {
-                        let _ = context::of(program, Some(profile), None).known_names();
-                        known_loaded = true;
-                    }
+                    let ctx = context::of(program, Some(profile), None);
+                    let known = crate::checker::expressions::KnownView::from(ctx.known_names());
                     before = args[..i].iter().any(|a| {
                         a.as_deref().is_some_and(|e| {
-                            !expressions::_undefined_names(
-                                Some(e),
-                                &crate::checker::expressions::KnownView::from_set(&empty_known),
-                            )
-                            .is_empty()
+                            !expressions::_undefined_names(Some(e), &known).is_empty()
                         })
                     });
                 }

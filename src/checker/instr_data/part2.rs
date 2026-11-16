@@ -955,7 +955,6 @@ pub fn _report_undefined_source(
             &crate::checker::expressions::KnownView::from(known),
         )
         .into_iter()
-        .map(crate::checker::expressions::UndefinedName::into_string)
         .collect::<Vec<_>>();
         if names.is_empty() {
             continue;

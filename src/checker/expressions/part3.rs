@@ -312,7 +312,7 @@ pub fn check_undefined_dotted_bases(
             continue;
         }
         let base_uppers: BTreeSet<String> = bases.iter().map(|b| pystr::upper(b)).collect();
-        let others: Vec<String> = exprs
+        let others: Vec<super::UndefinedName> = exprs
             .iter()
             .flat_map(|e| known_undefined_name_walk_strings(e.as_deref(), known))
             .filter(|n| !base_uppers.contains(&pystr::upper(n)))
@@ -602,7 +602,7 @@ pub fn _names_before_invalid_compound(
     expr: Option<&Expr>,
     known: &KnownNames,
     read_only: &BTreeSet<String>,
-) -> Option<Vec<String>> {
+) -> Option<Vec<super::UndefinedName>> {
     let expr = expr?;
     match expr {
         Expr::Binary(b) => {
@@ -661,7 +661,7 @@ fn _names_before_invalid_compound_children(
     children: &[Option<&Expr>],
     known: &KnownNames,
     read_only: &BTreeSet<String>,
-) -> Option<Vec<String>> {
+) -> Option<Vec<super::UndefinedName>> {
     for (i, &child) in children.iter().enumerate() {
         if let Some(names) = _names_before_invalid_compound(child, known, read_only) {
             let mut out = Vec::new();
@@ -947,8 +947,7 @@ pub fn check(
             Some(stmt_id(stmt)),
             &[],
             std::slice::from_ref(&if_stmt.cond),
-        )
-        .map_names();
+        );
         let before = diags.items.len();
         if is_whole_expr_echo_logger(profile) {
             diags.error_basic(
@@ -1113,8 +1112,7 @@ pub fn check(
             if visible.names != known.names {
                 let exprs_pair = [a.target.clone(), a.value.clone()];
                 let (early, dims) =
-                    super::_names_and_dims(&visible, None, Some(stmt_id(stmt)), &[], &exprs_pair)
-                        .map_names();
+                    super::_names_and_dims(&visible, None, Some(stmt_id(stmt)), &[], &exprs_pair);
                 if !early.is_empty()
                     && early.iter().any(|name| {
                         let up = pystr::upper(name.as_str());
@@ -1247,13 +1245,11 @@ pub fn check(
                 Some(stmt_id(stmt)),
                 &prior,
                 std::slice::from_ref(&a.value),
-            )
-            .map_names();
+            );
             if !dims && super::_over_indexed(a.value.as_deref(), dim_counts, None) {
                 resolved_names =
                     super::_names_through_over_index(a.value.as_deref(), &known.names, dim_counts)
                         .into_iter()
-                        .map(super::UndefinedName::Plain)
                         .collect();
             }
             for name in &resolved_names {
@@ -1337,23 +1333,20 @@ pub fn check_consts(program: &ProgramRef, profile: &'static Profile, diags: &mut
 /// Port of checker/expressions.py::_report_const_names
 pub fn _report_const_names(
     stmt: &ConstDecl,
-    names: &[String],
+    names: &[super::UndefinedName],
     profile: &Profile,
     diags: &mut Diagnostics,
 ) {
     if is_whole_expr_echo_logger(profile) {
+        let message = &profile.unresolved_symbol_message;
         let text = if let Some((start, end)) = stmt.value_span {
-            pystr::slice(&stmt.base.text, Some(start), Some(end)).to_owned()
+            message.format(pystr::slice(&stmt.base.text, Some(start), Some(end)))
         } else if let Some(Expr::Name(n)) = stmt.value.as_deref() {
-            n.name.clone()
+            message.format(&n.name)
         } else {
-            names[0].clone()
+            message.format(&names[0])
         };
-        diags.error_basic(
-            stmt.base.node.line,
-            &profile.unresolved_symbol_message.format(&text),
-            &stmt.base.node.file,
-        );
+        diags.error_basic(stmt.base.node.line, &text, &stmt.base.node.file);
     } else {
         for name in names {
             diags.error_basic(
@@ -1368,16 +1361,18 @@ pub fn _report_const_names(
 fn known_undefined_names(expr: Option<&Expr>, known: &KnownNames) -> Vec<super::UndefinedName> {
     super::_undefined_names(expr, &super::KnownView::from(known))
 }
-fn known_undefined_name_strings(expr: Option<&Expr>, known: &KnownNames) -> Vec<String> {
-    known_undefined_names(expr, known)
-        .into_iter()
-        .map(super::UndefinedName::into_string)
-        .collect()
+fn known_undefined_name_strings(
+    expr: Option<&Expr>,
+    known: &KnownNames,
+) -> Vec<super::UndefinedName> {
+    known_undefined_names(expr, known).into_iter().collect()
 }
-fn known_undefined_name_walk_strings(expr: Option<&Expr>, known: &KnownNames) -> Vec<String> {
+fn known_undefined_name_walk_strings(
+    expr: Option<&Expr>,
+    known: &KnownNames,
+) -> Vec<super::UndefinedName> {
     super::_undefined_names_walk(expr, &super::KnownView::from(known))
         .into_iter()
-        .map(super::UndefinedName::into_string)
         .collect()
 }
 fn format_unresolved_maybe_dotted(profile: &Profile, name: &super::UndefinedName) -> String {
@@ -1386,21 +1381,6 @@ fn format_unresolved_maybe_dotted(profile: &Profile, name: &super::UndefinedName
         super::UndefinedName::Dotted(d) => profile.unresolved_symbol_message.format_dotted(d),
     }
 }
-trait MapNames {
-    fn map_names(self) -> (Vec<super::UndefinedName>, bool);
-}
-impl MapNames for (Vec<String>, bool) {
-    fn map_names(self) -> (Vec<super::UndefinedName>, bool) {
-        (
-            self.0
-                .into_iter()
-                .map(super::UndefinedName::Plain)
-                .collect(),
-            self.1,
-        )
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -1544,7 +1524,8 @@ mod tests {
             type_: None,
             value_span: Some((12, 21)),
         };
-        let names = vec!["Baz".to_owned(), "Qux".to_owned()];
+        let names =
+            ["Baz", "Qux"].map(|n| crate::checker::expressions::UndefinedName::Plain(n.to_owned()));
 
         let mut d6 = Diagnostics::new();
         _report_const_names(&stmt, &names, cr6, &mut d6);

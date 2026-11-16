@@ -243,6 +243,35 @@ pub struct EssVariable {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DottedName(pub String);
 
+/// The `name=` argument of `Message::format`: Python passes a `str` or its subclass `DottedName`.
+pub trait NameArg {
+    fn text(&self) -> &str;
+    fn is_dotted(&self) -> bool {
+        false
+    }
+}
+
+impl NameArg for str {
+    fn text(&self) -> &str {
+        self
+    }
+}
+
+impl NameArg for String {
+    fn text(&self) -> &str {
+        self
+    }
+}
+
+impl NameArg for DottedName {
+    fn text(&self) -> &str {
+        &self.0
+    }
+    fn is_dotted(&self) -> bool {
+        true
+    }
+}
+
 /// A message template with a `{name}` placeholder (Python `str.format(name=...)`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Message {
@@ -259,9 +288,14 @@ impl Message {
         }
     }
 
-    /// `template.format(name=name)` for a name as written in source.
-    pub fn format(&self, name: &str) -> String {
-        format_name(self.template(), name)
+    /// `template.format(name=name)`; a name that is a Python `DottedName` takes the dotted wording.
+    pub fn format<N: NameArg + ?Sized>(&self, name: &N) -> String {
+        match self {
+            Message::DottedAware(_) if name.is_dotted() => {
+                format!("Could not find DataTable {}.", name.text())
+            }
+            _ => format_name(self.template(), name.text()),
+        }
     }
 
     /// `template.format(name=name)` for a `DottedName`.

@@ -227,16 +227,11 @@ pub fn _report_call_arg_names(
         out_of_scope: &known.out_of_scope,
         dotted_tables: known.dotted_tables,
     };
-    let undefined = |e: Option<&Expr>| {
-        _undefined_names(e, &view)
-            .into_iter()
-            .map(UndefinedName::into_string)
-            .collect::<Vec<_>>()
-    };
-    let report_unique = |names: Vec<String>, diags: &mut Diagnostics| {
+    let undefined = |e: Option<&Expr>| _undefined_names(e, &view).into_iter().collect::<Vec<_>>();
+    let report_unique = |names: Vec<UndefinedName>, diags: &mut Diagnostics| {
         let mut seen = BTreeSet::new();
         for name in names {
-            if seen.insert(name.clone()) {
+            if seen.insert(name.to_string()) {
                 diags.error_basic(
                     node.line,
                     &profile.unresolved_symbol_message.format(&name),
@@ -802,7 +797,7 @@ pub fn _check_assignment_pass2(
         for name in &target_names {
             diags.error_basic(
                 node.line,
-                &profile.unresolved_symbol_message.format(name.as_str()),
+                &profile.unresolved_symbol_message.format(name),
                 &node.file,
             );
         }
@@ -828,7 +823,7 @@ pub fn _check_assignment_pass2(
                 }
                 diags.error_basic(
                     node.line,
-                    &profile.unresolved_symbol_message.format(name.as_str()),
+                    &profile.unresolved_symbol_message.format(&name),
                     &node.file,
                 );
             }

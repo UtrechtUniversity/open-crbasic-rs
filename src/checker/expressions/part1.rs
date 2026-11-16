@@ -868,6 +868,22 @@ impl UndefinedName {
     }
 }
 
+impl std::ops::Deref for UndefinedName {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl crate::profiles::NameArg for UndefinedName {
+    fn text(&self) -> &str {
+        self.as_str()
+    }
+    fn is_dotted(&self) -> bool {
+        matches!(self, Self::Dotted(_))
+    }
+}
+
 /// View of `KnownNames` (or a plain `BTreeSet<String>`) for `_undefined_names`.
 pub struct KnownView<'a> {
     pub names: &'a BTreeSet<String>,

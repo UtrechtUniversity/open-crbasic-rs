@@ -82,12 +82,12 @@ pub fn _names_through_over_index(
     expr: Option<&Expr>,
     known: &BTreeSet<String>,
     dim_counts: &DimCounts,
-) -> Vec<String> {
+) -> Vec<crate::checker::expressions::UndefinedName> {
     fn walk(
         e: Option<&Expr>,
         known: &BTreeSet<String>,
         dim_counts: &DimCounts,
-        out: &mut Vec<String>,
+        out: &mut Vec<crate::checker::expressions::UndefinedName>,
     ) -> bool {
         let Some(e) = e else {
             return false;
@@ -101,7 +101,9 @@ pub fn _names_through_over_index(
             Expr::Index(ix) => {
                 let upper = pystr::upper(&ix.name);
                 if !known.contains(&upper) {
-                    out.push(ix.name.clone());
+                    out.push(crate::checker::expressions::UndefinedName::Plain(
+                        ix.name.clone(),
+                    ));
                 }
                 for a in &ix.args {
                     if walk(a.as_deref(), known, dim_counts, out) {
@@ -121,7 +123,6 @@ pub fn _names_through_over_index(
                         &crate::checker::expressions::KnownView::from_set(known),
                     )
                     .into_iter()
-                    .map(crate::checker::expressions::UndefinedName::into_string)
                     .collect::<Vec<_>>(),
                 );
                 false
@@ -392,13 +393,13 @@ pub fn _names_and_dims(
     stmt_id_opt: Option<usize>,
     prior: &[Option<ExprRef>],
     exprs: &[Option<ExprRef>],
-) -> (Vec<String>, bool) {
+) -> (Vec<crate::checker::expressions::UndefinedName>, bool) {
     fn walk(
         e: Option<&ExprRef>,
         known: &KnownNames,
         var_dims: &OrderedMap<String, Option<i64>>,
         state: &mut [Option<i64>],
-        out: &mut Vec<String>,
+        out: &mut Vec<crate::checker::expressions::UndefinedName>,
     ) -> bool {
         let Some(e) = e else {
             return false;
@@ -413,7 +414,9 @@ pub fn _names_and_dims(
                     state[0] = d;
                 }
                 if !known.names.contains(&upper) || oos || known.tables.contains(&upper) {
-                    out.push(n.name.clone());
+                    out.push(crate::checker::expressions::UndefinedName::Plain(
+                        n.name.clone(),
+                    ));
                 }
                 false
             }
@@ -425,7 +428,9 @@ pub fn _names_and_dims(
                     state[0] = d;
                 }
                 if !known.names.contains(&upper) || oos {
-                    out.push(ix.name.clone());
+                    out.push(crate::checker::expressions::UndefinedName::Plain(
+                        ix.name.clone(),
+                    ));
                     let count = i64::try_from(ix.args.iter().filter(|a| a.is_some()).count())
                         .unwrap_or(i64::MAX);
                     if state[0].is_some_and(|s| count > s) {
@@ -495,7 +500,6 @@ pub fn _names_and_dims(
                     &crate::checker::expressions::KnownView::from(known),
                 )
                 .into_iter()
-                .map(crate::checker::expressions::UndefinedName::into_string)
                 .collect::<Vec<_>>()
             })
             .collect();
@@ -1045,7 +1049,6 @@ pub fn _report_statement(
             &crate::checker::expressions::KnownView::from(known),
         )
         .into_iter()
-        .map(crate::checker::expressions::UndefinedName::into_string)
         .collect::<Vec<_>>();
         let mut dims = false;
         if !names.is_empty() && !whole_echo {
@@ -1715,7 +1718,12 @@ mod tests {
         ));
         let (names, dims) = _names_and_dims(&known, Some(&ds), Some(42), &[], &[Some(call)]);
         assert!(dims);
-        assert_eq!(names, vec!["Nope".to_owned()]);
+        assert_eq!(
+            names,
+            vec![crate::checker::expressions::UndefinedName::Plain(
+                "Nope".to_owned()
+            )]
+        );
 
         let mut state = [Some(0)];
         let mut vd = OrderedMap::new();

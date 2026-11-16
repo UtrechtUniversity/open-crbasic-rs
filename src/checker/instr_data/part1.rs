@@ -583,10 +583,10 @@ pub fn move_fieldnames_symbol_errors(program: &Program, diags: &mut Diagnostics)
         let moved: Vec<DiagRef> = mine
             .into_iter()
             .map(|d| {
-                let mut cloned = (*d).clone();
-                cloned.line = owner.line();
-                owner.file().clone_into(&mut cloned.file);
-                Rc::new(cloned)
+                Rc::new(d.replace(|c| {
+                    c.line = owner.line();
+                    owner.file().clone_into(&mut c.file);
+                }))
             })
             .collect();
         let pair: [DiagRef; 2] = [

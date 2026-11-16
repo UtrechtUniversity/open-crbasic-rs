@@ -188,7 +188,6 @@ pub fn _check_data_instruction(
             &crate::checker::expressions::KnownView::from_set(known),
         )
         .into_iter()
-        .map(crate::checker::expressions::UndefinedName::into_string)
         .collect::<Vec<_>>();
         let resolved_refs = super::part1::_variable_refs(Some(arg), known);
         if undefined.is_empty() && resolved_refs.is_empty() {
@@ -1074,7 +1073,6 @@ pub fn check_function_arity(
                             &crate::checker::expressions::KnownView::from_set(&visible),
                         )
                         .into_iter()
-                        .map(crate::checker::expressions::UndefinedName::into_string)
                         .collect::<Vec<_>>();
                         if !names.is_empty() {
                             super::part3::_report_const_names(cd, &names, profile, diags);

@@ -932,7 +932,7 @@ pub fn check_odd_pair_reps(
             && _constant_data_type(stmt, 2, env) == Some(1)
             && let Some(Expr::Name(Name { name: src, .. }) | Expr::Index(Index { name: src, .. })) =
                 stmt.args[1].as_deref()
-            && types.get(&pystr::upper(src)).map(String::as_str) != Some("UINT1")
+            && types.get(&pystr::upper(src)).is_some_and(|t| t != "UINT1")
         {
             diags.error_basic(
                 stmt.base.node.line,

@@ -267,23 +267,15 @@ pub fn check_members(
             }
         }
     }
-    let _ctx = context::of(program, Some(profile), None);
-    let known_names = BTreeSet::new();
+    let ctx = context::of(program, Some(profile), None);
+    let known = crate::checker::expressions::KnownView::from(ctx.known_names());
     for st in &flat.statements {
         let Stmt::Assignment(assign) = st.as_ref() else {
             continue;
         };
         if assign.compound
-            || !expressions::part1::_undefined_names(
-                assign.target.as_deref(),
-                &crate::checker::expressions::KnownView::from_set(&known_names),
-            )
-            .is_empty()
-            || !expressions::part1::_undefined_names(
-                assign.value.as_deref(),
-                &crate::checker::expressions::KnownView::from_set(&known_names),
-            )
-            .is_empty()
+            || !expressions::part1::_undefined_names(assign.target.as_deref(), &known).is_empty()
+            || !expressions::part1::_undefined_names(assign.value.as_deref(), &known).is_empty()
         {
             continue;
         }

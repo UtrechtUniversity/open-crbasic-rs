@@ -435,25 +435,50 @@ pub fn check_sdi12_nan_fill(
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let tables = ctx.scope_tables(true, false);
     let scope = tables.for_statement(st_stmt);
-    let Some(kind) = scope.types.get(&pystr::upper(dest_name)) else {
-        return;
+    let kind = scope.types.get(&pystr::upper(dest_name));
+    let alias = if kind.is_none() {
+        ctx.measurement_aliases().lookup(st_stmt, dest, false)
+    } else {
+        None
     };
-    if kind.starts_with("STRING") {
-        return;
-    }
-    let shape = scope
-        .dims
-        .get(&pystr::upper(dest_name))
-        .cloned()
-        .unwrap_or_else(|| vec![1]);
-    if let Expr::Index(ix) = dest {
-        let indexed = ix.args.iter().any(Option::is_some);
-        if (indexed && ix.args.len() != shape.len()) || shape == [1] {
+    let (offset, total) = if let Some((total, mut offset, _, size)) = alias {
+        if let Expr::Index(ix) = dest
+            && !ix.args.is_empty()
+        {
+            let k = if ix.args.len() == 1 {
+                crate::checker::instr_measure::_index_value(ix.args[0].as_deref(), Some(env))
+            } else {
+                None
+            };
+            match (k, size) {
+                (Some(k), Some(size)) if (1..=size).contains(&k) => offset += k - 1,
+                _ => return,
+            }
+        }
+        (Some(offset), total)
+    } else {
+        let Some(kind) = kind else {
+            return;
+        };
+        if kind.starts_with("STRING") {
             return;
         }
-    }
-    let offset = crate::checker::instr_measure::_flat_offset(dest, &shape, Some(env));
-    let total: i64 = shape.iter().copied().product();
+        let shape = scope
+            .dims
+            .get(&pystr::upper(dest_name))
+            .cloned()
+            .unwrap_or_else(|| vec![1]);
+        if let Expr::Index(ix) = dest {
+            let indexed = ix.args.iter().any(Option::is_some);
+            if (indexed && ix.args.len() != shape.len()) || shape == [1] {
+                return;
+            }
+        }
+        (
+            crate::checker::instr_measure::_flat_offset(dest, &shape, Some(env)),
+            shape.iter().copied().product::<i64>(),
+        )
+    };
     let Ok(fill) = consteval::value_of(st.args[6].as_deref(), env) else {
         return;
     };

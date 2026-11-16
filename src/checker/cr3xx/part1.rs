@@ -516,7 +516,6 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
             &crate::checker::expressions::KnownView::from_set(known),
         )
         .into_iter()
-        .map(crate::checker::expressions::UndefinedName::into_string)
         .collect::<Vec<_>>();
         if cr3 {
             for undefined_name in &names {
@@ -1209,9 +1208,10 @@ pub fn check_float_destinations(
             continue;
         }
 
-        let mut undefined: Vec<String> = _expr_names(Some(arg))
+        let mut undefined: Vec<expressions::UndefinedName> = _expr_names(Some(arg))
             .into_iter()
             .filter(|n| !known.contains(&pystr::upper(n)))
+            .map(expressions::UndefinedName::Plain)
             .collect();
         let mut variables = types.clone();
         if let Some(loc) = scoped.get(&stmt_id(stmt)) {
