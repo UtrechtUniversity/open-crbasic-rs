@@ -17,7 +17,7 @@ use crate::syntax::{
     stmt_id,
 };
 
-use super::{context, instr_data, instr_measure, instr_rules};
+use super::{context, instr_data, instr_measure, instr_rules, scan_time};
 
 const NON_EXECUTABLE_KEYWORDS: &[&str] = &[
     "BEGINPROG",
@@ -107,20 +107,17 @@ pub fn _table_arg_name(stmt: &Instruction) -> Option<String> {
     None
 }
 
-/// Port of `checker/warnings.py::_with_inline_branches`.
-pub fn _with_inline_branches() {}
-
 /// Helper for `_with_inline_branches` taking `statements`.
-pub fn _with_inline_branches_with(statements: &[StmtRef]) -> Vec<StmtRef> {
+pub fn _with_inline_branches(statements: &[StmtRef]) -> Vec<StmtRef> {
     let mut out = Vec::new();
     for stmt in statements {
         out.push(stmt.clone());
         if let Stmt::If(if_stmt) = stmt.as_ref() {
             if let Some(inline) = &if_stmt.inline {
-                out.extend(_with_inline_branches_with(inline));
+                out.extend(_with_inline_branches(inline));
             }
             if let Some(inline_else) = &if_stmt.inline_else {
-                out.extend(_with_inline_branches_with(inline_else));
+                out.extend(_with_inline_branches(inline_else));
             }
         }
     }
@@ -141,7 +138,7 @@ pub fn check(program: &Program, diags: &mut Diagnostics) {
     }
 
     let mut called: BTreeSet<String> = BTreeSet::new();
-    for stmt in _with_inline_branches_with(&program.statements) {
+    for stmt in _with_inline_branches(&program.statements) {
         let Stmt::Instruction(inst) = stmt.as_ref() else {
             continue;
         };
@@ -179,19 +176,8 @@ pub fn check(program: &Program, diags: &mut Diagnostics) {
     }
 }
 
-/// Port of `checker/warnings.py::_check_uint1_dims`.
-pub fn _check_uint1_dims(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    _check_uint1_dims_with(program, profile, diags, &env);
-}
-
 /// Helper for `_check_uint1_dims` taking `env`.
-pub fn _check_uint1_dims_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+pub fn _check_uint1_dims(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     if profile.name != "cr6" && profile.name != "cr1000x" {
         return;
     }
@@ -231,17 +217,11 @@ pub fn _check_uint1_dims_with(
     }
 }
 
-/// Port of `checker/warnings.py::check_early`.
-pub fn check_early(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    check_early_with(program, profile, diags, &env);
-}
-
 /// Helper for `check_early` taking `env`.
-pub fn check_early_with(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
-    _check_uint1_dims_with(program, profile, diags, env);
-    _check_reachability_with(program, profile, diags, env);
-    _check_fnotch_with(program, profile, diags, env);
+pub fn check_early(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
+    _check_uint1_dims(program, profile, diags, env);
+    _check_reachability(program, profile, diags, env);
+    _check_fnotch(program, profile, diags, env);
     instr_rules::check_scan_params(program, profile, diags, env);
     instr_rules::check_scan_max_interval(program, profile, diags, env);
     instr_rules::check_data_interval(program, profile, diags, env);
@@ -356,28 +336,15 @@ pub fn _scan_span(statements: &[StmtRef], start: i64) -> (i64, bool) {
     (i64::try_from(j).unwrap_or(i64::MAX), has_exit)
 }
 
-/// Port of `checker/warnings.py::_scan_count_is_zero`.
-pub fn _scan_count_is_zero(stmt: &Instruction) -> Option<bool> {
-    let profile = profiles::get("cr6").ok()?;
-    let env = Env::new(profile);
-    _scan_count_is_zero_with(stmt, &env)
-}
-
 /// Helper for `_scan_count_is_zero` taking `env`.
-pub fn _scan_count_is_zero_with(stmt: &Instruction, env: &Env) -> Option<bool> {
+pub fn _scan_count_is_zero(stmt: &Instruction, env: &Env) -> Option<bool> {
     let arg3 = stmt.args.get(3)?.as_deref()?;
     let val = consteval::value_of(Some(arg3), env).ok()?;
     Some(const_eq_i64(&val, 0))
 }
 
-/// Port of `checker/warnings.py::_check_reachability`.
-pub fn _check_reachability(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    _check_reachability_with(program, profile, diags, &env);
-}
-
 /// Helper for `_check_reachability` taking `env`.
-pub fn _check_reachability_with(
+pub fn _check_reachability(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -454,7 +421,7 @@ pub fn _check_reachability_with(
             }
             let (j_i64, has_exit) = _scan_span(statements, i64::try_from(i).unwrap_or(i64::MAX));
             let j = usize::try_from(j_i64).unwrap_or(n);
-            let count_is_zero = _scan_count_is_zero_with(inst, env);
+            let count_is_zero = _scan_count_is_zero(inst, env);
             dead = count_is_zero == Some(true) && !has_exit;
             if !begun && (profile.name == "cr6" || profile.name == "cr1000x") {
                 dead = false;
@@ -563,14 +530,8 @@ pub fn _check_reachability_with(
     }
 }
 
-/// Port of `checker/warnings.py::check_background_calibration`.
-pub fn check_background_calibration(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    check_background_calibration_with(program, profile, diags, &env);
-}
-
 /// Helper for `check_background_calibration` taking `env`.
-pub fn check_background_calibration_with(
+pub fn check_background_calibration(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -589,10 +550,22 @@ pub fn check_background_calibration_with(
     if instr_measure::is_sequential(program, profile, env) {
         return;
     }
-    // TODO: populate `busy` and `timed` from `scan_time::budgets` and `scan_time::MODELS`
-    // once `scan_time` is ported.
-    let busy: BTreeSet<usize> = BTreeSet::new();
-    let timed: BTreeSet<usize> = BTreeSet::new();
+    let busy_slack = data.get("busy_slack").and_then(Json::as_i64).unwrap_or(0);
+    let mut busy: BTreeSet<usize> = BTreeSet::new();
+    let mut timed: BTreeSet<usize> = BTreeSet::new();
+    for b in scan_time::budgets(program, env, profile, false) {
+        if b.total != 0 {
+            timed.insert(stmt_id(&b.scan));
+            let gap = if b.max_integ > 0 {
+                b.max_integ + scan_time::model_for(profile.name).map_or(0, |m| m.busy_extra)
+            } else {
+                0
+            };
+            if b.interval - b.total < busy_slack.max(gap) && !b.pulse_only {
+                busy.insert(stmt_id(&b.scan));
+            }
+        }
+    }
 
     let mut in_slow = false;
     let mut main_scan_index: i64 = 0;
@@ -625,13 +598,8 @@ pub fn check_background_calibration_with(
     }
 }
 
-/// Port of `checker/warnings.py::_value_in`.
-pub fn _value_in(_position: i64) -> bool {
-    false
-}
-
 /// Helper for `_value_in` taking `args`, `values`, and `env`.
-pub fn _value_in_with(args: &[Option<ExprRef>], position: i64, values: &[Json], env: &Env) -> bool {
+pub fn _value_in(args: &[Option<ExprRef>], position: i64, values: &[Json], env: &Env) -> bool {
     if position < 1 {
         return false;
     }
@@ -647,14 +615,8 @@ pub fn _value_in_with(args: &[Option<ExprRef>], position: i64, values: &[Json], 
     values.iter().any(|v| const_eq_json(&val, v))
 }
 
-/// Port of `checker/warnings.py::check_slow_scan_skips`.
-pub fn check_slow_scan_skips(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    check_slow_scan_skips_with(program, profile, diags, &env);
-}
-
 /// Helper for `check_slow_scan_skips` taking `env`.
-pub fn check_slow_scan_skips_with(
+pub fn check_slow_scan_skips(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -683,7 +645,7 @@ pub fn check_slow_scan_skips_with(
     let mut scan_no: i64 = 0;
     let mut cur_idx: Option<usize> = None;
 
-    for stmt in _with_inline_branches_with(&program.statements) {
+    for stmt in _with_inline_branches(&program.statements) {
         let mut kw = _kw(&stmt);
         if kw == "NEXT" && NEXT_SCAN_RE.match_(stmt.text()).is_some() {
             kw = "NEXTSCAN".to_string();
@@ -755,7 +717,7 @@ pub fn check_slow_scan_skips_with(
                 for (p, vals) in entries {
                     if let Ok(pos) = p.parse::<i64>()
                         && let Some(vals_arr) = vals.as_array()
-                        && _value_in_with(&inst.args, pos, vals_arr, env)
+                        && _value_in(&inst.args, pos, vals_arr, env)
                     {
                         any_no_task = true;
                         break;
@@ -807,19 +769,8 @@ pub fn _scan_interval_ms(stmt: &Instruction, env: &Env) -> Option<f64> {
     i32::try_from(signed).ok().map(|v| f64::from(v) / 10.0)
 }
 
-/// Port of `checker/warnings.py::_check_fnotch`.
-pub fn _check_fnotch(program: &Program, profile: &Profile, diags: &mut Diagnostics) {
-    let env = env_for(program, profile);
-    _check_fnotch_with(program, profile, diags, &env);
-}
-
 /// Helper for `_check_fnotch` taking `env`.
-pub fn _check_fnotch_with(
-    program: &Program,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+pub fn _check_fnotch(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
     let data = profile.fnotch();
     let Some(valid_arr) = data.get("valid").and_then(Json::as_array) else {
         return;
@@ -1047,7 +998,7 @@ mod tests {
             inline: Some(vec![a.clone()]),
             inline_else: Some(vec![b.clone()]),
         }));
-        let flat = _with_inline_branches_with(std::slice::from_ref(&if_stmt));
+        let flat = _with_inline_branches(std::slice::from_ref(&if_stmt));
         assert_eq!(flat.len(), 3);
         assert!(Rc::ptr_eq(&flat[0], &if_stmt));
         assert!(Rc::ptr_eq(&flat[1], &a));
@@ -1077,7 +1028,7 @@ mod tests {
         }));
         let prog = Program::new("t.cr6", vec![decl]);
         let mut diags = Diagnostics::new();
-        _check_uint1_dims(&prog, prof_cr6, &mut diags);
+        _check_uint1_dims(&prog, prof_cr6, &mut diags, &Env::new(prof_cr6));
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].line, 1);
         assert_eq!(
@@ -1086,7 +1037,7 @@ mod tests {
         );
 
         let mut diags_cr300 = Diagnostics::new();
-        _check_uint1_dims(&prog, prof_cr300, &mut diags_cr300);
+        _check_uint1_dims(&prog, prof_cr300, &mut diags_cr300, &Env::new(prof_cr300));
         assert_eq!(diags_cr300.items.len(), 0);
     }
 
@@ -1166,7 +1117,7 @@ mod tests {
             ],
         );
         let mut diags = Diagnostics::new();
-        _check_reachability(&prog, prof, &mut diags);
+        _check_reachability(&prog, prof, &mut diags, &Env::new(prof));
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].line, 4);
         assert_eq!(diags.items[0].message, "Delay never reached at run time.");
@@ -1203,7 +1154,7 @@ mod tests {
             ],
         );
         let mut diags2 = Diagnostics::new();
-        _check_reachability(&sub_prog, prof, &mut diags2);
+        _check_reachability(&sub_prog, prof, &mut diags2, &Env::new(prof));
         assert_eq!(diags2.items.len(), 0);
     }
 
@@ -1234,7 +1185,7 @@ mod tests {
             ],
         );
         let mut diags = Diagnostics::new();
-        _check_fnotch(&prog, prof_cr300, &mut diags);
+        _check_fnotch(&prog, prof_cr300, &mut diags, &Env::new(prof_cr300));
         assert_eq!(diags.items.len(), 1);
         assert_eq!(diags.items[0].line, 4);
         assert_eq!(

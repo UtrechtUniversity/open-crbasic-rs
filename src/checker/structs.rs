@@ -25,12 +25,7 @@ fn unmodelled() -> Vec<(String, String, i64)> {
 }
 
 /// Port of `checker/structs.py::_structure_members`.
-pub fn _structure_members(_program: &Program) {
-    todo!("checker/structs.py::_structure_members (signature returns () instead of OrderedMap)")
-}
-
-/// Port of `checker/structs.py::_structure_members`.
-pub fn structure_members(program: &Program) -> OrderedMap<String, OrderedMap<String, String>> {
+pub fn _structure_members(program: &Program) -> OrderedMap<String, OrderedMap<String, String>> {
     let mut result: OrderedMap<String, OrderedMap<String, String>> = OrderedMap::new();
     let mut current: Option<String> = None;
     for st in &program.statements {
@@ -66,12 +61,7 @@ pub fn structure_members(program: &Program) -> OrderedMap<String, OrderedMap<Str
 }
 
 /// Port of `checker/structs.py::_variable_kinds`.
-pub fn _variable_kinds(_program: &Program) -> OrderedMap<String, String> {
-    todo!("checker/structs.py::_variable_kinds (omitted: structs: dict)")
-}
-
-/// Port of `checker/structs.py::_variable_kinds`.
-pub fn variable_kinds(
+pub fn _variable_kinds(
     program: &Program,
     structs: &OrderedMap<String, OrderedMap<String, String>>,
 ) -> OrderedMap<String, String> {
@@ -140,14 +130,7 @@ pub fn _names(expr: Option<&Expr>) -> Vec<String> {
 }
 
 /// Port of `checker/structs.py::_member_chain`.
-pub fn _member_chain(_expr: &Member) {
-    todo!(
-        "checker/structs.py::_member_chain (signature returns () instead of Option<(&Expr, Vec<String>)>)"
-    )
-}
-
-/// Port of `checker/structs.py::_member_chain`.
-pub fn member_chain(expr: &Member) -> Option<(&Expr, Vec<String>)> {
+pub fn _member_chain(expr: &Member) -> Option<(&Expr, Vec<String>)> {
     let mut path = vec![expr.member.clone()];
     let mut node: Option<&Expr> = expr.base.as_deref();
     while let Some(Expr::Member(m)) = node {
@@ -167,12 +150,7 @@ pub fn member_chain(expr: &Member) -> Option<(&Expr, Vec<String>)> {
 }
 
 /// Port of `checker/structs.py::_member_errors`.
-pub fn _member_errors(_expr: Option<&Expr>, _kinds: &OrderedMap<String, String>) {
-    todo!("checker/structs.py::_member_errors (omitted: structs: dict)")
-}
-
-/// Port of `checker/structs.py::_member_errors`.
-pub fn member_errors(
+pub fn _member_errors(
     expr: Option<&Expr>,
     kinds: &OrderedMap<String, String>,
     structs: &OrderedMap<String, OrderedMap<String, String>>,
@@ -182,7 +160,7 @@ pub fn member_errors(
     };
     match expr {
         Expr::Member(m) => {
-            let chain = member_chain(m);
+            let chain = _member_chain(m);
             let root = chain.as_ref().map(|(r, _)| *r);
             let root_name = match root {
                 Some(Expr::Name(n)) => Some(n.name.as_str()),
@@ -231,7 +209,7 @@ pub fn member_errors(
             };
             if let Expr::Index(idx) = root {
                 for a in &idx.args {
-                    found.extend(member_errors(a.as_deref(), kinds, structs));
+                    found.extend(_member_errors(a.as_deref(), kinds, structs));
                 }
             }
             found
@@ -239,14 +217,14 @@ pub fn member_errors(
         Expr::Index(idx) => {
             let mut out = Vec::new();
             for a in &idx.args {
-                out.extend(member_errors(a.as_deref(), kinds, structs));
+                out.extend(_member_errors(a.as_deref(), kinds, structs));
             }
             out
         }
-        Expr::Unary(u) => member_errors(u.operand.as_deref(), kinds, structs),
+        Expr::Unary(u) => _member_errors(u.operand.as_deref(), kinds, structs),
         Expr::Binary(b) => {
-            let mut out = member_errors(b.left.as_deref(), kinds, structs);
-            out.extend(member_errors(b.right.as_deref(), kinds, structs));
+            let mut out = _member_errors(b.left.as_deref(), kinds, structs);
+            out.extend(_member_errors(b.right.as_deref(), kinds, structs));
             out
         }
         _ => Vec::new(),
@@ -254,22 +232,17 @@ pub fn member_errors(
 }
 
 /// Port of `checker/structs.py::check_members`.
-pub fn check_members(_program: &Program, _diags: &mut Diagnostics, _flat: &Program) {
-    todo!("checker/structs.py::check_members (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structs.py::check_members`.
-pub fn check_members_with_profile(
+pub fn check_members(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
     flat: &Program,
 ) {
-    let structs = structure_members(program);
+    let structs = _structure_members(program);
     if structs.is_empty() {
         return;
     }
-    let mut kinds = variable_kinds(program, &structs);
+    let mut kinds = _variable_kinds(program, &structs);
     let mut declared: BTreeSet<String> = BTreeSet::new();
     for st in &program.statements {
         if let Stmt::Declaration(d) = st.as_ref() {
@@ -314,8 +287,8 @@ pub fn check_members_with_profile(
         {
             continue;
         }
-        let left = member_errors(assign.target.as_deref(), &kinds, &structs);
-        let right = member_errors(assign.value.as_deref(), &kinds, &structs);
+        let left = _member_errors(assign.target.as_deref(), &kinds, &structs);
+        let right = _member_errors(assign.value.as_deref(), &kinds, &structs);
         if left.iter().chain(right.iter()).any(|e| e.0 == "?")
             || (left.is_empty() && right.is_empty())
         {
@@ -379,12 +352,7 @@ pub fn check_members_with_profile(
 }
 
 /// Port of `checker/structs.py::_operand_kind`.
-pub fn _operand_kind(_expr: Option<&Expr>, _kinds: &OrderedMap<String, String>) -> Option<String> {
-    todo!("checker/structs.py::_operand_kind (omitted: structs: dict)")
-}
-
-/// Port of `checker/structs.py::_operand_kind`.
-pub fn operand_kind(
+pub fn _operand_kind(
     expr: Option<&Expr>,
     kinds: &OrderedMap<String, String>,
     structs: &OrderedMap<String, OrderedMap<String, String>>,
@@ -411,7 +379,7 @@ pub fn operand_kind(
             }
         }
         Expr::Member(m) => {
-            let chain = member_chain(m)?;
+            let chain = _member_chain(m)?;
             let root_name = match chain.0 {
                 Expr::Name(n) => &n.name,
                 Expr::Index(idx) => &idx.name,
@@ -451,12 +419,7 @@ pub fn operand_kind(
 }
 
 /// Port of `checker/structs.py::check_struct_assignment`.
-pub fn check_struct_assignment(_program: &Program, _diags: &mut Diagnostics, _flat: &Program) {
-    todo!("checker/structs.py::check_struct_assignment (omitted: profile: untyped)")
-}
-
-/// Port of `checker/structs.py::check_struct_assignment`.
-pub fn check_struct_assignment_with_profile(
+pub fn check_struct_assignment(
     program: &Program,
     profile: &Profile,
     diags: &mut Diagnostics,
@@ -465,11 +428,11 @@ pub fn check_struct_assignment_with_profile(
     if !profile.single_pass {
         return;
     }
-    let structs = structure_members(program);
+    let structs = _structure_members(program);
     if structs.is_empty() {
         return;
     }
-    let kinds = variable_kinds(program, &structs);
+    let kinds = _variable_kinds(program, &structs);
     for st in &flat.statements {
         let Stmt::Assignment(assign) = st.as_ref() else {
             continue;
@@ -483,8 +446,8 @@ pub fn check_struct_assignment_with_profile(
         ) {
             continue;
         }
-        let left = operand_kind(assign.target.as_deref(), &kinds, &structs);
-        let right = operand_kind(assign.value.as_deref(), &kinds, &structs);
+        let left = _operand_kind(assign.target.as_deref(), &kinds, &structs);
+        let right = _operand_kind(assign.value.as_deref(), &kinds, &structs);
         let (Some(left), Some(right)) = (left, right) else {
             continue;
         };
@@ -537,11 +500,11 @@ mod tests {
             name: "v".to_string(),
         });
         assert_eq!(
-            operand_kind(Some(&p_expr), &kinds, &structs).as_deref(),
+            _operand_kind(Some(&p_expr), &kinds, &structs).as_deref(),
             Some("S")
         );
         assert_eq!(
-            operand_kind(Some(&v_expr), &kinds, &structs).as_deref(),
+            _operand_kind(Some(&v_expr), &kinds, &structs).as_deref(),
             Some("N")
         );
     }

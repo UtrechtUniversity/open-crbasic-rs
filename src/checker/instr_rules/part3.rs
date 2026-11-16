@@ -306,7 +306,7 @@ pub fn check_avgrun_options(
             .cloned()
     };
     let number = |arg: Option<&Expr>| -> Option<i64> {
-        if let Some(converted) = longconv::long_value_with(arg, env, profile, names, literals) {
+        if let Some(converted) = longconv::long_value(arg, env, profile, names, literals) {
             return Some(converted);
         }
         let value = consteval::value_of(arg, env).ok()?;
@@ -439,7 +439,7 @@ pub fn check_option_values(
         }
         let value = |i: usize| -> Option<i64> {
             if i < args.len() {
-                longconv::long_value_with(args[i].as_deref(), env, profile, names, literals)
+                longconv::long_value(args[i].as_deref(), env, profile, names, literals)
             } else {
                 None
             }
@@ -642,8 +642,7 @@ pub fn _cdm_delay_overlong(
         return 0;
     }
     let unit = unit_f as i64;
-    let Some(n) = longconv::long_value_with(args[3].as_deref(), env, profile, names, literals)
-    else {
+    let Some(n) = longconv::long_value(args[3].as_deref(), env, profile, names, literals) else {
         return 0;
     };
     let (sec, us) = match unit {
@@ -733,7 +732,7 @@ pub fn matrix_undefined_operands(
         return None;
     }
     let ctx = context::of(program, Some(profile), Some(env.clone()));
-    let mut option = longconv::long_value_with(
+    let mut option = longconv::long_value(
         args[0].as_deref(),
         env,
         profile,
@@ -980,7 +979,7 @@ pub fn check_serialbrk_comport(
         return;
     }
     let ctx = context::of(program, Some(profile), Some(env.clone()));
-    let port = longconv::long_value_with(
+    let port = longconv::long_value(
         stmt.args[0].as_deref(),
         env,
         profile,
@@ -1090,7 +1089,7 @@ pub fn check_serialin_comport(
         return;
     }
     let ctx = context::of(program, Some(profile), Some(env.clone()));
-    let v = longconv::long_value_with(
+    let v = longconv::long_value(
         stmt.args[1].as_deref(),
         env,
         profile,
@@ -1211,7 +1210,7 @@ pub fn debug_history_oom(
     let arg = stmt.args[1].as_deref();
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let Some(mut v) =
-        longconv::long_value_with(arg, env, profile, ctx.float_names(), ctx.literal_names())
+        longconv::long_value(arg, env, profile, ctx.float_names(), ctx.literal_names())
     else {
         return false;
     };

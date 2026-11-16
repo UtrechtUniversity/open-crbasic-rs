@@ -16,16 +16,11 @@ pub const INT_MIN: i64 = -(1_i64 << 31);
 const _OPS: &[&str] = &["+", "-", "*", "/", "^", "\\", "MOD"];
 
 /// Port of `checker/longconv.py::float_names`.
-pub fn float_names() -> BTreeSet<String> {
-    todo!("checker/longconv.py::float_names (omitted: statements: untyped)")
-}
-
-/// Port of `checker/longconv.py::float_names`.
-pub fn float_names_in(statements: &[StmtRef]) -> BTreeSet<String> {
+pub fn float_names(statements: &[StmtRef]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for st in statements {
         if let Stmt::ConstDecl(cd) = st.as_ref()
-            && _float_typed_with(cd.value.as_deref(), &names)
+            && _float_typed(cd.value.as_deref(), &names)
         {
             names.insert(pystr::upper(&cd.name));
         }
@@ -34,12 +29,7 @@ pub fn float_names_in(statements: &[StmtRef]) -> BTreeSet<String> {
 }
 
 /// Port of `checker/longconv.py::literal_names`.
-pub fn literal_names() -> BTreeSet<String> {
-    todo!("checker/longconv.py::literal_names (omitted: statements: untyped)")
-}
-
-/// Port of `checker/longconv.py::literal_names`.
-pub fn literal_names_in(statements: &[StmtRef]) -> BTreeSet<String> {
+pub fn literal_names(statements: &[StmtRef]) -> BTreeSet<String> {
     statements
         .iter()
         .filter_map(|st| match st.as_ref() {
@@ -52,12 +42,7 @@ pub fn literal_names_in(statements: &[StmtRef]) -> BTreeSet<String> {
 }
 
 /// Port of `checker/longconv.py::_float_typed`.
-pub fn _float_typed(_expr: Option<&Expr>) -> bool {
-    todo!("checker/longconv.py::_float_typed (omitted: names: untyped)")
-}
-
-/// Port of `checker/longconv.py::_float_typed`.
-pub fn _float_typed_with(expr: Option<&Expr>, names: &BTreeSet<String>) -> bool {
+pub fn _float_typed(expr: Option<&Expr>, names: &BTreeSet<String>) -> bool {
     let Some(expr) = expr else {
         return false;
     };
@@ -77,12 +62,12 @@ pub fn _float_typed_with(expr: Option<&Expr>, names: &BTreeSet<String>) -> bool 
             }
         }
         Expr::Name(n) => names.contains(&pystr::upper(&n.name)),
-        Expr::Unary(u) => _float_typed_with(u.operand.as_deref(), names),
+        Expr::Unary(u) => _float_typed(u.operand.as_deref(), names),
         Expr::Binary(b) => {
             b.op == "/"
                 || b.op == "^"
-                || _float_typed_with(b.left.as_deref(), names)
-                || _float_typed_with(b.right.as_deref(), names)
+                || _float_typed(b.left.as_deref(), names)
+                || _float_typed(b.right.as_deref(), names)
         }
         _ => false,
     }
@@ -104,14 +89,7 @@ pub fn _plain(expr: Option<&Expr>) -> bool {
 }
 
 /// Port of `checker/longconv.py::long_value`.
-pub fn long_value(_arg: Option<&Expr>) -> Option<i64> {
-    todo!(
-        "checker/longconv.py::long_value (omitted: env: consteval.Env, profile: untyped, names: untyped, literals: untyped)"
-    )
-}
-
-/// Port of `checker/longconv.py::long_value`.
-pub fn long_value_with(
+pub fn long_value(
     arg: Option<&Expr>,
     env: &Env,
     profile: &Profile,
@@ -169,7 +147,7 @@ pub fn long_value_with(
         ConstValue::Float(f) | ConstValue::CFloat(f) => f.fract() == 0.0,
         ConstValue::Str(_) => false,
     };
-    if !_float_typed_with(Some(arg), names) && is_whole {
+    if !_float_typed(Some(arg), names) && is_whole {
         return match value {
             ConstValue::Int(i) => Some(_wrap(i)),
             ConstValue::Float(f) | ConstValue::CFloat(f) => pystr::py_int_from_f64(f).map(_wrap),
@@ -309,7 +287,7 @@ mod tests {
             right: Some(int_expr(100_000)),
         });
         assert_eq!(
-            long_value_with(Some(&mul), &env, cr6, &names, &literals),
+            long_value(Some(&mul), &env, cr6, &names, &literals),
             Some(1_410_065_408)
         );
 
@@ -320,17 +298,17 @@ mod tests {
             right: Some(int_expr(1)),
         });
         assert_eq!(
-            long_value_with(Some(&add), &env, cr6, &names, &literals),
+            long_value(Some(&add), &env, cr6, &names, &literals),
             Some(-2_147_483_648)
         );
 
         let big = int_expr(2_147_483_648);
         assert_eq!(
-            long_value_with(Some(&big), &env, cr6, &names, &literals),
+            long_value(Some(&big), &env, cr6, &names, &literals),
             Some(-2_147_483_648)
         );
         assert_eq!(
-            long_value_with(Some(&big), &env, cr300, &names, &literals),
+            long_value(Some(&big), &env, cr300, &names, &literals),
             Some(2_147_483_647)
         );
 
@@ -340,13 +318,13 @@ mod tests {
             operand: Some(int_expr(2_147_483_649)),
         });
         assert_eq!(
-            long_value_with(Some(&neg_big), &env, cr300, &names, &literals),
+            long_value(Some(&neg_big), &env, cr300, &names, &literals),
             Some(-2_147_483_647)
         );
 
         let flt = float_expr(2_147_483_648.0, "2147483648.0");
         assert_eq!(
-            long_value_with(Some(&flt), &env, cr300, &names, &literals),
+            long_value(Some(&flt), &env, cr300, &names, &literals),
             Some(-2_147_483_648)
         );
 
@@ -355,7 +333,7 @@ mod tests {
             value: "abc".to_string(),
         });
         assert_eq!(
-            long_value_with(Some(&s), &env, cr6, &names, &literals),
+            long_value(Some(&s), &env, cr6, &names, &literals),
             Some(-2_147_483_648)
         );
 
@@ -364,7 +342,7 @@ mod tests {
             name: "NAN".to_string(),
         });
         assert_eq!(
-            long_value_with(Some(&nan), &env, cr6, &names, &literals),
+            long_value(Some(&nan), &env, cr6, &names, &literals),
             Some(-2_147_483_648)
         );
     }

@@ -16,7 +16,7 @@ use crate::checker::expressions::part1::{
     _WHOLE_EXPR_ECHO_LOGGERS, _undefined_names, _variable_refs, KnownView,
 };
 use crate::checker::expressions::part4::_find_arity_problem;
-use crate::checker::symbols::is_reserved_predefined_name_with_profile;
+use crate::checker::symbols::is_reserved_predefined_name;
 use crate::consteval::{self, Env};
 use crate::diagnostics::ShowFile;
 use crate::syntax::{ConstValue, Node, NumberValue, StmtBase, rc_id};
@@ -1160,8 +1160,7 @@ pub fn _alias_name_collisions(
         } else if prior == Some("CONST") {
             out.insert(k, format!("{} is already declared as a CONST.", a.name));
         } else if k == 0
-            && profile
-                .is_some_and(|profile| is_reserved_predefined_name_with_profile(&a.name, profile))
+            && profile.is_some_and(|profile| is_reserved_predefined_name(&a.name, profile))
         {
             out.insert(k, format!("{} is a predefined CONST.", a.name));
         }

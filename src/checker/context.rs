@@ -1420,13 +1420,13 @@ impl Context {
     /// Port of `checker/context.py::Context.float_names`.
     pub fn float_names(&self) -> &BTreeSet<String> {
         self.float_names_cell
-            .get_or_init(|| longconv::float_names_in(&self.program.statements))
+            .get_or_init(|| longconv::float_names(&self.program.statements))
     }
 
     /// Port of `checker/context.py::Context.literal_names`.
     pub fn literal_names(&self) -> &BTreeSet<String> {
         self.literal_names_cell
-            .get_or_init(|| longconv::literal_names_in(&self.program.statements))
+            .get_or_init(|| longconv::literal_names(&self.program.statements))
     }
 
     /// Port of `checker/context.py::Context.string_consts`.

@@ -55,6 +55,8 @@ pub struct CompileResult {
     pub mode: Option<String>,
     pub tables: Vec<TdfTable>,
     pub table_list: Option<String>,
+    /// Attributes Python hangs on each `TdfTable` (`_dup_fields`, `_interval_display`, `_storage`).
+    pub table_extras: crate::tables::TableExtras,
     pub signature: Option<i64>,
     pub file_order: OrderedMap<String, i64>,
     pub stmt_lines: OrderedMap<String, Vec<(i64, i64)>>,
@@ -84,6 +86,7 @@ impl CompileResult {
             mode: None,
             tables: Vec::new(),
             table_list: None,
+            table_extras: crate::tables::TableExtras::default(),
             signature: None,
             file_order: OrderedMap::new(),
             stmt_lines: OrderedMap::new(),
@@ -229,28 +232,8 @@ pub fn dropped_message(result: &CompileResult) -> Option<DiagRef> {
 }
 
 /// Port of `compiler.py::compile_file`.
-pub fn compile_file(
-    path: &Path,
-    profile: Option<&'static Profile>,
-    display_name: Option<&str>,
-    warn_unused: bool,
-    provenance: bool,
-) -> CompileResult {
-    compile_file_with(
-        path,
-        profile,
-        display_name,
-        warn_unused,
-        None,
-        true,
-        provenance,
-        false,
-    )
-}
-
-/// Port of `compiler.py::compile_file` with all Python parameters.
 #[allow(clippy::too_many_arguments)]
-pub fn compile_file_with(
+pub fn compile_file(
     path: &Path,
     profile: Option<&'static Profile>,
     display_name: Option<&str>,
@@ -269,17 +252,17 @@ pub fn compile_file_with(
         },
         str::to_string,
     );
-    let mut result = _compile_once_with(path, profile, &name, None, source, provenance, macros);
+    let mut result = _compile_once(path, profile, &name, None, source, provenance, macros);
     if profile.single_pass {
         let mut limit: Option<Vec<i64>> = None;
         for _ in 0..16 {
             let Some(ref ast) = result.program_ast else {
                 break;
             };
-            // TODO(wiring): read `ast.pull_log` and `ast.pull_site` once added to `syntax::Program`.
-            let log: Vec<(Vec<i64>, Vec<i64>)> = Vec::new();
-            let site: OrderedMap<String, Vec<i64>> = OrderedMap::new();
-            let _ = ast;
+            let log: Vec<(Vec<i64>, Vec<i64>)> =
+                ast.provenance.pull_log.clone().unwrap_or_default();
+            let site: OrderedMap<String, Vec<i64>> =
+                ast.provenance.pull_site.clone().unwrap_or_default();
             let errs: Vec<Vec<i64>> = result
                 .diagnostics
                 .items
@@ -306,7 +289,7 @@ pub fn compile_file_with(
                 break;
             }
             limit = Some(bad);
-            result = _compile_once_with(
+            result = _compile_once(
                 path,
                 profile,
                 &name,
@@ -320,31 +303,11 @@ pub fn compile_file_with(
     if result.program_ast.is_none() {
         return result;
     }
-    _finish_with(&mut result, path, warn_unused, source, signature)
+    _finish(&mut result, path, warn_unused, source, signature)
 }
 
 /// Port of `compiler.py::_compile_once`.
-#[allow(clippy::needless_pass_by_value)]
 pub fn _compile_once(
-    path: &Path,
-    profile: &'static Profile,
-    name: &str,
-    pull_limit: Option<Vec<i64>>,
-    provenance: bool,
-) -> CompileResult {
-    _compile_once_with(
-        path,
-        profile,
-        name,
-        pull_limit.as_deref(),
-        None,
-        provenance,
-        false,
-    )
-}
-
-/// Port of `compiler.py::_compile_once` with `source` and `macros`.
-pub fn _compile_once_with(
     path: &Path,
     profile: &'static Profile,
     name: &str,
@@ -446,12 +409,7 @@ pub fn _compile_once_with(
 }
 
 /// Port of `compiler.py::_finish`.
-pub fn _finish(result: &mut CompileResult, path: &Path, warn_unused: bool) -> CompileResult {
-    _finish_with(result, path, warn_unused, None, true)
-}
-
-/// Port of `compiler.py::_finish` with `source` and `signature`.
-pub fn _finish_with(
+pub fn _finish(
     result: &mut CompileResult,
     _path: &Path,
     warn_unused: bool,
@@ -459,12 +417,12 @@ pub fn _finish_with(
     signature: bool,
 ) -> CompileResult {
     if warn_unused && result.program_ast.is_some() && !result.diagnostics.has_errors() {
-        // TODO(wiring): call `crate::checker::unused::check(program, diags)` once `checker::unused` is ported.
+        // TODO(wire): `checker/unused.py::check(program, diags)` (the `-u` warnings): `checker::unused` is not ported yet.
     }
     if !signature {
         return result.clone();
     }
-    // TODO(wiring): call `crate::signature::program_signature(path, source)` once `signature` is ported.
+    // TODO(wire): `result.signature = signature.program_signature(path, source)`: `signature` is not ported yet.
     result.clone()
 }
 

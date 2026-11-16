@@ -9,11 +9,12 @@
 
 use std::collections::BTreeSet;
 
-use crate::consteval::{self, Env};
+use crate::consteval::Env;
 use crate::diagnostics::{Diagnostics, ShowFile};
 use crate::profiles::Profile;
 use crate::pystr;
-use crate::syntax::{ConstValue, Expr, Program, Stmt, VarDecl, rc_id};
+use crate::syntax::{ConstValue, Expr, Program, Stmt, rc_id};
+use crate::tables::{_INT32_MAX, _as_int, _fold, _make_var_info, SizeClass, size_class};
 
 const _PAGE: i64 = 4096;
 const _BLOCK_BYTES: i64 = 496;
@@ -21,7 +22,6 @@ const _INT_MIN: i64 = -(1_i64 << 31);
 const _BASE: i64 = 0x0060_0000;
 const _MAX_ALLOC: i64 = 0x0800_0000;
 const _TWO31: f64 = 2_147_483_648.0;
-const _INT32_MAX: i64 = 2_147_483_647;
 
 pub const MSG_ALLOC: &str =
     "Unable to allocate enough data table space to manage flash write cycle limits.";
@@ -105,129 +105,11 @@ pub struct TableMeta {
     pub alloc: Option<AllocResult>,
 }
 
-/// One declared table's name and storage metadata for `check_with`.
+/// One declared table's name and storage metadata for `check`.
 #[derive(Debug, Clone, Default)]
 pub struct TableStorageEntry {
     pub name: String,
     pub storage: TableMeta,
-}
-
-// ---------------------------------------------------------------- local tables.py helpers
-// TODO(P3-h): replace with calls into `crate::tables` once `tables.rs` is ported.
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SizeClass {
-    Auto,
-    Fixed(i64, bool),
-    Edge(i64),
-    Inf,
-    Toxic,
-}
-
-fn _f32_safe_local(x: f64) -> f64 {
-    _f32(x)
-}
-
-fn _size_class(raw: Option<&ConstValue>) -> Option<SizeClass> {
-    let raw = raw?;
-    let v = match raw {
-        ConstValue::Int(i) if *i >= -2_147_483_648 && *i < 2_147_483_648 => *i,
-        ConstValue::Int(i) => {
-            let f = _f32_safe_local(i64_to_f64(*i));
-            return _classify_f32(f);
-        }
-        ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            let f32v = _f32_safe_local(*f);
-            return _classify_f32(f32v);
-        }
-        ConstValue::BigInt(s) => {
-            let f32v = _f32_safe_local(s.parse::<f64>().unwrap_or(f64::INFINITY));
-            return _classify_f32(f32v);
-        }
-        ConstValue::Str(_) => return None,
-    };
-    if v == -1 {
-        Some(SizeClass::Auto)
-    } else if v == 0 {
-        Some(SizeClass::Fixed(1, false))
-    } else if v < -1 {
-        Some(SizeClass::Fixed((-v).min(_INT32_MAX), true))
-    } else {
-        Some(SizeClass::Fixed(v, false))
-    }
-}
-
-fn _classify_f32(f: f64) -> Option<SizeClass> {
-    if f.is_nan() {
-        return None;
-    }
-    if f.is_infinite() && f.is_sign_positive() {
-        return Some(SizeClass::Inf);
-    }
-    if f == _TWO31 {
-        return Some(SizeClass::Edge(1));
-    }
-    if f == -_TWO31 {
-        return Some(SizeClass::Edge(-1));
-    }
-    if f.abs() > _TWO31 {
-        return Some(SizeClass::Toxic);
-    }
-    let v = pystr::py_int_from_f64(f)?;
-    if v == -1 {
-        Some(SizeClass::Auto)
-    } else if v == 0 {
-        Some(SizeClass::Fixed(1, false))
-    } else if v < -1 {
-        Some(SizeClass::Fixed((-v).min(_INT32_MAX), true))
-    } else {
-        Some(SizeClass::Fixed(v, false))
-    }
-}
-
-fn _fold_local(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
-    let e = expr?;
-    consteval::value_of(Some(e), env).ok()
-}
-
-fn _as_int_local(v: Option<&ConstValue>, default: i64) -> i64 {
-    let Some(v) = v else {
-        return default;
-    };
-    let f = match v {
-        ConstValue::Int(i) => return *i,
-        ConstValue::Float(f) | ConstValue::CFloat(f) => *f,
-        ConstValue::BigInt(s) => s.parse::<f64>().unwrap_or(f64::INFINITY),
-        ConstValue::Str(s) => match pystr::parse_float(s) {
-            Some(f) => f,
-            None => return default,
-        },
-    };
-    pystr::py_round(f).unwrap_or(default)
-}
-
-fn _string_stored_len_local(n: i64) -> i64 {
-    (pystr::floordiv_i64(n, 4).unwrap_or(0) + 1) * 4
-}
-
-fn _string_size_expr_local(v: &VarDecl) -> Option<&Expr> {
-    let e = v.string_size.as_deref()?;
-    if let Expr::Binary(b) = e
-        && b.op == "="
-    {
-        return b.left.as_deref();
-    }
-    Some(e)
-}
-
-fn _make_var_stored_len(v: &VarDecl, env: &Env) -> Option<i64> {
-    let ty = pystr::upper(v.type_.as_deref().unwrap_or(""));
-    if ty == "STRING" {
-        let n = _as_int_local(_fold_local(_string_size_expr_local(v), env).as_ref(), 20);
-        Some(_string_stored_len_local(n.max(1)))
-    } else {
-        None
-    }
 }
 
 // ---------------------------------------------------------------- ported functions
@@ -264,13 +146,8 @@ pub fn _i32(v: i64) -> i64 {
     _wrap32(v)
 }
 
-/// Port of `checker/storage.py::_min_recs`.
-pub fn _min_recs(k: i64, cc: i64) -> i64 {
-    _min_recs_with(&TableState::default(), k, cc)
-}
-
 /// Full implementation of `checker/storage.py::_min_recs`.
-pub fn _min_recs_with(sp: &TableState, k: i64, cc: i64) -> i64 {
+pub fn _min_recs(sp: &TableState, k: i64, cc: i64) -> i64 {
     let period = if sp.flagged {
         86_400_000.0
     } else if sp.day {
@@ -344,11 +221,8 @@ pub fn _round_page(v: i64) -> i64 {
     _wrap32((-pages).wrapping_mul(_PAGE))
 }
 
-/// Port of `checker/storage.py::allocate`.
-pub fn allocate(_pool: i64) {}
-
 /// Full implementation of `checker/storage.py::allocate`.
-pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
+pub fn allocate(specs: &[TableSpec], pool: i64) -> AllocResult {
     let mut st: Vec<TableState> = specs
         .iter()
         .map(|sp| TableState {
@@ -382,7 +256,7 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
                 continue;
             }
             if (t.n < 0 || t.w.is_none()) && !t.flagged {
-                _blockfix_with(t, 512);
+                _blockfix(t, 512);
                 let (r, k) = (t.r, t.k);
                 let c1 = (if r < 512 { 1 } else { 3 })
                     + pystr::floordiv_i64(1024, r).unwrap_or(0)
@@ -390,7 +264,7 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
                 let c1 = c1.wrapping_mul(r).max(0x3000);
                 reserve = _i32(reserve.wrapping_add(c1));
                 if !t.card {
-                    reserve = _i32(reserve.wrapping_add(_lap_with(t).wrapping_mul(t.b)));
+                    reserve = _i32(reserve.wrapping_add(_lap(t).wrapping_mul(t.b)));
                 }
                 let w = match t.w {
                     None => 1.0,
@@ -398,11 +272,11 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
                 };
                 rate = _f32(_f32(i64_to_f64(r) / _f32(i64_to_f64(k) * w)) + rate);
             } else {
-                let a1 = _lap_with(t);
+                let a1 = _lap(t);
                 let arg = _i32(a1.wrapping_add(t.n));
-                _blockfix_with(t, arg);
+                _blockfix(t, arg);
                 let (r, k) = (t.r, t.k);
-                let a2 = _lap_with(t);
+                let a2 = _lap(t);
                 let mut u = _i32(
                     a2.wrapping_add(_cvt_int(_f32(
                         _f32(i64_to_f64(r)) * _f32(_f32(i64_to_f64(t.n)) / _f32(i64_to_f64(k))),
@@ -410,7 +284,7 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
                     .wrapping_add(0x2000),
                 );
                 if !t.fillstop {
-                    let lo = _min_recs_with(t, k, cc);
+                    let lo = _min_recs(t, k, cc);
                     if _cvt_int(_f32(_f32(i64_to_f64(u)) / _f32(i64_to_f64(r)))) < lo {
                         u = _i32(lo.wrapping_mul(r));
                     }
@@ -445,12 +319,12 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
                     let mut u = _cvt_int(_f32(
                         _f32(i64_to_f64(r)) * _f32(_f32(i64_to_f64(n)) / _f32(i64_to_f64(k))),
                     ));
-                    u = _i32(u.wrapping_add(_lap_with(t)).wrapping_add(0x2000));
+                    u = _i32(u.wrapping_add(_lap(t)).wrapping_add(0x2000));
                     if u < 0x3000 {
                         u = 0x3000;
                     }
                     if !t.fillstop {
-                        let lo = _min_recs_with(t, k, cc);
+                        let lo = _min_recs(t, k, cc);
                         if _tdiv(u, r) < lo {
                             d8 = true;
                         }
@@ -488,13 +362,8 @@ pub fn allocate_with(specs: &[TableSpec], pool: i64) -> AllocResult {
     }
 }
 
-/// Port of `checker/storage.py::_lap`.
-pub fn _lap() -> i64 {
-    0
-}
-
 /// Full implementation of `checker/storage.py::_lap`.
-pub fn _lap_with(t: &TableState) -> i64 {
+pub fn _lap(t: &TableState) -> i64 {
     if t.lapses != 0 {
         _tdiv(_i32(t.lapses.wrapping_mul(16)), t.b) + 1
     } else {
@@ -514,11 +383,8 @@ pub fn _alloc(ptr: i64, u: i64) -> (i64, i64) {
     (end, _i32(end.wrapping_sub(start)))
 }
 
-/// Port of `checker/storage.py::_blockfix`.
-pub fn _blockfix(_arg: i64) {}
-
 /// Full implementation of `checker/storage.py::_blockfix`.
-pub fn _blockfix_with(t: &mut TableState, arg: i64) {
+pub fn _blockfix(t: &mut TableState, arg: i64) {
     if t.r != 0 {
         return;
     }
@@ -550,12 +416,9 @@ pub fn pool_bytes(
     (pages - 4 * (n_declared + extra)) * _PAGE
 }
 
-/// Port of `checker/storage.py::spec_of`.
-pub fn spec_of() {}
-
 /// Full implementation of `checker/storage.py::spec_of`.
-pub fn spec_of_with(m: &TableMeta) -> TableSpec {
-    let cls = _size_class(m.size_raw.as_ref());
+pub fn spec_of(m: &TableMeta) -> TableSpec {
+    let cls = size_class(m.size_raw.as_ref());
     let mut flagged = false;
     let n = match cls {
         None => 1,
@@ -603,12 +466,9 @@ pub fn spec_of_with(m: &TableMeta) -> TableSpec {
     }
 }
 
-/// Port of `checker/storage.py::run`.
-pub fn run(_pool: i64) {}
-
 /// Full implementation of `checker/storage.py::run`.
-pub fn run_with(metas: &[TableMeta], pool: i64) -> Option<AllocResult> {
-    let mut specs: Vec<TableSpec> = metas.iter().map(spec_of_with).collect();
+pub fn run(metas: &[TableMeta], pool: i64) -> Option<AllocResult> {
+    let mut specs: Vec<TableSpec> = metas.iter().map(spec_of).collect();
     for sp in &mut specs {
         if sp.zero_interval
             && let Some(w) = sp.w
@@ -620,17 +480,12 @@ pub fn run_with(metas: &[TableMeta], pool: i64) -> Option<AllocResult> {
     if specs.iter().any(|sp| sp.b == 0) {
         return None;
     }
-    Some(allocate_with(&specs, pool))
-}
-
-/// Port of `checker/storage.py::cr6_table_oom`.
-pub fn cr6_table_oom(_auto_n: Option<i64>, _name: &str) -> Option<String> {
-    None
+    Some(allocate(&specs, pool))
 }
 
 /// Full implementation of `checker/storage.py::cr6_table_oom`.
-pub fn cr6_table_oom_with(m: &TableMeta, auto_n: Option<i64>, name: &str) -> Option<String> {
-    let cls = _size_class(m.size_raw.as_ref());
+pub fn cr6_table_oom(m: &TableMeta, auto_n: Option<i64>, name: &str) -> Option<String> {
+    let cls = size_class(m.size_raw.as_ref());
     let mut auto = false;
     let n = match cls {
         None => 1,
@@ -695,11 +550,8 @@ pub fn cr6_table_oom_with(m: &TableMeta, auto_n: Option<i64>, name: &str) -> Opt
     }
 }
 
-/// Port of `checker/storage.py::_var_words`.
-pub fn _var_words(_program: &Program) {}
-
 /// Full implementation of `checker/storage.py::_var_words`.
-pub fn _var_words_with(program: &Program, env: &Env, kinds: &[&str]) -> Vec<(i64, i64)> {
+pub fn _var_words(program: &Program, env: &Env, kinds: &[&str]) -> Vec<(i64, i64)> {
     let mut out = Vec::new();
     for st in &program.statements {
         let Stmt::Declaration(decl) = st.as_ref() else {
@@ -719,12 +571,12 @@ pub fn _var_words_with(program: &Program, env: &Env, kinds: &[&str]) -> Vec<(i64
             let dims: Vec<i64> = v
                 .dims
                 .iter()
-                .map(|d| _as_int_local(_fold_local(Some(d.as_ref()), env).as_ref(), 1))
+                .map(|d| _as_int(_fold(Some(d.as_ref()), env, None).as_ref(), 1))
                 .collect();
             if dims.len() > 3 || dims.iter().any(|&d| !(1..=_INT32_MAX).contains(&d)) {
                 continue;
             }
-            let stored = _make_var_stored_len(v, env).unwrap_or(0);
+            let stored = _make_var_info(v, env).stored_len.unwrap_or(0);
             if t == "STRING" && stored > _INT32_MAX {
                 continue;
             }
@@ -754,13 +606,8 @@ pub fn _var_words_with(program: &Program, env: &Env, kinds: &[&str]) -> Vec<(i64
     out
 }
 
-/// Port of `checker/storage.py::_segment_oom`.
-pub fn _segment_oom() -> bool {
-    false
-}
-
 /// Full implementation of `checker/storage.py::_segment_oom`.
-pub fn _segment_oom_with(words: &[(i64, i64)]) -> bool {
+pub fn _segment_oom(words: &[(i64, i64)]) -> bool {
     let mut total: i64 = 4;
     for &(n, w) in words {
         total = _wrap32(total.wrapping_add(_wrap32(_wrap32(n).wrapping_mul(w))));
@@ -769,26 +616,16 @@ pub fn _segment_oom_with(words: &[(i64, i64)]) -> bool {
     !(0..=_MAX_ALLOC).contains(&req)
 }
 
-/// Port of `checker/storage.py::variables_oom`.
-pub fn variables_oom(_program: &Program) -> bool {
-    false
-}
-
 /// Full implementation of `checker/storage.py::variables_oom`.
-pub fn variables_oom_with(program: &Program, profile: &Profile, env: &Env) -> bool {
+pub fn variables_oom(program: &Program, profile: &Profile, env: &Env) -> bool {
     matches!(profile.name, "cr6" | "cr1000x")
         && ["DIM", "PUBLIC"]
             .iter()
-            .any(|&k| _segment_oom_with(&_var_words_with(program, env, &[k])))
-}
-
-/// Port of `checker/storage.py::string_length_oom_line`.
-pub fn string_length_oom_line(_program: &Program) -> Option<i64> {
-    None
+            .any(|&k| _segment_oom(&_var_words(program, env, &[k])))
 }
 
 /// Full implementation of `checker/storage.py::string_length_oom_line`.
-pub fn string_length_oom_line_with(program: &Program, diags: &Diagnostics) -> Option<i64> {
+pub fn string_length_oom_line(program: &Program, diags: &Diagnostics) -> Option<i64> {
     let tagged: BTreeSet<usize> = diags
         .errors()
         .into_iter()
@@ -829,13 +666,10 @@ pub fn string_length_oom_line_with(program: &Program, diags: &Diagnostics) -> Op
     None
 }
 
-/// Port of `checker/storage.py::check_pass1`.
-pub fn check_pass1(_program: &Program) {}
-
 /// Full implementation of `checker/storage.py::check_pass1`.
-pub fn check_pass1_with(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
-    let mut line = string_length_oom_line_with(program, diags);
-    if line.is_none() && variables_oom_with(program, profile, env) {
+pub fn check_pass1(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
+    let mut line = string_length_oom_line(program, diags);
+    if line.is_none() && variables_oom(program, profile, env) {
         line = Some(program.last_line);
     }
     if let Some(line) = line {
@@ -851,14 +685,9 @@ pub fn check_pass1_with(program: &Program, profile: &Profile, diags: &mut Diagno
     }
 }
 
-/// Port of `checker/storage.py::public_table_oom`.
-pub fn public_table_oom(_program: &Program) -> bool {
-    false
-}
-
 /// Full implementation of `checker/storage.py::public_table_oom`.
-pub fn public_table_oom_with(program: &Program, env: &Env) -> bool {
-    let words = _var_words_with(program, env, &["PUBLIC"]);
+pub fn public_table_oom(program: &Program, env: &Env) -> bool {
+    let words = _var_words(program, env, &["PUBLIC"]);
     if words.iter().any(|&(n, _)| n >= (1_i64 << 31)) {
         return false;
     }
@@ -870,11 +699,8 @@ pub fn public_table_oom_with(program: &Program, env: &Env) -> bool {
     total_words * 4 > limit
 }
 
-/// Port of `checker/storage.py::check`.
-pub fn check(_program: &Program) {}
-
 /// Full implementation of `checker/storage.py::check`.
-pub fn check_with(
+pub fn check(
     program: &Program,
     profile: &'static Profile,
     tables: &[TableStorageEntry],
@@ -883,12 +709,12 @@ pub fn check_with(
     if matches!(profile.name, "cr6" | "cr1000x") && !diags.has_errors() {
         let mut consts = std::rc::Rc::new(std::cell::RefCell::new(program.consts.clone()));
         let env = Env::with_consts(profile, std::mem::take(&mut consts));
-        if public_table_oom_with(program, &env) {
+        if public_table_oom(program, &env) {
             diags.error(0, MSG_OOM, "", ShowFile::Bool(true), 0, "out_of_memory", "");
         } else {
             let msgs: Vec<Option<String>> = tables
                 .iter()
-                .map(|t| cr6_table_oom_with(&t.storage, t.storage.n_raw, &t.name))
+                .map(|t| cr6_table_oom(&t.storage, t.storage.n_raw, &t.name))
                 .collect();
             if msgs.iter().any(|m| m.as_deref() == Some(MSG_OOM)) {
                 diags.error(0, MSG_OOM, "", ShowFile::Bool(true), 0, "out_of_memory", "");
@@ -975,15 +801,12 @@ mod tests {
             day,
             ..TableState::default()
         };
-        assert_eq!(_min_recs_with(&mk(true, false, 0, Some(1.0)), 1, 0), 0);
-        assert_eq!(_min_recs_with(&mk(false, true, 0, Some(1.0)), 2, 5), 0);
-        assert_eq!(
-            _min_recs_with(&mk(false, false, 500, Some(1.0)), 1, 15),
-            630
-        );
-        assert_eq!(_min_recs_with(&mk(false, false, 0, None), 1, 0), 63072);
-        assert_eq!(_min_recs_with(&mk(false, false, 0, Some(0.0)), 1, 10), 31);
-        assert_eq!(_min_recs_with(&mk(false, false, 0, Some(1.0)), 1, 0), 3153);
+        assert_eq!(_min_recs(&mk(true, false, 0, Some(1.0)), 1, 0), 0);
+        assert_eq!(_min_recs(&mk(false, true, 0, Some(1.0)), 2, 5), 0);
+        assert_eq!(_min_recs(&mk(false, false, 500, Some(1.0)), 1, 15), 630);
+        assert_eq!(_min_recs(&mk(false, false, 0, None), 1, 0), 63072);
+        assert_eq!(_min_recs(&mk(false, false, 0, Some(0.0)), 1, 10), 31);
+        assert_eq!(_min_recs(&mk(false, false, 0, Some(1.0)), 1, 0), 3153);
 
         let sp = TableSpec {
             called: true,
@@ -1007,7 +830,7 @@ mod tests {
             w: None,
             ..TableSpec::default()
         };
-        let res = allocate_with(&[sp, sp2, sp3], pool_bytes("cr300", 3, true, 0));
+        let res = allocate(&[sp, sp2, sp3], pool_bytes("cr300", 3, true, 0));
         assert_eq!(
             res,
             AllocResult {
@@ -1031,7 +854,7 @@ mod tests {
             w: Some(1.0),
             ..TableSpec::default()
         };
-        let res_fail = allocate_with(&[sp_fixed, sp_auto], pool_bytes("cr300", 2, true, 0));
+        let res_fail = allocate(&[sp_fixed, sp_auto], pool_bytes("cr300", 2, true, 0));
         assert_eq!(
             res_fail,
             AllocResult {
@@ -1049,7 +872,7 @@ mod tests {
             call_w: Some(2.5),
             ..TableMeta::default()
         };
-        let res_zero = run_with(&[m_zero], pool_bytes("cr300", 1, false, 0));
+        let res_zero = run(&[m_zero], pool_bytes("cr300", 1, false, 0));
         assert_eq!(
             res_zero,
             Some(AllocResult {
@@ -1069,8 +892,8 @@ mod tests {
             call_w: Some(1.0),
             ..TableMeta::default()
         };
-        assert_eq!(cr6_table_oom_with(&m1, Some(0), "T1"), None);
-        assert_eq!(cr6_table_oom_with(&m1, Some(1000), "T1"), None);
+        assert_eq!(cr6_table_oom(&m1, Some(0), "T1"), None);
+        assert_eq!(cr6_table_oom(&m1, Some(1000), "T1"), None);
 
         let m2 = TableMeta {
             size_raw: Some(ConstValue::Int(10_000_000)),
@@ -1082,10 +905,7 @@ mod tests {
             display_interval: true,
             ..TableMeta::default()
         };
-        assert_eq!(
-            cr6_table_oom_with(&m2, None, "T2").as_deref(),
-            Some(MSG_OOM)
-        );
+        assert_eq!(cr6_table_oom(&m2, None, "T2").as_deref(), Some(MSG_OOM));
 
         let dim_expr = Rc::new(Expr::Number(Number {
             value: NumberValue::Int(40_000_000),
@@ -1114,10 +934,10 @@ mod tests {
         };
         let profile = profiles::get("cr6").unwrap();
         let env = Env::new(profile);
-        assert!(variables_oom_with(&prog, profile, &env));
+        assert!(variables_oom(&prog, profile, &env));
 
         let mut diags = Diagnostics::new();
-        check_pass1_with(&prog, profile, &mut diags, &env);
+        check_pass1(&prog, profile, &mut diags, &env);
         assert_eq!(diags.errors().len(), 1);
         assert_eq!(diags.errors()[0].line, 10);
         assert_eq!(diags.errors()[0].message, MSG_OOM);
@@ -1157,6 +977,6 @@ mod tests {
             "",
             "",
         );
-        assert_eq!(string_length_oom_line_with(&prog_str, &diags_str), Some(4));
+        assert_eq!(string_length_oom_line(&prog_str, &diags_str), Some(4));
     }
 }

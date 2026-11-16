@@ -1369,12 +1369,12 @@ fn _numeric_include_spec(
         return Some(pystr::format_g(fv, 7));
     }
     if let Expr::Binary(_) = arg
-        && let Some(converted) = crate::checker::longconv::long_value_with(
+        && let Some(converted) = crate::checker::longconv::long_value(
             Some(arg),
             env,
             profile,
-            &crate::checker::longconv::float_names_in(statements),
-            &crate::checker::longconv::literal_names_in(statements),
+            &crate::checker::longconv::float_names(statements),
+            &crate::checker::longconv::literal_names(statements),
         )
     {
         iv_opt = Some(converted);

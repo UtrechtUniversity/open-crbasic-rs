@@ -1011,9 +1011,7 @@ pub fn _check_duplicate_declaration(
                 if let Some(profile) = profile
                     && profile.functions().contains(&name)
                 {
-                    symbols::report_function_name_collision_with_profile(
-                        stmt, &v.name, profile, diags,
-                    );
+                    symbols::report_function_name_collision(stmt, &v.name, profile, diags);
                     if profile.single_pass {
                         if let Some(v) = decl.vars.borrow().get(index + 2) {
                             diags.error_basic(
@@ -1048,9 +1046,7 @@ pub fn _check_duplicate_declaration(
                     declared.insert(name, "VAR".to_owned());
                 }
                 if let Some(profile) = profile
-                    && symbols::report_predefined_name_collision_with_profile(
-                        stmt, &v.name, profile, diags,
-                    )
+                    && symbols::report_predefined_name_collision(stmt, &v.name, profile, diags)
                     && profile.single_pass
                 {
                     if let Some(v) = decl.vars.borrow().get(index + 2) {
@@ -1074,10 +1070,10 @@ pub fn _check_duplicate_declaration(
             if let Some(profile) = profile
                 && profile.functions().contains(&pystr::upper(name))
             {
-                symbols::report_function_name_collision_with_profile(stmt, name, profile, diags);
-            } else if !profile.is_some_and(|p| {
-                symbols::report_predefined_name_collision_with_profile(stmt, name, p, diags)
-            }) {
+                symbols::report_function_name_collision(stmt, name, profile, diags);
+            } else if !profile
+                .is_some_and(|p| symbols::report_predefined_name_collision(stmt, name, p, diags))
+            {
                 if matches!(prior, Some("VAR" | "ALIAS")) {
                     diags.error_basic(
                         node.line,
@@ -1099,12 +1095,12 @@ pub fn _check_duplicate_declaration(
             if let Some(profile) = profile
                 && profile.functions().contains(&name)
             {
-                symbols::report_function_name_collision_with_profile(stmt, &c.name, profile, diags);
+                symbols::report_function_name_collision(stmt, &c.name, profile, diags);
                 return None;
             }
-            if profile.is_some_and(|p| {
-                symbols::report_predefined_name_collision_with_profile(stmt, &c.name, p, diags)
-            }) {
+            if profile
+                .is_some_and(|p| symbols::report_predefined_name_collision(stmt, &c.name, p, diags))
+            {
                 return None;
             }
             match declared.get(&name).map(String::as_str) {
@@ -1156,7 +1152,7 @@ pub fn _check_duplicate_declaration(
         }
         Stmt::Instruction(i) if pystr::upper(&i.keyword) == "ESSVARIABLES" => {
             if let Some(profile) = profile {
-                for row in ess::_table_for_profile(profile) {
+                for row in ess::_table(profile) {
                     if row.count != 0 && !declared.contains_key(&pystr::upper(&row.name)) {
                         declared.insert(pystr::upper(&row.name), "VAR".to_owned());
                     }

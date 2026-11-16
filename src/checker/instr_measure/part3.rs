@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 use crate::checker::context::Context;
 use crate::checker::expressions::_arg_text;
-use crate::checker::longconv::{float_names, literal_names, long_value_with};
+use crate::checker::longconv::{float_names, literal_names, long_value};
 use crate::consteval::{Env, to_long, value_of};
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics, ShowFile};
 use crate::profiles::Profile;
@@ -263,8 +263,8 @@ pub fn check_dest_bounds(
     ));
     let tables = ctx.scope_tables(true, false);
     let with_parameters = ctx.scope_tables(true, true);
-    let fnames = crate::checker::longconv::float_names_in(&program.statements);
-    let lnames = crate::checker::longconv::literal_names_in(&program.statements);
+    let fnames = crate::checker::longconv::float_names(&program.statements);
+    let lnames = crate::checker::longconv::literal_names(&program.statements);
     let alias_storage = _measurement_aliases(program, &tables, env);
 
     for stmt in &program.statements {
@@ -300,7 +300,7 @@ pub fn check_dest_bounds(
                 }
                 continue;
             }
-            let mode = long_value_with(inst.args[11].as_deref(), env, profile, &fnames, &lnames);
+            let mode = long_value(inst.args[11].as_deref(), env, profile, &fnames, &lnames);
             let valid_modes: &[i64] = if profile.single_pass {
                 &[1, 2, 20]
             } else {
@@ -368,7 +368,7 @@ pub fn check_dest_bounds(
 
         if kw == "EC100" && inst.args.len() >= 3 {
             let option_arg = inst.args[2].as_deref();
-            let mut option = long_value_with(option_arg, env, profile, &fnames, &lnames);
+            let mut option = long_value(option_arg, env, profile, &fnames, &lnames);
             if let Some(Expr::Name(n)) = option_arg {
                 if pystr::upper(&n.name) == "INF" && env.consts.borrow().get("INF").is_none() {
                     option = Some(i64::from(i32::MAX));
@@ -444,7 +444,7 @@ pub fn check_dest_bounds(
             {
                 continue;
             }
-            let reps = long_value_with(inst.args[3].as_deref(), env, profile, &fnames, &lnames);
+            let reps = long_value(inst.args[3].as_deref(), env, profile, &fnames, &lnames);
             if let Some(r) = reps {
                 if p3_overruns(
                     inst.args[2].as_deref(),

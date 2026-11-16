@@ -18,9 +18,9 @@ use crate::syntax::{
     Unparsed, VarDecl, stmt_id,
 };
 use crate::tables::part1::{
-    _dtype_code_with, _make_var_info_with, _scan_program, _string_stored_len, VarInfo,
+    _dtype_code, _make_var_info, _scan_program, _string_stored_len, VarInfo,
 };
-use crate::tables::part2::{_anonymous_string_len_impl, _is_anonymous_source_impl, VarInfoData};
+use crate::tables::part2::{_anonymous_string_len, _is_anonymous_source};
 use crate::{pyre, pystr};
 
 const STAGE2A_INT32_MIN: i64 = -2_147_483_648;
@@ -29,17 +29,6 @@ fn stage3_expr_name_attr(expr: Option<&Expr>) -> &str {
         Some(Expr::Name(n)) => &n.name,
         Some(Expr::Index(ix)) => &ix.name,
         _ => "",
-    }
-}
-
-fn stage3_var_info_to_data(info: VarInfo) -> VarInfoData {
-    VarInfoData {
-        type_code: info.type_code,
-        shape: info.shape,
-        stored_len: info.stored_len,
-        units: info.units,
-        struct_info: None,
-        name: info.name,
     }
 }
 
@@ -57,7 +46,7 @@ pub fn _check_stage2a(
     let tables = ctx.scope_tables(false, false);
     let aliases =
         super::part2::_alias_sources(program, &|st| tables.for_statement(st).clone(), env);
-    let mut source_vars: Option<OrderedMap<String, VarInfoData>> = None;
+    let mut source_vars: Option<OrderedMap<String, VarInfo>> = None;
     let mut in_table = false;
     let mut sources_ok = true;
     let top_level: HashSet<usize> = program.statements.iter().map(stmt_id).collect();
@@ -244,20 +233,20 @@ pub fn _check_stage2a(
             let source = inst.args[1].as_deref();
             if kw == "SAMPLE"
                 && inst.args.len() > 2
-                && _dtype_code_with(inst.args[2].as_deref(), env) == 11
+                && _dtype_code(inst.args[2].as_deref(), env) == 11
             {
                 if source_vars.is_none() {
                     let scanned = _scan_program(program);
                     let mut map = OrderedMap::new();
                     for v in &scanned.all_vars {
-                        let info = _make_var_info_with(v, env);
-                        map.insert(pystr::upper(&v.name), stage3_var_info_to_data(info));
+                        let info = _make_var_info(v, env);
+                        map.insert(pystr::upper(&v.name), info);
                     }
                     source_vars = Some(map);
                 }
                 if let Some(sv) = source_vars.as_ref()
-                    && _is_anonymous_source_impl(source, sv, env)
-                    && _string_stored_len(_anonymous_string_len_impl(source, sv, env)) <= 0
+                    && _is_anonymous_source(source, sv, env)
+                    && _string_stored_len(_anonymous_string_len(source, sv, env)) <= 0
                 {
                     diags.error(
                         inst.base.node.line,
@@ -755,7 +744,7 @@ pub fn _fieldless(stmt: &Instruction, profile: &Profile, env: &Env) -> bool {
     }
     if kw == "SAMPLE" {
         let empty = BTreeSet::new();
-        if let Some(code) = crate::checker::longconv::long_value_with(
+        if let Some(code) = crate::checker::longconv::long_value(
             stmt.args[pos].as_deref(),
             env,
             profile,
@@ -799,7 +788,7 @@ pub fn check_output_datatype(
         let mut value = _constant_data_type(stmt, i64::try_from(pos).unwrap_or(0), env);
         if value.is_none() && kw == "SAMPLE" && !profile.single_pass {
             let empty = BTreeSet::new();
-            if let Some(wide) = crate::checker::longconv::long_value_with(
+            if let Some(wide) = crate::checker::longconv::long_value(
                 stmt.args[pos].as_deref(),
                 env,
                 profile,

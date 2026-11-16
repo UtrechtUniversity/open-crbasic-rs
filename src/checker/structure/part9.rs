@@ -9,7 +9,7 @@ use crate::checker::context;
 use crate::checker::expressions::part1::_WHOLE_EXPR_ECHO_LOGGERS;
 use crate::checker::structure::part7::_split_top;
 use crate::checker::structure::part8::{_adjacent_literals, _alias_flat_offset};
-use crate::checker::symbols::is_reserved_predefined_name_with_profile;
+use crate::checker::symbols::is_reserved_predefined_name;
 use crate::consteval;
 use crate::diagnostics::{Diagnostics, ShowFile};
 use crate::lexer;
@@ -269,7 +269,7 @@ pub fn _check_alias_dims(
             }
             if let Expr::Name(n) = rhs
                 && let Some(prof) = profile
-                && is_reserved_predefined_name_with_profile(&n.name, prof)
+                && is_reserved_predefined_name(&n.name, prof)
             {
                 err(
                     diags,

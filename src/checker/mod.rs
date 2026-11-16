@@ -644,7 +644,7 @@ pub fn _check_with_context(
         var_types::check_string_operands(program, diags);
     });
     _run_pass("intervals::check", "pass1", || {
-        intervals::check(program, diags);
+        intervals::check(program, profile, diags, env);
     });
     _run_pass("instr_rules::check_const_int_args", "pass1", || {
         instr_rules::check_const_int_args(program, profile, diags, env);
@@ -701,10 +701,10 @@ pub fn _check_with_context(
         instr_rules::check_iif_types(ctx.flat(), profile, diags);
     });
     _run_pass("var_types::check_ctype", "pass1", || {
-        var_types::check_ctype(program, diags);
+        var_types::check_ctype(program, profile, diags);
     });
     _run_pass("var_types::check_pointer_deref", "pass1", || {
-        var_types::check_pointer_deref(program, diags);
+        var_types::check_pointer_deref(program, profile, diags);
     });
     _run_pass("expressions::check_function_arity", "pass1", || {
         expressions::check_function_arity(ctx.flat(), profile, diags, None);
@@ -712,14 +712,14 @@ pub fn _check_with_context(
 
     if !profile.single_pass && !diags.has_errors() {
         _run_pass("structs::check_members", "pass1", || {
-            structs::check_members(program, diags, ctx.flat());
+            structs::check_members(program, profile, diags, ctx.flat());
         });
     }
 
     if !profile.early_warnings_gated {
         let errors_before_early = diags.errors().len();
         _run_pass("warnings::check_early", "early", || {
-            warnings::check_early(program, profile, diags);
+            warnings::check_early(program, profile, diags, env);
         });
         if !profile.single_pass && errors_before_early == 0 {
             _run_pass("instr_measure::check_scan_delay_budget", "early", || {
@@ -752,14 +752,14 @@ pub fn _check_with_context(
     }
 
     _run_pass("storage::check_pass1", "pass1", || {
-        storage::check_pass1(program);
+        storage::check_pass1(program, profile, diags, env);
     });
     _run_pass("instr_data::drop_unreached_destinations", "pass1", || {
         instr_data::drop_unreached_destinations(program, profile, diags, env);
     });
     let pass1_errors = diags.has_errors();
-    let _ = result;
-    // TODO(P3-s): `result.pass1_errors = Some(pass1_errors);` once `CompileResult` is ported.
+    result.pass1_errors = Some(pass1_errors);
+    let pass1_items = diags.errors();
     if pass1_errors {
         if !profile.single_pass {
             diags.items.retain(|d| !_is_unreached(d));
@@ -997,7 +997,7 @@ pub fn _check_with_context(
             });
         }
         _run_pass("ess::check", "tier_b", || {
-            ess::check(&flat, diags);
+            ess::check(&flat, profile, diags, env);
         });
 
         if !profile.single_pass {
@@ -1376,7 +1376,7 @@ pub fn _check_with_context(
         && profile.early_warnings_gated
     {
         _run_pass("warnings::check_early", "late", || {
-            warnings::check_early(program, profile, diags);
+            warnings::check_early(program, profile, diags, env);
         });
         let stop = _run_pass_capture("structure::check_scan_placement_late", "late_scan", || {
             structure::check_scan_placement_late(program, profile, diags)
@@ -1475,7 +1475,7 @@ pub fn _check_with_context(
             instr_measure::check_dest_bounds(program, profile, diags, env);
         });
         _run_pass("var_types::check", "tier_c", || {
-            var_types::check(program, diags);
+            var_types::check(program, profile, diags, env);
         });
         if profile.single_pass {
             _run_pass("instr_measure::check_const_ranges", "tier_c", || {
@@ -1527,10 +1527,10 @@ pub fn _check_with_context(
     if profile.single_pass && !has_errors {
         let flat_program = ctx.flat();
         _run_pass("structs::check_members", "structs_late", || {
-            structs::check_members(program, diags, flat_program);
+            structs::check_members(program, profile, diags, flat_program);
         });
         _run_pass("structs::check_struct_assignment", "structs_late", || {
-            structs::check_struct_assignment(program, diags, flat_program);
+            structs::check_struct_assignment(program, profile, diags, flat_program);
         });
         has_errors = diags.has_errors() || has_errors;
     }
@@ -1621,18 +1621,14 @@ pub fn _check_with_context(
         cr3xx::semicolon_headers(program, profile, diags);
     });
     _run_pass("intervals::fold_timeout_expressions", "cr3xx", || {
-        intervals::fold_timeout_expressions(ctx.flat(), diags);
+        intervals::fold_timeout_expressions(ctx.flat(), profile, diags, env, &pass1_items);
     });
     _run_pass("intervals::order_timeout_negative", "cr3xx", || {
-        intervals::order_timeout_negative(diags, program);
+        intervals::order_timeout_negative(diags, profile, program);
     });
 
     if let Err(payload) = catch_unwind(AssertUnwindSafe(|| {
-        result.mode = Some(crate::mode::decide_with_env(
-            &program.statements,
-            profile,
-            env,
-        ));
+        result.mode = Some(crate::mode::decide(&program.statements, profile, env));
     })) {
         _record_exception("mode::decide", &*payload);
         result.mode = None;
@@ -1643,21 +1639,53 @@ pub fn _check_with_context(
 
     if !diags.has_errors() {
         _run_pass("warnings::check_background_calibration", "post", || {
-            warnings::check_background_calibration(program, profile, diags);
+            warnings::check_background_calibration(program, profile, diags, env);
         });
         _run_pass("warnings::check_slow_scan_skips", "post", || {
-            warnings::check_slow_scan_skips(program, profile, diags);
+            warnings::check_slow_scan_skips(program, profile, diags, env);
         });
         _run_pass("instr_measure::check_cpi_time", "post", || {
             instr_measure::check_cpi_time(program, profile, diags, env);
         });
+        _run_pass("tables_hook::attach", "post", || {
+            crate::tables::attach(program, profile, result);
+        });
         _run_pass("instr_data::check_duplicate_fields", "post", || {
-            // TODO(wire): tables builder must provide duplicate-field bookkeeping.
-            instr_data::check_duplicate_fields(program, &result.tables, None, diags);
+            let dup: Vec<Option<Vec<instr_data::DupFieldEntry>>> = result
+                .table_extras
+                .dup_fields
+                .iter()
+                .map(|o| {
+                    o.as_ref().map(|fs| {
+                        fs.iter()
+                            .map(|f| instr_data::DupFieldEntry {
+                                name: f.name.clone(),
+                                renamed: f.renamed,
+                                rng: f.rng,
+                                placeholder: f.placeholder,
+                                ch400: f.ch400,
+                                dim: f.dim,
+                            })
+                            .collect()
+                    })
+                })
+                .collect();
+            instr_data::check_duplicate_fields(program, &result.tables, Some(&dup), diags);
         });
         if !diags.has_errors() {
             _run_pass("storage::check", "post", || {
-                storage::check(program);
+                let entries: Vec<storage::TableStorageEntry> = result
+                    .tables
+                    .iter()
+                    .zip(result.table_extras.storage.iter())
+                    .filter_map(|(t, m)| {
+                        m.as_ref().map(|m| storage::TableStorageEntry {
+                            name: t.name.clone(),
+                            storage: m.to_storage_meta(),
+                        })
+                    })
+                    .collect();
+                storage::check(program, profile, &entries, diags);
             });
         }
         if !diags.has_errors() {

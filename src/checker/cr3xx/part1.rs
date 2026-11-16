@@ -180,7 +180,7 @@ pub fn _check_cr350_comms_mode(
     }
     let mode_arg = stmt.args[if shifted { 4 } else { 5 }].as_deref();
     let empty_set = BTreeSet::new();
-    if longconv::_float_typed_with(mode_arg, &empty_set) {
+    if longconv::_float_typed(mode_arg, &empty_set) {
         return;
     }
     let env = env_with_consts(profile, Some(consts));
@@ -198,7 +198,7 @@ pub fn _check_cr350_comms_mode(
     let fmt = if shifted {
         None
     } else {
-        longconv::long_value_with(
+        longconv::long_value(
             stmt.args[2].as_deref(),
             &env,
             profile,
@@ -209,8 +209,7 @@ pub fn _check_cr350_comms_mode(
     if !shifted && !invalid_format && !fmt.is_some_and(|v| (-1..=15).contains(&v)) {
         return;
     }
-    if let Some(value) = longconv::long_value_with(mode_arg, &env, profile, &empty_set, &empty_set)
-    {
+    if let Some(value) = longconv::long_value(mode_arg, &env, profile, &empty_set, &empty_set) {
         let mode = value & 0xFF;
         if mode > maximum {
             diags.error_basic(
@@ -640,7 +639,7 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
             && format_arg.is_some_and(|fa| {
                 _non_numeric(Some(fa), profile, Some(&program.consts), variable_names)
                     || (!matches!(fa, Expr::Name(_))
-                        && longconv::_float_typed_with(Some(fa), &empty_float_names))
+                        && longconv::_float_typed(Some(fa), &empty_float_names))
             });
         if cr3_shifted {
             if profile.name == "cr350"

@@ -13,25 +13,13 @@ use crate::pystr;
 use crate::syntax::{ConstValue, Expr, ExprRef, Stmt, StmtRef};
 
 /// Port of `mode.py::_const_value`.
-pub fn _const_value() -> Option<f64> {
-    todo!("mode.py::_const_value (omitted: expr: untyped, value_of: Callable)")
-}
-
-/// Port of `mode.py::_const_value`.
-pub fn _const_value_with_env(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
+pub fn _const_value(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     let expr = expr?;
     consteval::value_of(Some(expr), env).ok()
 }
 
 /// Port of `mode.py::_numeric_constant`.
-pub fn _numeric_constant() -> bool {
-    todo!(
-        "mode.py::_numeric_constant (omitted: expr: untyped, is_constant: Callable, value_of: Callable)"
-    )
-}
-
-/// Port of `mode.py::_numeric_constant`.
-pub fn _numeric_constant_with_env(expr: Option<&Expr>, env: &Env) -> bool {
+pub fn _numeric_constant(expr: Option<&Expr>, env: &Env) -> bool {
     let Some(expr) = expr else {
         return false;
     };
@@ -39,27 +27,18 @@ pub fn _numeric_constant_with_env(expr: Option<&Expr>, env: &Env) -> bool {
         Expr::Number(_) => true,
         Expr::Name(_) => {
             consteval::is_constant(Some(expr), env)
-                && !matches!(
-                    _const_value_with_env(Some(expr), env),
-                    Some(ConstValue::Str(_))
-                )
+                && !matches!(_const_value(Some(expr), env), Some(ConstValue::Str(_)))
         }
-        Expr::Unary(u) => _numeric_constant_with_env(u.operand.as_deref(), env),
+        Expr::Unary(u) => _numeric_constant(u.operand.as_deref(), env),
         Expr::Binary(b) => {
-            _numeric_constant_with_env(b.left.as_deref(), env)
-                && _numeric_constant_with_env(b.right.as_deref(), env)
+            _numeric_constant(b.left.as_deref(), env) && _numeric_constant(b.right.as_deref(), env)
         }
         _ => false,
     }
 }
 
 /// Port of `mode.py::decide`.
-pub fn decide(_statements: &[StmtRef], _profile: &Profile) -> String {
-    todo!("mode.py::decide (omitted: is_constant: Callable, value_of: Callable)")
-}
-
-/// Port of `mode.py::decide`.
-pub fn decide_with_env(statements: &[StmtRef], profile: &Profile, env: &Env) -> String {
+pub fn decide(statements: &[StmtRef], profile: &Profile, env: &Env) -> String {
     struct State {
         sequential: bool,
         pipeline_forced: bool,
@@ -102,10 +81,9 @@ pub fn decide_with_env(statements: &[StmtRef], profile: &Profile, env: &Env) -> 
                 && (state.depth != 0 || state.in_scan == 0)
             {
                 if kw == "SW12" {
-                    state.sequential =
-                        is_num_eq(_const_value_with_env(_arg_ref(args, 2), env).as_ref(), 1);
+                    state.sequential = is_num_eq(_const_value(_arg(args, 2), env).as_ref(), 1);
                 } else if kw == "DELAY" {
-                    let v = _const_value_with_env(_arg_ref(args, 0), env);
+                    let v = _const_value(_arg(args, 0), env);
                     state.sequential = is_num_eq(v.as_ref(), 0) || is_num_eq(v.as_ref(), 2);
                 } else if kw == "SERIALOUTBLOCK" || kw == "SERIALINRECORD" {
                     state.sequential = state.in_slow == 0 || state.depth > 0;
@@ -114,13 +92,13 @@ pub fn decide_with_env(statements: &[StmtRef], profile: &Profile, env: &Env) -> 
                 }
             } else if let Some(indices) = nonconstant_arg.get(kw.as_str()) {
                 state.sequential = indices.iter().any(|&i| {
-                    let a = _arg_ref(args, i);
-                    a.is_some() && !_numeric_constant_with_env(a, env)
+                    let a = _arg(args, i);
+                    a.is_some() && !_numeric_constant(a, env)
                 });
             } else if matches!(kw.as_str(), "FOR" | "IF" | "SELECT" | "WHILE" | "DO") {
                 state.depth += 1;
             } else if matches!(kw.as_str(), "NEXT" | "ENDIF" | "END" | "WEND" | "LOOP") {
-                let target = _block_word_in(args);
+                let target = _block_word(args);
                 if kw == "NEXT" && target.as_deref() == Some("SCAN") {
                     state.in_scan -= 1;
                 } else if (kw == "NEXT" && target.as_deref() == Some("SUBSCAN"))
@@ -143,7 +121,7 @@ pub fn decide_with_env(statements: &[StmtRef], profile: &Profile, env: &Env) -> 
         if let Some(&idx) = variable_arg.get(kw.as_str())
             && !state.pipeline_forced
         {
-            let arg = _arg_ref(args, idx);
+            let arg = _arg(args, idx);
             if arg.is_none() || !consteval::is_constant(arg, env) {
                 state.sequential = true;
             }
@@ -269,22 +247,12 @@ pub fn _keyword(stmt: &Stmt) -> String {
 }
 
 /// Port of `mode.py::_arg`.
-pub fn _arg(_i: i64) {
-    todo!("mode.py::_arg (omitted: args: list)")
-}
-
-/// Port of `mode.py::_arg`.
-pub fn _arg_ref(args: &[Option<ExprRef>], i: usize) -> Option<&Expr> {
+pub fn _arg(args: &[Option<ExprRef>], i: usize) -> Option<&Expr> {
     args.get(i).and_then(|e| e.as_deref())
 }
 
 /// Port of `mode.py::_block_word`.
-pub fn _block_word() -> Option<String> {
-    todo!("mode.py::_block_word (omitted: args: list)")
-}
-
-/// Port of `mode.py::_block_word`.
-pub fn _block_word_in(args: &[Option<ExprRef>]) -> Option<String> {
+pub fn _block_word(args: &[Option<ExprRef>]) -> Option<String> {
     match args.first().and_then(|e| e.as_deref()) {
         Some(Expr::Name(n)) => Some(pystr::upper(&n.name)),
         _ => None,
@@ -316,7 +284,7 @@ mod tests {
             inst("NextScan"),
             inst("EndProg"),
         ];
-        assert_eq!(decide_with_env(&stmts, profile, &env), "Pipeline");
+        assert_eq!(decide(&stmts, profile, &env), "Pipeline");
 
         let stmts2 = vec![
             inst("SequentialMode"),
@@ -325,6 +293,6 @@ mod tests {
             inst("NextScan"),
             inst("EndProg"),
         ];
-        assert_eq!(decide_with_env(&stmts2, profile, &env), "Sequential");
+        assert_eq!(decide(&stmts2, profile, &env), "Sequential");
     }
 }

@@ -104,12 +104,7 @@ fn is_numeric_type(ty: Option<&str>) -> bool {
 }
 
 /// Port of `checker/var_types.py::_types`.
-pub fn _types(program: &Program, scoped: bool) {
-    let _ = _types_with(&Rc::new(program.clone()), scoped);
-}
-
-/// Port of `checker/var_types.py::_types` (returning `(types, alias)`).
-pub fn _types_with(
+pub fn _types(
     program: &ProgramRef,
     scoped: bool,
 ) -> (OrderedMap<String, String>, OrderedMap<String, String>) {
@@ -175,7 +170,7 @@ impl Typer {
         profile: Option<&'static Profile>,
     ) -> Self {
         let visible = scope.unwrap_or(program);
-        let (types, alias) = _types_with(visible, scope.is_some());
+        let (types, alias) = _types(visible, scope.is_some());
         let mut consts = OrderedMap::new();
         for st in &visible.statements {
             if let Stmt::ConstDecl(c) = st.as_ref() {
@@ -199,7 +194,7 @@ impl Typer {
         let mut table_types = OrderedMap::new();
         let mut structure_types = OrderedMap::new();
         if let Some(prof) = profile {
-            structure_types = structs::structure_members(visible);
+            structure_types = structs::_structure_members(visible);
             let mut status_map = OrderedMap::new();
             for n in STATUS_STRING_FIELDS.iter() {
                 if prof.status_members().contains(n) {
@@ -537,12 +532,7 @@ pub fn _same_type(dest: &str, source: &str) -> bool {
 }
 
 /// Port of `checker/var_types.py::_indexed_past_first`.
-pub fn _indexed_past_first(_typer: &mut Typer, _dest: Option<&Expr>) -> bool {
-    false
-}
-
-/// Port of `checker/var_types.py::_indexed_past_first` (with `env`).
-pub fn _indexed_past_first_with(typer: &Typer, dest: Option<&Expr>, env: &Env) -> bool {
+pub fn _indexed_past_first(typer: &Typer, dest: Option<&Expr>, env: &Env) -> bool {
     let Some(Expr::Index(ix)) = dest else {
         return false;
     };
@@ -577,12 +567,7 @@ pub fn _indexed_past_first_with(typer: &Typer, dest: Option<&Expr>, env: &Env) -
 }
 
 /// Port of `checker/var_types.py::check_string_operands`.
-pub fn check_string_operands(program: &Program, diags: &mut Diagnostics) {
-    check_string_operands_with(&Rc::new(program.clone()), diags);
-}
-
-/// Port of `checker/var_types.py::check_string_operands` (taking `ProgramRef`).
-pub fn check_string_operands_with(program: &ProgramRef, diags: &mut Diagnostics) {
+pub fn check_string_operands(program: &ProgramRef, diags: &mut Diagnostics) {
     let mut typer = Typer::new(program, None, None);
     for stmt in &program.statements {
         for text in _string_operand_messages(&mut typer, stmt) {
@@ -592,23 +577,7 @@ pub fn check_string_operands_with(program: &ProgramRef, diags: &mut Diagnostics)
 }
 
 /// Port of `checker/var_types.py::check`.
-pub fn check(program: &Program, diags: &mut Diagnostics) {
-    let prog_ref = Rc::new(program.clone());
-    let ctx = context::of(&prog_ref, None, None);
-    let profile = ctx
-        .profile
-        .expect("var_types::check requires an active context with profile");
-    let env = ctx.env().clone();
-    check_with(&prog_ref, profile, diags, &env);
-}
-
-/// Port of `checker/var_types.py::check` (with `profile` and `env`).
-pub fn check_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
+pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics, env: &Env) {
     let mut typer = Typer::new(program, None, None);
     let tables = context::of(program, None, Some(env.clone())).scope_tables(false, false);
     let mut in_prog = false;
@@ -655,7 +624,7 @@ pub fn check_with(
             if typer.variable(arg0).is_some() || matches!(arg0, Some(Expr::String(_))) {
                 if kind.as_deref() != Some("LONG") {
                     message = Some("Destination variable must be type LONG");
-                } else if _indexed_past_first_with(&typer, arg0, env) {
+                } else if _indexed_past_first(&typer, arg0, env) {
                     message = Some("Destination variable cannot be indexed");
                 }
             }
@@ -783,12 +752,7 @@ pub fn _array_size(
 }
 
 /// Port of `checker/var_types.py::_ctype_illegal`.
-pub fn _ctype_illegal(_node: &crate::syntax::Index) -> bool {
-    false
-}
-
-/// Port of `checker/var_types.py::_ctype_illegal` (with `env`, `legal`, `known`).
-pub fn _ctype_illegal_with(
+pub fn _ctype_illegal(
     node: &crate::syntax::Index,
     env: &Env,
     legal: &BTreeSet<i64>,
@@ -832,24 +796,14 @@ pub fn _ctype_illegal_with(
 }
 
 /// Port of `checker/var_types.py::check_ctype`.
-pub fn check_ctype(program: &Program, diags: &mut Diagnostics) {
-    let prog_ref = Rc::new(program.clone());
-    let ctx = context::of(&prog_ref, None, None);
-    let profile = ctx
-        .profile
-        .expect("var_types::check_ctype requires an active context with profile");
-    check_ctype_with(&prog_ref, profile, diags);
-}
-
-/// Port of `checker/var_types.py::check_ctype` (with `profile`).
-pub fn check_ctype_with(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
+pub fn check_ctype(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics) {
     if !profile.functions().contains("CTYPE") {
         return;
     }
     let env = Env::with_consts(profile, Rc::new(RefCell::new(program.consts.clone())));
     let mut legal = BTreeSet::new();
     for n in ["UINT1", "IEEE4", "IEEE8"] {
-        if let Some(ConstValue::Int(v)) = _symbol_value_with(&env, n) {
+        if let Some(ConstValue::Int(v)) = _symbol_value(&env, n) {
             legal.insert(v);
         }
     }
@@ -864,7 +818,7 @@ pub fn check_ctype_with(program: &ProgramRef, profile: &'static Profile, diags: 
             for node in nodes {
                 if let Expr::Index(ix) = node
                     && pystr::upper(&ix.name) == "CTYPE"
-                    && _ctype_illegal_with(ix, &env, &legal, known)
+                    && _ctype_illegal(ix, &env, &legal, known)
                 {
                     diags.error_basic(stmt.line(), "Illegal type", stmt.file());
                 }
@@ -874,10 +828,7 @@ pub fn check_ctype_with(program: &ProgramRef, profile: &'static Profile, diags: 
 }
 
 /// Port of `checker/var_types.py::_symbol_value`.
-pub fn _symbol_value(_name: &str) {}
-
-/// Port of `checker/var_types.py::_symbol_value` (with `env` and return value).
-pub fn _symbol_value_with(env: &Env, name: &str) -> Option<ConstValue> {
+pub fn _symbol_value(env: &Env, name: &str) -> Option<ConstValue> {
     let expr = Expr::Name(Name {
         node: Node {
             line: 0,
@@ -959,17 +910,7 @@ fn offender(
 }
 
 /// Port of `checker/var_types.py::check_pointer_deref`.
-pub fn check_pointer_deref(program: &Program, diags: &mut Diagnostics) {
-    let prog_ref = Rc::new(program.clone());
-    let ctx = context::of(&prog_ref, None, None);
-    let profile = ctx
-        .profile
-        .expect("var_types::check_pointer_deref requires an active context with profile");
-    check_pointer_deref_with(&prog_ref, profile, diags);
-}
-
-/// Port of `checker/var_types.py::check_pointer_deref` (with `profile`).
-pub fn check_pointer_deref_with(
+pub fn check_pointer_deref(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -979,8 +920,7 @@ pub fn check_pointer_deref_with(
     }
     let ctx = context::of(program, Some(profile), None);
     let scopes = ctx.routine_scopes();
-    // TODO(integrator): use `ctx.known_names()` once `KnownNames` is ported.
-    let known_empty: BTreeSet<String> = BTreeSet::new();
+    let known = &ctx.known_names().names;
     for stmt in &program.statements {
         let Some(scope) = scopes.get(&stmt_id(stmt)) else {
             continue;
@@ -993,7 +933,7 @@ pub fn check_pointer_deref_with(
         let has_undeclared = derefs.iter().any(|opt| {
             opt.as_ref().is_some_and(|n| {
                 let up = pystr::upper(n);
-                !scope.contains_key(&up) && !known_empty.contains(&up)
+                !scope.contains_key(&up) && !known.contains(&up)
             })
         });
         if has_undeclared {
@@ -1013,7 +953,7 @@ pub fn check_pointer_deref_with(
                 && let Some(Some(first_deref)) = derefs.first()
             {
                 let first_up = pystr::upper(first_deref);
-                if !scope.contains_key(&first_up) && !known_empty.contains(&first_up) {
+                if !scope.contains_key(&first_up) && !known.contains(&first_up) {
                     diags.error_basic(stmt.line(), &format!("{orig}{POINTER_SUFFIX}"), stmt.file());
                     diags.error_basic(
                         stmt.line(),
@@ -1374,7 +1314,7 @@ mod tests {
             })),
         ]);
         let mut diags = Diagnostics::new();
-        check_string_operands_with(&p, &mut diags);
+        check_string_operands(&p, &mut diags);
         let got: Vec<(i64, String)> = diags
             .errors()
             .into_iter()
@@ -1506,7 +1446,7 @@ mod tests {
         consts.insert("TWO".to_owned(), ConstValue::Int(2));
         let env = Env::with_consts(prof, Rc::new(RefCell::new(consts)));
         let mut diags = Diagnostics::new();
-        check_with(&p, prof, &mut diags, &env);
+        check(&p, prof, &mut diags, &env);
         let got: Vec<(i64, String)> = diags
             .errors()
             .into_iter()
@@ -1578,7 +1518,7 @@ mod tests {
             ),
         ]);
         let mut diags = Diagnostics::new();
-        check_ctype_with(&p, prof, &mut diags);
+        check_ctype(&p, prof, &mut diags);
         let got: Vec<(i64, String)> = diags
             .errors()
             .into_iter()

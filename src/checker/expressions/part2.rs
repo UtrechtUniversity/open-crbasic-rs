@@ -1365,12 +1365,39 @@ pub struct TablesWithFields {
 
 /// Port of checker/expressions.py::_data_table_fields
 pub fn _data_table_fields(
-    _program: &Program,
-    _profile: &Profile,
+    program: &Program,
+    profile: &'static Profile,
 ) -> OrderedMap<String, BTreeSet<String>> {
-    // TODO(wire): tables::build_tables_with needs a real BuildTablesHooks adapter;
-    // no adapter is implemented yet, so table field discovery remains unavailable.
-    OrderedMap::new()
+    let Ok(built) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::tables::build_tables(program, profile, &program.consts).0
+    })) else {
+        return OrderedMap::new();
+    };
+    let props: BTreeSet<String> = crate::tables::TABLE_PROPERTIES
+        .iter()
+        .map(|p| pystr::upper(p))
+        .collect();
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    for st in &program.statements {
+        if let Stmt::Instruction(inst) = st.as_ref()
+            && pystr::upper(&inst.keyword) == "DATATABLE"
+            && let Some(Some(a0)) = inst.args.first()
+            && let Expr::Name(n) = a0.as_ref()
+        {
+            names.insert(pystr::upper(&n.name));
+        }
+    }
+    let mut out = OrderedMap::new();
+    for t in &built {
+        let key = pystr::upper(&t.name);
+        if !names.contains(&key) {
+            continue;
+        }
+        let mut set: BTreeSet<String> = t.fields.iter().map(|f| pystr::upper(&f.name)).collect();
+        set.extend(props.iter().cloned());
+        out.insert(key, set);
+    }
+    out
 }
 
 #[cfg(test)]

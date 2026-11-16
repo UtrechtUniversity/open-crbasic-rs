@@ -243,7 +243,7 @@ pub fn check_status_member_reads_late(
     let variables: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name_with_profile(n, profile))
+        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name(n, profile))
         .cloned()
         .collect();
     for stmt in &program.statements {
@@ -379,11 +379,11 @@ pub fn check_digit_members(
     let mut variables: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name_with_profile(n, profile))
+        .filter(|n| !crate::checker::symbols::is_reserved_predefined_name(n, profile))
         .cloned()
         .collect();
-    let struct_types = crate::checker::structs::structure_members(program);
-    let kinds = crate::checker::structs::variable_kinds(program, &struct_types);
+    let struct_types = crate::checker::structs::_structure_members(program);
+    let kinds = crate::checker::structs::_variable_kinds(program, &struct_types);
     variables.retain(|n| !kinds.get(n).is_some_and(|k| k.starts_with("STRUCT")));
     for st in &program.statements {
         if let Stmt::SubDef(sd) = &**st {
@@ -549,9 +549,7 @@ pub fn check_const_family_args(
     let mut variable_names: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|name| {
-            !crate::checker::symbols::is_reserved_predefined_name_with_profile(name, profile)
-        })
+        .filter(|name| !crate::checker::symbols::is_reserved_predefined_name(name, profile))
         .cloned()
         .collect();
     for name in super::part2::_alias_names(program) {

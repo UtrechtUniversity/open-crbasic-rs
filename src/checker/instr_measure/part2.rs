@@ -336,7 +336,7 @@ pub const _CLOSERS: [&str; 4] = ["ENDIF", "ENDSELECT", "NEXTSUBSCAN", "WEND"];
 
 /// Port of checker/instr_measure.py::is_sequential
 pub fn is_sequential(program: &Program, profile: &Profile, env: &Env) -> bool {
-    mode::decide_with_env(&program.statements, profile, env) == "Sequential"
+    mode::decide(&program.statements, profile, env) == "Sequential"
 }
 
 /// Port of checker/instr_measure.py::check_scan_delay_budget
@@ -353,7 +353,7 @@ pub fn check_scan_delay_budget(
     if is_sequential(program, profile, env) {
         return;
     }
-    for b in scan_time::budgets_with(program, env, profile, zero) {
+    for b in scan_time::budgets(program, env, profile, zero) {
         if (b.interval == 0) != zero {
             continue;
         }
@@ -401,8 +401,8 @@ pub fn check_cpi_time(program: &Program, profile: &Profile, diags: &mut Diagnost
     let mut sub: Option<(i64, i64)> = None;
     let mut sub_start: OrderedMap<i64, i64> = OrderedMap::new();
     let sequential = is_sequential(program, profile, env);
-    let float_names = longconv::float_names_in(&program.statements);
-    let literal_names = longconv::literal_names_in(&program.statements);
+    let float_names = longconv::float_names(&program.statements);
+    let literal_names = longconv::literal_names(&program.statements);
 
     let mut depth: i64 = 0;
     let mut items: Vec<(StmtRef, bool)> = Vec::new();
@@ -576,7 +576,7 @@ pub fn check_cpi_time(program: &Program, profile: &Profile, diags: &mut Diagnost
                 return;
             }
             let lv = |idx: usize| {
-                longconv::long_value_with(
+                longconv::long_value(
                     instr.args[idx].as_deref(),
                     env,
                     profile,

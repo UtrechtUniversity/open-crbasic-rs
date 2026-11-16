@@ -129,7 +129,7 @@ fn _bus_port_impl(
     {
         return Some(I32_MAX);
     }
-    let value = longconv::long_value_with(arg, env, profile, &names.0, &names.1);
+    let value = longconv::long_value(arg, env, profile, &names.0, &names.1);
     if value.is_some() {
         return value;
     }
@@ -222,8 +222,8 @@ pub fn check_i2c_open_order_with_env(
         }
         let names_ref = names.get_or_insert_with(|| {
             (
-                longconv::float_names_in(&program.statements),
-                longconv::literal_names_in(&program.statements),
+                longconv::float_names(&program.statements),
+                longconv::literal_names(&program.statements),
             )
         });
         let Some(mut port) = _bus_port_impl(stmt.args[0].as_deref(), env, profile, names_ref)
@@ -345,8 +345,8 @@ pub fn check_with_env(
             if pos == 1 && _SERIAL_BUS.contains(&kw.as_str()) && !stmt.args.is_empty() {
                 let names_ref = bus_names.get_or_insert_with(|| {
                     (
-                        longconv::float_names_in(&program.statements),
-                        longconv::literal_names_in(&program.statements),
+                        longconv::float_names(&program.statements),
+                        longconv::literal_names(&program.statements),
                     )
                 });
                 let val = _bus_port_impl(stmt.args[0].as_deref(), env, profile, names_ref);

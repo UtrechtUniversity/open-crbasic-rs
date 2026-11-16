@@ -137,7 +137,16 @@ fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let message_path = Path::new(positional.get(1).unwrap_or(&default_message));
 
     let (ok, lines, version) = if let Some(program) = program.filter(|path| path.is_file()) {
-        let result = compiler::compile_file(program, Some(profile), None, false, false);
+        let result = compiler::compile_file(
+            program,
+            Some(profile),
+            None,
+            false,
+            None,
+            true,
+            false,
+            false,
+        );
         (result.ok(), result.result_lines(false), version.as_deref())
     } else {
         let name = positional

@@ -37,37 +37,6 @@ const _INT_MIN_F64: f64 = -2_147_483_648.0;
 const _INT_MAX_F64: f64 = 2_147_483_647.0;
 const _F32_MAX: f64 = 3.402_823_466_385_288_6e38;
 
-// TODO(P4): move to `instr_data` when `checker/instr_data.py` is ported.
-const _TABLE_ONLY_INSTRUCTIONS: &[&str] = &[
-    "CARDOUT",
-    "MQTTPUBLISHTABLE",
-    "GOESTABLE",
-    "GOESFIELD",
-    "TABLEFILE",
-    "TOTALIZE",
-    "AVERAGE",
-    "MAXIMUM",
-    "MINIMUM",
-    "SAMPLEMAXMIN",
-    "STDDEV",
-    "MOMENT",
-    "SAMPLE",
-    "HISTOGRAM",
-    "HISTOGRAM4D",
-    "COVARIANCE",
-    "RAINFLOW",
-    "LEVELCROSSING",
-    "WINDVECTOR",
-    "MEDIAN",
-    "SAMPLEFIELDCAL",
-    "FILLSTOP",
-    "DATATIME",
-    "OPENINTERVAL",
-    "DATAINTERVAL",
-    "FFT",
-    "DATAEVENT",
-];
-
 static _MODE_RE: LazyLock<pyre::Regex> = LazyLock::new(|| {
     pyre::Regex::new(
         r"(?i)\b(IfTime|TimeIntoInterval|Timer|SerialOpen|HTTPPut|FTPClient)\b\s*\(",
@@ -164,12 +133,7 @@ fn us_per_unit(unit: i64) -> i128 {
 }
 
 /// Port of `checker/intervals.py::gate_text`.
-pub fn gate_text() -> Option<String> {
-    todo!("checker/intervals.py::gate_text (omitted: stmt: untyped)")
-}
-
-/// Port of `checker/intervals.py::gate_text`.
-pub fn gate_text_with(stmt: &Stmt) -> Option<String> {
+pub fn gate_text(stmt: &Stmt) -> Option<String> {
     let text = stmt.text();
     if let Stmt::If(i) = stmt
         && i.inline.is_some()
@@ -185,14 +149,7 @@ pub fn gate_text_with(stmt: &Stmt) -> Option<String> {
 }
 
 /// Port of `checker/intervals.py::timeout_gate`.
-pub fn timeout_gate(_seen: bool, _text: Option<&str>) {
-    todo!(
-        "checker/intervals.py::timeout_gate (signature returns () instead of (Option<bool>, bool))"
-    )
-}
-
-/// Port of `checker/intervals.py::timeout_gate`.
-pub fn timeout_gate_with(seen: bool, text: Option<&str>) -> (Option<bool>, bool) {
+pub fn timeout_gate(seen: bool, text: Option<&str>) -> (Option<bool>, bool) {
     let code = _LITERAL_RE.sub("\"\"", text.unwrap_or(""));
     let mut mode = seen;
     let mut gate: Option<bool> = Some(false);
@@ -217,18 +174,8 @@ pub fn timeout_gate_with(seen: bool, text: Option<&str>) -> (Option<bool>, bool)
 }
 
 /// Port of `checker/intervals.py::check`.
-pub fn check(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/intervals.py::check (omitted: profile: untyped, env: consteval.Env)")
-}
-
-/// Port of `checker/intervals.py::check`.
-pub fn check_with(
-    program: &ProgramRef,
-    profile: &'static Profile,
-    diags: &mut Diagnostics,
-    env: &Env,
-) {
-    let wide = wide_constants_with(program, profile);
+pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagnostics, env: &Env) {
+    let wide = wide_constants(program, profile);
     let mut known_cache: Option<&KnownNames> = None;
     let ctx = context::of(program, Some(profile), Some(env.clone()));
     let positions: HashMap<usize, usize> = program
@@ -244,11 +191,11 @@ pub fn check_with(
     let empty_known = BTreeSet::new();
 
     for stmt in &program.statements {
-        let (gate, next_seen) = timeout_gate_with(seen, Some(stmt.text()));
+        let (gate, next_seen) = timeout_gate(seen, Some(stmt.text()));
         seen = next_seen;
-        _check_timeout_value_with(stmt, diags, env, profile, &wide, program);
+        _check_timeout_value(stmt, diags, env, profile, &wide, program);
         if gate == Some(true) {
-            _check_timeout_with(stmt, diags, env, profile, &wide);
+            _check_timeout(stmt, diags, env, profile, &wide);
         }
         let kw = match &**stmt {
             Stmt::Instruction(i) => pystr::upper(&i.keyword),
@@ -273,7 +220,7 @@ pub fn check_with(
         if let Stmt::Instruction(i) = &**stmt
             && kw == "SCAN"
         {
-            scan = _scan_step_with(i, env);
+            scan = _scan_step(i, env);
             continue;
         }
         if matches!(kw.as_str(), "NEXTSCAN" | "SUBSCAN" | "NEXTSUBSCAN")
@@ -282,8 +229,8 @@ pub fn check_with(
             scan = None;
         }
         if !profile.single_pass {
-            for call in _calls_with(stmt, &["FTPCLIENT"]) {
-                if let Some(option) = _put_get_option_with(call.args(), env) {
+            for call in _calls(stmt, &["FTPCLIENT"]) {
+                if let Some(option) = _put_get_option(call.args(), env) {
                     diags.error_basic(
                         stmt.line(),
                         &format!("Invalid PutGetOption: {option}"),
@@ -292,24 +239,23 @@ pub fn check_with(
                 }
             }
         }
-        for call in _calls_with(stmt, _ALL_INTEGRAL_NAMES) {
+        for call in _calls(stmt, _ALL_INTEGRAL_NAMES) {
             if call.is_explicit_call() {
                 continue;
             }
             let cname = pystr::upper(call.name());
             if cname == "TIMER" {
                 let known = *known_cache.get_or_insert_with(|| ctx.known_names());
-                let (owner, before) = _timer_context_with(stmt, &call, known, profile.single_pass);
+                let (owner, before) = _timer_context(stmt, &call, known, profile.single_pass);
                 let table_only = matches!(
                     &*owner,
                     Stmt::Instruction(i)
-                        if _TABLE_ONLY_INSTRUCTIONS.contains(&pystr::upper(&i.keyword).as_str())
+                        if crate::checker::instr_data::TABLE_ONLY_INSTRUCTIONS.contains_key(pystr::upper(&i.keyword).as_str())
                 );
                 if before
                     || blocked_table
                     || (table_only && !in_table)
-                    || (!profile.single_pass
-                        && _timer_shadowed_with(program, stmt, &positions, diags))
+                    || (!profile.single_pass && _timer_shadowed(program, stmt, &positions, diags))
                 {
                     continue;
                 }
@@ -318,9 +264,7 @@ pub fn check_with(
             for &idx in integral_args_for(&cname) {
                 if idx < call.args().len() {
                     let arg = call.args()[idx].as_deref();
-                    if not_integral_with(arg, env, profile, &wide)
-                        || _nonfinite_literal_with(arg, env)
-                    {
+                    if not_integral(arg, env, profile, &wide) || _nonfinite_literal(arg, env) {
                         bad.push(idx);
                     }
                 }
@@ -330,19 +274,14 @@ pub fn check_with(
             }
             if bad.is_empty() && _FUNCTIONS.contains(&cname.as_str()) {
                 let after_error = diags.errors().iter().any(|d| d.line < stmt.line());
-                _check_call_with(&call, scan, stmt, diags, env, after_error);
+                _check_call(&call, scan, stmt, diags, env, after_error);
             }
         }
     }
 }
 
 /// Port of `checker/intervals.py::_put_get_option`.
-pub fn _put_get_option() -> Option<i64> {
-    todo!("checker/intervals.py::_put_get_option (omitted: call: untyped, env: consteval.Env)")
-}
-
-/// Port of `checker/intervals.py::_put_get_option`.
-pub fn _put_get_option_with(args: &[Option<ExprRef>], env: &Env) -> Option<i64> {
+pub fn _put_get_option(args: &[Option<ExprRef>], env: &Env) -> Option<i64> {
     if args.len() < 6 {
         return None;
     }
@@ -377,20 +316,12 @@ pub fn _put_get_option_with(args: &[Option<ExprRef>], env: &Env) -> Option<i64> 
 }
 
 /// Port of `checker/intervals.py::_timer_context`.
-pub fn _timer_context() {
-    todo!(
-        "checker/intervals.py::_timer_context (omitted: stmt: untyped, call: untyped, known: untyped, single_pass: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::_timer_context`.
-pub fn _timer_context_with(
+pub fn _timer_context(
     stmt: &StmtRef,
     call: &CallSite,
     known: &KnownNames,
     single_pass: bool,
 ) -> (StmtRef, bool) {
-    let _ = known;
     if call.id() == stmt_id(stmt) {
         return (Rc::clone(stmt), false);
     }
@@ -399,13 +330,17 @@ pub fn _timer_context_with(
         if !(single_pass && matches!(&**stmt, Stmt::Call(_))) {
             before = false;
         }
-        for node in symbols::name_nodes(expr.as_ref()) {
+        for node in symbols::_name_nodes(expr.as_ref()) {
             if expr_id(&node) == call.id() {
                 return (Rc::clone(stmt), before);
             }
-            // TODO(P4): check `node.name.upper() not in known or id(node) in known.out_of_scope`
-            // once `KnownNames` fields are ported.
-            let _ = &node;
+            let node_name = match node.as_ref() {
+                Expr::Name(n) => n.name.as_str(),
+                Expr::Index(i) => i.name.as_str(),
+                _ => "",
+            };
+            before |= !known.names.contains(&pystr::upper(node_name))
+                || known.out_of_scope.contains(&expr_id(&node));
         }
     }
     if let Stmt::If(i) = &**stmt {
@@ -415,11 +350,11 @@ pub fn _timer_context_with(
             .flatten()
             .chain(i.inline_else.iter().flatten())
         {
-            if _calls_with(inner, &["TIMER"])
+            if _calls(inner, &["TIMER"])
                 .iter()
                 .any(|c| c.id() == call.id())
             {
-                return _timer_context_with(inner, call, known, single_pass);
+                return _timer_context(inner, call, known, single_pass);
             }
         }
     }
@@ -427,14 +362,7 @@ pub fn _timer_context_with(
 }
 
 /// Port of `checker/intervals.py::_timer_shadowed`.
-pub fn _timer_shadowed() {
-    todo!(
-        "checker/intervals.py::_timer_shadowed (omitted: program: untyped, stmt: untyped, positions: untyped, diags: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::_timer_shadowed`.
-pub fn _timer_shadowed_with<S: std::hash::BuildHasher>(
+pub fn _timer_shadowed<S: std::hash::BuildHasher>(
     program: &ProgramRef,
     stmt: &StmtRef,
     positions: &HashMap<usize, usize, S>,
@@ -479,12 +407,7 @@ pub fn _timer_shadowed_with<S: std::hash::BuildHasher>(
 }
 
 /// Port of `checker/intervals.py::_nonfinite_literal`.
-pub fn _nonfinite_literal(_expr: Option<&Expr>) -> bool {
-    todo!("checker/intervals.py::_nonfinite_literal (omitted: env: untyped)")
-}
-
-/// Port of `checker/intervals.py::_nonfinite_literal`.
-pub fn _nonfinite_literal_with(mut expr: Option<&Expr>, env: &Env) -> bool {
+pub fn _nonfinite_literal(mut expr: Option<&Expr>, env: &Env) -> bool {
     while let Some(Expr::Unary(u)) = expr
         && (u.op == "+" || u.op == "-")
     {
@@ -499,14 +422,7 @@ pub fn _nonfinite_literal_with(mut expr: Option<&Expr>, env: &Env) -> bool {
 }
 
 /// Port of `checker/intervals.py::_check_timeout_value`.
-pub fn _check_timeout_value(_stmt: &Stmt, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/intervals.py::_check_timeout_value (omitted: env: untyped, profile: untyped, wide: untyped, program: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::_check_timeout_value`.
-pub fn _check_timeout_value_with(
+pub fn _check_timeout_value(
     stmt: &StmtRef,
     diags: &mut Diagnostics,
     env: &Env,
@@ -514,8 +430,8 @@ pub fn _check_timeout_value_with(
     wide: &BTreeSet<String>,
     program: &ProgramRef,
 ) {
-    for call in _calls_with(stmt, _TIMEOUT_NAMES) {
-        if _negative_timeout_with(&call, env, profile, wide, program) {
+    for call in _calls(stmt, _TIMEOUT_NAMES) {
+        if _negative_timeout(&call, env, profile, wide, program) {
             diags.error(
                 stmt.line(),
                 _TIMEOUT_NEGATIVE,
@@ -530,14 +446,7 @@ pub fn _check_timeout_value_with(
 }
 
 /// Port of `checker/intervals.py::_negative_timeout`.
-pub fn _negative_timeout() -> bool {
-    todo!(
-        "checker/intervals.py::_negative_timeout (omitted: call: untyped, env: untyped, profile: untyped, wide: untyped, program: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::_negative_timeout`.
-pub fn _negative_timeout_with(
+pub fn _negative_timeout(
     call: &CallSite,
     env: &Env,
     profile: &'static Profile,
@@ -557,22 +466,17 @@ pub fn _negative_timeout_with(
     let Some(arg) = args[i].as_deref() else {
         return false;
     };
-    let Some(TimeoutValue::Int(v)) = timeout_value_with(Some(arg), Some(env), profile, wide) else {
+    let Some(TimeoutValue::Int(v)) = timeout_value(Some(arg), Some(env), profile, wide) else {
         return false;
     };
     if _signed32(10 * v) >= 0 {
         return false;
     }
-    profile.single_pass || !_undefined_sibling_with(args, i, program, profile)
+    profile.single_pass || !_undefined_sibling(args, i, program, profile)
 }
 
 /// Port of `checker/intervals.py::_undefined_sibling`.
-pub fn _undefined_sibling(_call: &Index, _i: i64, _program: &Program) -> bool {
-    todo!("checker/intervals.py::_undefined_sibling (omitted: profile: untyped)")
-}
-
-/// Port of `checker/intervals.py::_undefined_sibling`.
-pub fn _undefined_sibling_with(
+pub fn _undefined_sibling(
     args: &[Option<ExprRef>],
     i: usize,
     program: &ProgramRef,
@@ -593,12 +497,7 @@ pub fn _undefined_sibling_with(
 }
 
 /// Port of `checker/intervals.py::_needs_integer_fold`.
-pub fn _needs_integer_fold() -> bool {
-    todo!("checker/intervals.py::_needs_integer_fold (omitted: arg: untyped)")
-}
-
-/// Port of `checker/intervals.py::_needs_integer_fold`.
-pub fn _needs_integer_fold_with(mut arg: Option<&Expr>) -> bool {
+pub fn _needs_integer_fold(mut arg: Option<&Expr>) -> bool {
     while let Some(Expr::Unary(u)) = arg
         && (u.op == "-" || u.op == "+")
     {
@@ -611,14 +510,7 @@ pub fn _needs_integer_fold_with(mut arg: Option<&Expr>) -> bool {
 }
 
 /// Port of `checker/intervals.py::fold_timeout_expressions`.
-pub fn fold_timeout_expressions(_program: &Program, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/intervals.py::fold_timeout_expressions (omitted: profile: untyped, env: untyped, reported: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::fold_timeout_expressions`.
-pub fn fold_timeout_expressions_with(
+pub fn fold_timeout_expressions(
     program: &ProgramRef,
     profile: &'static Profile,
     diags: &mut Diagnostics,
@@ -635,7 +527,7 @@ pub fn fold_timeout_expressions_with(
                 .push_back(Rc::clone(d));
         }
     }
-    let wide = wide_constants_with(program, profile);
+    let wide = wide_constants(program, profile);
     let mut lines: HashMap<String, Vec<(i64, usize)>> = HashMap::new();
     let mut first: HashMap<(String, i64), usize> = HashMap::new();
     for (i, st) in stmts.iter().enumerate() {
@@ -668,7 +560,7 @@ pub fn fold_timeout_expressions_with(
     let mut added: Vec<DiagRef> = Vec::new();
 
     for (k, stmt) in stmts.iter().enumerate() {
-        let (gate, next_seen) = timeout_gate_with(seen, gate_text_with(stmt).as_deref());
+        let (gate, next_seen) = timeout_gate(seen, gate_text(stmt).as_deref());
         seen = next_seen;
         let mut inline_ids: BTreeSet<usize> = BTreeSet::new();
         if let Stmt::If(i) = &**stmt {
@@ -678,12 +570,12 @@ pub fn fold_timeout_expressions_with(
                 .flatten()
                 .chain(i.inline_else.iter().flatten())
             {
-                for c in _calls_with(inner, _TIMEOUT_NAMES) {
+                for c in _calls(inner, _TIMEOUT_NAMES) {
                     inline_ids.insert(c.id());
                 }
             }
         }
-        for call in _calls_with(stmt, _TIMEOUT_NAMES) {
+        for call in _calls(stmt, _TIMEOUT_NAMES) {
             if inline_ids.contains(&call.id()) || call.is_explicit_call() {
                 continue;
             }
@@ -699,11 +591,11 @@ pub fn fold_timeout_expressions_with(
             };
             let key = (stmt.file().to_string(), stmt.line());
             let mut own: Option<DiagRef> = None;
-            if _negative_timeout_with(&call, env, profile, &wide, program) {
+            if _negative_timeout(&call, env, profile, &wide, program) {
                 own = neg_lines.get_mut(&key).and_then(VecDeque::pop_front);
             }
-            let value = timeout_value_with(Some(arg), Some(env), profile, &wide);
-            if _needs_integer_fold_with(Some(arg)) && matches!(value, Some(TimeoutValue::Int(_))) {
+            let value = timeout_value(Some(arg), Some(env), profile, &wide);
+            if _needs_integer_fold(Some(arg)) && matches!(value, Some(TimeoutValue::Int(_))) {
                 let line_first = first[&(stmt.file().to_string(), stmt.line())];
                 let counted: Vec<&DiagRef> = diags
                     .items
@@ -765,12 +657,7 @@ pub fn fold_timeout_expressions_with(
 }
 
 /// Port of `checker/intervals.py::order_timeout_negative`.
-pub fn order_timeout_negative(_diags: &mut Diagnostics, _program: &Program) {
-    todo!("checker/intervals.py::order_timeout_negative (omitted: profile: untyped)")
-}
-
-/// Port of `checker/intervals.py::order_timeout_negative`.
-pub fn order_timeout_negative_with(diags: &mut Diagnostics, profile: &Profile, program: &Program) {
+pub fn order_timeout_negative(diags: &mut Diagnostics, profile: &Profile, program: &Program) {
     if !profile.single_pass {
         return;
     }
@@ -824,21 +711,14 @@ pub fn order_timeout_negative_with(diags: &mut Diagnostics, profile: &Profile, p
 }
 
 /// Port of `checker/intervals.py::_check_timeout`.
-pub fn _check_timeout(_stmt: &Stmt, _diags: &mut Diagnostics) {
-    todo!(
-        "checker/intervals.py::_check_timeout (omitted: env: untyped, profile: untyped, wide: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::_check_timeout`.
-pub fn _check_timeout_with(
+pub fn _check_timeout(
     stmt: &StmtRef,
     diags: &mut Diagnostics,
     env: &Env,
     profile: &Profile,
     wide: &BTreeSet<String>,
 ) {
-    for call in _calls_with(stmt, _TIMEOUT_NAMES) {
+    for call in _calls(stmt, _TIMEOUT_NAMES) {
         if call.is_explicit_call() {
             continue;
         }
@@ -859,9 +739,9 @@ pub fn _check_timeout_with(
                 stmt.file(),
             );
         } else if matches!(arg, Expr::Name(n) if pystr::upper(&n.name) == "NAN")
-            || (not_integral_with(Some(arg), env, profile, wide)
-                && (!profile.single_pass || _float_typed_with(Some(arg), env, wide)))
-            || timeout_value_with(Some(arg), Some(env), profile, wide) == Some(TimeoutValue::Wide)
+            || (not_integral(Some(arg), env, profile, wide)
+                && (!profile.single_pass || _float_typed(Some(arg), env, wide)))
+            || timeout_value(Some(arg), Some(env), profile, wide) == Some(TimeoutValue::Wide)
         {
             diags.error_basic(stmt.line(), NOT_INTEGRAL, stmt.file());
         }
@@ -869,19 +749,14 @@ pub fn _check_timeout_with(
 }
 
 /// Port of `checker/intervals.py::wide_constants`.
-pub fn wide_constants(_program: &Program) -> BTreeSet<String> {
-    todo!("checker/intervals.py::wide_constants (omitted: profile: untyped)")
-}
-
-/// Port of `checker/intervals.py::wide_constants`.
-pub fn wide_constants_with(program: &Program, profile: &Profile) -> BTreeSet<String> {
+pub fn wide_constants(program: &Program, profile: &Profile) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     for st in &program.statements {
         if let Stmt::ConstDecl(c) = &**st
             && let Some(val_expr) = &c.value
             && let Expr::Number(n) = &**val_expr
             && !n.text.starts_with('&')
-            && _out_of_range_with(n.value.clone(), profile)
+            && _out_of_range(n.value.clone(), profile)
         {
             out.insert(pystr::upper(&c.name));
         }
@@ -890,17 +765,12 @@ pub fn wide_constants_with(program: &Program, profile: &Profile) -> BTreeSet<Str
 }
 
 /// Port of `checker/intervals.py::_out_of_range`.
-pub fn _out_of_range() -> bool {
-    todo!("checker/intervals.py::_out_of_range (omitted: value: untyped, profile: untyped)")
-}
-
-/// Port of `checker/intervals.py::_out_of_range`.
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     reason = "matches Python float() and struct.pack('<f') rounding"
 )]
-pub fn _out_of_range_with(value: NumberValue, profile: &Profile) -> bool {
+pub fn _out_of_range(value: NumberValue, profile: &Profile) -> bool {
     if matches!(profile.name, "cr300" | "cr350") {
         let f = match value {
             NumberValue::Int(i) => i as f64,
@@ -922,14 +792,7 @@ pub fn _out_of_range_with(value: NumberValue, profile: &Profile) -> bool {
 }
 
 /// Port of `checker/intervals.py::not_integral`.
-pub fn not_integral(_expr: Option<&Expr>) -> bool {
-    todo!(
-        "checker/intervals.py::not_integral (omitted: env: consteval.Env, profile: untyped, wide: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::not_integral`.
-pub fn not_integral_with(
+pub fn not_integral(
     expr: Option<&Expr>,
     env: &Env,
     profile: &Profile,
@@ -949,7 +812,7 @@ pub fn not_integral_with(
             (NumberValue::Float(f), f.is_finite() && pystr::is_integer(f))
         }
     };
-    if _float_typed_with(expr, env, wide) || !is_whole {
+    if _float_typed(expr, env, wide) || !is_whole {
         return true;
     }
     let literal = match expr {
@@ -962,7 +825,7 @@ pub fn not_integral_with(
     if n.text.starts_with('&') {
         return false;
     }
-    _out_of_range_with(num, profile)
+    _out_of_range(num, profile)
 }
 
 /// Port of `checker/intervals.py::_plain`.
@@ -980,12 +843,7 @@ pub fn _plain(expr: Option<&Expr>) -> bool {
 }
 
 /// Port of `checker/intervals.py::_float_typed`.
-pub fn _float_typed(_expr: Option<&Expr>) -> bool {
-    todo!("checker/intervals.py::_float_typed (omitted: env: consteval.Env, wide: untyped)")
-}
-
-/// Port of `checker/intervals.py::_float_typed`.
-pub fn _float_typed_with(expr: Option<&Expr>, env: &Env, wide: &BTreeSet<String>) -> bool {
+pub fn _float_typed(expr: Option<&Expr>, env: &Env, wide: &BTreeSet<String>) -> bool {
     match expr {
         Some(Expr::Number(n)) => {
             let text = pystr::upper(&n.text);
@@ -1005,11 +863,11 @@ pub fn _float_typed_with(expr: Option<&Expr>, env: &Env, wide: &BTreeSet<String>
                 _ => false,
             }
         }
-        Some(Expr::Unary(u)) => _float_typed_with(u.operand.as_deref(), env, wide),
+        Some(Expr::Unary(u)) => _float_typed(u.operand.as_deref(), env, wide),
         Some(Expr::Binary(b)) => {
             matches!(b.op.as_str(), "/" | "^")
-                || _float_typed_with(b.left.as_deref(), env, wide)
-                || _float_typed_with(b.right.as_deref(), env, wide)
+                || _float_typed(b.left.as_deref(), env, wide)
+                || _float_typed(b.right.as_deref(), env, wide)
         }
         _ => false,
     }
@@ -1026,14 +884,7 @@ pub fn _signed32(x: i64) -> i64 {
 }
 
 /// Port of `checker/intervals.py::timeout_value`.
-pub fn timeout_value() {
-    todo!(
-        "checker/intervals.py::timeout_value (omitted: arg: untyped, env: untyped, profile: untyped, wide: untyped)"
-    )
-}
-
-/// Port of `checker/intervals.py::timeout_value`.
-pub fn timeout_value_with(
+pub fn timeout_value(
     arg: Option<&Expr>,
     env: Option<&Env>,
     profile: &Profile,
@@ -1055,9 +906,9 @@ pub fn timeout_value_with(
         }
         let sign = if neg_count % 2 == 1 { -1 } else { 1 };
         if let Some(Expr::Number(n)) = lit {
-            return _timeout_literal_with(n, sign, profile);
+            return _timeout_literal(n, sign, profile);
         }
-        let val = timeout_value_with(lit, env, profile, wide)?;
+        let val = timeout_value(lit, env, profile, wide)?;
         return match val {
             TimeoutValue::Int(v) => Some(TimeoutValue::Int(_signed32(sign * v))),
             TimeoutValue::Wide => Some(TimeoutValue::Wide),
@@ -1066,12 +917,12 @@ pub fn timeout_value_with(
     if let Expr::Binary(b) = arg
         && matches!(b.op.as_str(), "+" | "-" | "*")
     {
-        let Some(TimeoutValue::Int(a)) = timeout_value_with(b.left.as_deref(), env, profile, wide)
+        let Some(TimeoutValue::Int(a)) = timeout_value(b.left.as_deref(), env, profile, wide)
         else {
             return None;
         };
         let Some(TimeoutValue::Int(right_b)) =
-            timeout_value_with(b.right.as_deref(), env, profile, wide)
+            timeout_value(b.right.as_deref(), env, profile, wide)
         else {
             return None;
         };
@@ -1083,7 +934,7 @@ pub fn timeout_value_with(
         return Some(TimeoutValue::Int(_signed32(value)));
     }
     if let Expr::Number(n) = arg {
-        return _timeout_literal_with(n, 1, profile);
+        return _timeout_literal(n, 1, profile);
     }
     if let Expr::Name(n) = arg {
         let name = pystr::upper(&n.name);
@@ -1103,18 +954,13 @@ pub fn timeout_value_with(
         if (_INT_MIN..=_INT_MAX).contains(&v) {
             return Some(TimeoutValue::Int(v));
         }
-        return _decimal_with(v.unsigned_abs(), if v < 0 { -1 } else { 1 }, profile, false);
+        return _decimal(v.unsigned_abs(), if v < 0 { -1 } else { 1 }, profile, false);
     }
     None
 }
 
 /// Port of `checker/intervals.py::_timeout_literal`.
-pub fn _timeout_literal(_lit: &Number, _sign: i64) {
-    todo!("checker/intervals.py::_timeout_literal (omitted: profile: untyped)")
-}
-
-/// Port of `checker/intervals.py::_timeout_literal`.
-pub fn _timeout_literal_with(lit: &Number, sign: i64, profile: &Profile) -> Option<TimeoutValue> {
+pub fn _timeout_literal(lit: &Number, sign: i64, profile: &Profile) -> Option<TimeoutValue> {
     let text = pystr::upper(&lit.text);
     if text.starts_with("&H") || text.starts_with("&B") {
         let digits = pystr::slice(&text, Some(2), None);
@@ -1142,14 +988,9 @@ pub fn _timeout_literal_with(lit: &Number, sign: i64, profile: &Profile) -> Opti
         return None;
     }
     match text.parse::<u64>() {
-        Ok(mag) => _decimal_with(mag, sign, profile, true),
+        Ok(mag) => _decimal(mag, sign, profile, true),
         Err(_) => Some(TimeoutValue::Wide),
     }
-}
-
-/// Port of `checker/intervals.py::_decimal`.
-pub fn _decimal(_magnitude: i64, _sign: i64, _literal: bool) {
-    todo!("checker/intervals.py::_decimal (omitted: profile: untyped)")
 }
 
 /// Port of `checker/intervals.py::_decimal`.
@@ -1159,7 +1000,7 @@ pub fn _decimal(_magnitude: i64, _sign: i64, _literal: bool) {
     clippy::cast_possible_wrap,
     reason = "magnitude is clamped or checked against 2^31/2^32"
 )]
-pub fn _decimal_with(
+pub fn _decimal(
     magnitude: u64,
     sign: i64,
     profile: &Profile,
@@ -1189,12 +1030,7 @@ pub fn _decimal_with(
 }
 
 /// Port of `checker/intervals.py::_check_call`.
-pub fn _check_call(_call: &Stmt, _stmt: &Stmt, _diags: &mut Diagnostics, _after_error: bool) {
-    todo!("checker/intervals.py::_check_call (omitted: scan: untyped, env: untyped)")
-}
-
-/// Port of `checker/intervals.py::_check_call`.
-pub fn _check_call_with(
+pub fn _check_call(
     call: &CallSite,
     scan: Option<(i64, i64)>,
     stmt: &Stmt,
@@ -1206,13 +1042,13 @@ pub fn _check_call_with(
     if args.len() != 3 {
         return;
     }
-    let Some(tinto_raw) = _int_with(args[0].as_deref(), env) else {
+    let Some(tinto_raw) = _int(args[0].as_deref(), env) else {
         return;
     };
-    let Some(interval_raw) = _int_with(args[1].as_deref(), env) else {
+    let Some(interval_raw) = _int(args[1].as_deref(), env) else {
         return;
     };
-    let Some(unit) = _int_with(args[2].as_deref(), env) else {
+    let Some(unit) = _int(args[2].as_deref(), env) else {
         return;
     };
     if unit == _MONTH || tinto_raw == _INT_MIN || interval_raw == _INT_MIN {
@@ -1277,12 +1113,7 @@ fn split_i128(total_us: i128) -> (i64, i64) {
 }
 
 /// Port of `checker/intervals.py::_scan_step`.
-pub fn _scan_step(_stmt: &Instruction) -> Option<(i64, i64)> {
-    todo!("checker/intervals.py::_scan_step (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/intervals.py::_scan_step`.
-pub fn _scan_step_with(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
+pub fn _scan_step(stmt: &Instruction, env: &Env) -> Option<(i64, i64)> {
     super::instr_rules::scan_split(stmt, env)
 }
 
@@ -1315,12 +1146,7 @@ pub fn _cmod(a: i64, b: i64) -> i64 {
 }
 
 /// Port of `checker/intervals.py::_int`.
-pub fn _int(_expr: Option<&Expr>) -> Option<i64> {
-    todo!("checker/intervals.py::_int (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/intervals.py::_int`.
-pub fn _int_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+pub fn _int(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     let e = expr?;
     if !consteval::is_constant(Some(e), env) {
         return None;
@@ -1360,12 +1186,7 @@ pub fn _int_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
 }
 
 /// Port of `checker/intervals.py::_calls`.
-pub fn _calls(_stmt: &Stmt) {
-    todo!("checker/intervals.py::_calls (omitted: names: untyped)")
-}
-
-/// Port of `checker/intervals.py::_calls`.
-pub fn _calls_with(stmt: &StmtRef, names: &[&str]) -> Vec<CallSite> {
+pub fn _calls(stmt: &StmtRef, names: &[&str]) -> Vec<CallSite> {
     let mut out = Vec::new();
     let mut exprs: Vec<Option<ExprRef>> = Vec::new();
     match &**stmt {
@@ -1377,7 +1198,7 @@ pub fn _calls_with(stmt: &StmtRef, names: &[&str]) -> Vec<CallSite> {
                 .flatten()
                 .chain(i.inline_else.iter().flatten())
             {
-                out.extend(_calls_with(inner, names));
+                out.extend(_calls(inner, names));
             }
         }
         Stmt::ElseIf(e) => exprs.push(e.cond.clone()),
@@ -1473,27 +1294,27 @@ mod tests {
     #[test]
     fn timeout_gate_matches_python() {
         assert_eq!(
-            timeout_gate_with(false, Some("HTTPPut(1,2,3,4,5,6,7,8,9)")),
+            timeout_gate(false, Some("HTTPPut(1,2,3,4,5,6,7,8,9)")),
             (Some(false), false)
         );
         assert_eq!(
-            timeout_gate_with(false, Some("IfTime(0,1,Sec) : HTTPPut(1,2,3,4,5,6,7,8,9)")),
+            timeout_gate(false, Some("IfTime(0,1,Sec) : HTTPPut(1,2,3,4,5,6,7,8,9)")),
             (Some(true), true)
         );
         assert_eq!(
-            timeout_gate_with(true, Some("HTTPPut(1,2,3,4,5,6,7,8,9)")),
+            timeout_gate(true, Some("HTTPPut(1,2,3,4,5,6,7,8,9)")),
             (Some(true), true)
         );
         assert_eq!(
-            timeout_gate_with(true, Some("Timer(0,Sec,0) : HTTPPut(1,2,3,4,5,6,7,8,9)")),
+            timeout_gate(true, Some("Timer(0,Sec,0) : HTTPPut(1,2,3,4,5,6,7,8,9)")),
             (Some(false), false)
         );
         assert_eq!(
-            timeout_gate_with(false, Some("HTTPPut(1,2,3,4,5,6,7,8,9) : IfTime(0,1,Sec)")),
+            timeout_gate(false, Some("HTTPPut(1,2,3,4,5,6,7,8,9) : IfTime(0,1,Sec)")),
             (None, true)
         );
         assert_eq!(
-            timeout_gate_with(false, Some("\"IfTime(\" : HTTPPut(1,2,3,4,5,6,7,8,9)")),
+            timeout_gate(false, Some("\"IfTime(\" : HTTPPut(1,2,3,4,5,6,7,8,9)")),
             (Some(false), false)
         );
     }
@@ -1508,10 +1329,7 @@ mod tests {
             inline: Some(Vec::new()),
             inline_else: None,
         });
-        assert_eq!(
-            gate_text_with(&stmt),
-            Some("If IfTime(0,1,Sec) ".to_string())
-        );
+        assert_eq!(gate_text(&stmt), Some("If IfTime(0,1,Sec) ".to_string()));
     }
 
     #[test]
@@ -1546,36 +1364,30 @@ mod tests {
         let cr6 = profiles::get("cr6").unwrap();
         let cr300 = profiles::get("cr300").unwrap();
 
-        assert_eq!(_decimal_with(10, 1, cr6, true), Some(TimeoutValue::Int(10)));
+        assert_eq!(_decimal(10, 1, cr6, true), Some(TimeoutValue::Int(10)));
         assert_eq!(
-            _decimal_with(1 << 31, -1, cr6, true),
+            _decimal(1 << 31, -1, cr6, true),
             Some(TimeoutValue::Int(-2147483648))
         );
-        assert_eq!(
-            _decimal_with(1 << 31, 1, cr6, true),
-            Some(TimeoutValue::Wide)
-        );
-        assert_eq!(_decimal_with(1 << 31, -1, cr6, false), None);
+        assert_eq!(_decimal(1 << 31, 1, cr6, true), Some(TimeoutValue::Wide));
+        assert_eq!(_decimal(1 << 31, -1, cr6, false), None);
 
         assert_eq!(
-            _decimal_with((1 << 31) - 1, 1, cr300, true),
+            _decimal((1 << 31) - 1, 1, cr300, true),
             Some(TimeoutValue::Int(2147483647))
         );
         assert_eq!(
-            _decimal_with(1 << 31, -1, cr300, true),
+            _decimal(1 << 31, -1, cr300, true),
             Some(TimeoutValue::Int(-2147483647))
         );
         assert_eq!(
-            _decimal_with((1 << 31) + 1000, 1, cr300, true),
+            _decimal((1 << 31) + 1000, 1, cr300, true),
             Some(TimeoutValue::Wide)
         );
-        assert_eq!(
-            _decimal_with(1 << 32, 1, cr300, true),
-            Some(TimeoutValue::Wide)
-        );
+        assert_eq!(_decimal(1 << 32, 1, cr300, true), Some(TimeoutValue::Wide));
 
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Int(0xFFFFFFFF),
@@ -1587,7 +1399,7 @@ mod tests {
             Some(TimeoutValue::Int(-1))
         );
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Int(0xFFFFFFFF),
@@ -1599,7 +1411,7 @@ mod tests {
             Some(TimeoutValue::Int(1))
         );
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Int(5),
@@ -1611,7 +1423,7 @@ mod tests {
             Some(TimeoutValue::Int(5))
         );
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Float(1.5),
@@ -1623,7 +1435,7 @@ mod tests {
             Some(TimeoutValue::Wide)
         );
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Int(2147483648),
@@ -1635,7 +1447,7 @@ mod tests {
             Some(TimeoutValue::Int(-2147483648))
         );
         assert_eq!(
-            _timeout_literal_with(
+            _timeout_literal(
                 &Number {
                     node: node(1),
                     value: NumberValue::Int(2147483648),
@@ -1654,39 +1466,36 @@ mod tests {
         let cr300 = profiles::get("cr300").unwrap();
         let env6 = Env::new(cr6);
 
-        assert!(!_out_of_range_with(NumberValue::Int(2147483647), cr6));
-        assert!(_out_of_range_with(NumberValue::Int(2147483648), cr6));
-        assert!(!_out_of_range_with(NumberValue::Int(-2147483648), cr6));
-        assert!(_out_of_range_with(NumberValue::Int(-2147483649), cr6));
+        assert!(!_out_of_range(NumberValue::Int(2147483647), cr6));
+        assert!(_out_of_range(NumberValue::Int(2147483648), cr6));
+        assert!(!_out_of_range(NumberValue::Int(-2147483648), cr6));
+        assert!(_out_of_range(NumberValue::Int(-2147483649), cr6));
 
-        assert!(!_out_of_range_with(NumberValue::Int(2147483648), cr300));
-        assert!(!_out_of_range_with(NumberValue::Int(2147483649), cr300));
-        assert!(!_out_of_range_with(NumberValue::Int(2147483700), cr300));
-        assert!(_out_of_range_with(NumberValue::Float(3.5e38), cr300));
+        assert!(!_out_of_range(NumberValue::Int(2147483648), cr300));
+        assert!(!_out_of_range(NumberValue::Int(2147483649), cr300));
+        assert!(!_out_of_range(NumberValue::Int(2147483700), cr300));
+        assert!(_out_of_range(NumberValue::Float(3.5e38), cr300));
 
         let mk_args = |e: ExprRef| vec![None, None, None, None, None, Some(e)];
+        assert_eq!(_put_get_option(&mk_args(num_i(1, 29, "29")), &env6), None);
         assert_eq!(
-            _put_get_option_with(&mk_args(num_i(1, 29, "29")), &env6),
-            None
-        );
-        assert_eq!(
-            _put_get_option_with(&mk_args(num_i(1, 30, "30")), &env6),
+            _put_get_option(&mk_args(num_i(1, 30, "30")), &env6),
             Some(30)
         );
         assert_eq!(
-            _put_get_option_with(&mk_args(num_i(1, -30, "-30")), &env6),
+            _put_get_option(&mk_args(num_i(1, -30, "-30")), &env6),
             Some(-30)
         );
         assert_eq!(
-            _put_get_option_with(&mk_args(num_i(1, 2147483648, "2147483648")), &env6),
+            _put_get_option(&mk_args(num_i(1, 2147483648, "2147483648")), &env6),
             Some(-2147483648)
         );
         assert_eq!(
-            _put_get_option_with(&mk_args(num_i(1, -2147483649, "-2147483649")), &env6),
+            _put_get_option(&mk_args(num_i(1, -2147483649, "-2147483649")), &env6),
             None
         );
         assert_eq!(
-            _put_get_option_with(&mk_args(num_f(1, 1e39, "1e+39")), &env6),
+            _put_get_option(&mk_args(num_f(1, 1e39, "1e+39")), &env6),
             Some(2147483647)
         );
     }
@@ -1714,7 +1523,7 @@ mod tests {
                 inline_else: None,
             }));
             let call = CallSite::Expr(call_expr);
-            _check_call_with(&call, scan, &st, &mut diags, &env6, after);
+            _check_call(&call, scan, &st, &mut diags, &env6, after);
             diags
                 .items
                 .into_iter()
@@ -1764,30 +1573,20 @@ mod tests {
             ..Default::default()
         }));
         let prog = Program::new("test.cr6", vec![wide_stmt]);
-        let wide = wide_constants_with(&prog, cr6);
+        let wide = wide_constants(&prog, cr6);
         assert!(wide.contains("KB"));
 
-        assert!(not_integral_with(
-            Some(&num_f(1, 1.5, "1.5")),
-            &env6,
-            cr6,
-            &wide
-        ));
-        assert!(not_integral_with(
+        assert!(not_integral(Some(&num_f(1, 1.5, "1.5")), &env6, cr6, &wide));
+        assert!(not_integral(
             Some(&num_f(1, 60.0, "60.0")),
             &env6,
             cr6,
             &wide
         ));
-        assert!(!not_integral_with(
-            Some(&num_i(1, 60, "60")),
-            &env6,
-            cr6,
-            &wide
-        ));
-        assert!(not_integral_with(Some(&name_e(1, "KB")), &env6, cr6, &wide));
-        assert!(_nonfinite_literal_with(Some(&name_e(1, "NAN")), &env6));
-        assert!(_nonfinite_literal_with(
+        assert!(!not_integral(Some(&num_i(1, 60, "60")), &env6, cr6, &wide));
+        assert!(not_integral(Some(&name_e(1, "KB")), &env6, cr6, &wide));
+        assert!(_nonfinite_literal(Some(&name_e(1, "NAN")), &env6));
+        assert!(_nonfinite_literal(
             Some(&Expr::Unary(Unary {
                 node: node(1),
                 op: "-".to_string(),
@@ -1795,13 +1594,13 @@ mod tests {
             })),
             &env6
         ));
-        assert!(_needs_integer_fold_with(Some(&Expr::Binary(Binary {
+        assert!(_needs_integer_fold(Some(&Expr::Binary(Binary {
             node: node(1),
             op: "+".to_string(),
             left: Some(num_i(1, 1, "1")),
             right: Some(num_i(1, 2, "2")),
         }))));
-        assert!(!_needs_integer_fold_with(Some(&Expr::Unary(Unary {
+        assert!(!_needs_integer_fold(Some(&Expr::Unary(Unary {
             node: node(1),
             op: "+".to_string(),
             operand: Some(num_i(1, 1, "1")),
@@ -1811,7 +1610,7 @@ mod tests {
             value: "hi".to_string(),
         }))));
         assert_eq!(
-            _calls_with(
+            _calls(
                 &Rc::new(Stmt::Call(Call {
                     base: StmtBase::new(1, "t"),
                     name: "Timer".to_string(),

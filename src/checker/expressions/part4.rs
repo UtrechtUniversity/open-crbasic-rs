@@ -611,11 +611,11 @@ pub fn _bare_function_message(
 
 /// Port of checker/expressions.py::_struct_var_names
 pub fn _struct_var_names(program: &Program) -> BTreeSet<String> {
-    let types = structs::structure_members(program);
+    let types = structs::_structure_members(program);
     if types.is_empty() {
         return BTreeSet::new();
     }
-    structs::variable_kinds(program, &types)
+    structs::_variable_kinds(program, &types)
         .iter()
         .filter(|&(_, k)| k.starts_with("STRUCT:"))
         .map(|(n, _)| n.clone())
@@ -678,11 +678,11 @@ pub fn check_function_arity(
     }
     let mut known: Option<BTreeSet<String>> = None;
     let mut const_unready_loaded = false;
-    let struct_types = structs::structure_members(program);
+    let struct_types = structs::_structure_members(program);
     let kinds = if struct_types.is_empty() {
         OrderedMap::new()
     } else {
-        structs::variable_kinds(program, &struct_types)
+        structs::_variable_kinds(program, &struct_types)
     };
     let struct_vars = _struct_var_names(program);
     let sub_names: BTreeSet<String> = program
@@ -700,7 +700,7 @@ pub fn check_function_arity(
     let mut seen_timeint = false;
     let _timeout_state = TimeoutStateGuard;
     super::part1::_TIMEOUT_WIDE
-        .with(|slot| *slot.borrow_mut() = intervals::wide_constants_with(program, profile));
+        .with(|slot| *slot.borrow_mut() = intervals::wide_constants(program, profile));
     super::set_arity_context(program, Some(profile), Some(declared_variables.clone()));
     let arity_known = if _WHOLE_EXPR_ECHO_LOGGERS.contains(&profile.name) {
         Some(ctx.known_names().names.clone())
@@ -757,7 +757,7 @@ pub fn check_function_arity(
                 .collect()
         };
         let (gate, next_seen) =
-            intervals::timeout_gate_with(seen_timeint, intervals::gate_text_with(stmt).as_deref());
+            intervals::timeout_gate(seen_timeint, intervals::gate_text(stmt).as_deref());
         seen_timeint = next_seen;
         super::part1::_TIMEOUT_GATE.with(|slot| *slot.borrow_mut() = gate);
 
@@ -1141,7 +1141,7 @@ pub fn check_function_arity(
                     if profile.single_pass
                         && !assign.compound
                         && matches!(assign.value.as_deref(), Some(Expr::Index(_)))
-                        && structs::operand_kind(assign.target.as_deref(), &kinds, &struct_types)
+                        && structs::_operand_kind(assign.target.as_deref(), &kinds, &struct_types)
                             .as_deref()
                             == Some("S")
                     {

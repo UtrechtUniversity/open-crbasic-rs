@@ -580,7 +580,7 @@ pub fn _timer_arg(arg: Option<&Expr>, env: &Env, declared: &BTreeSet<String>) ->
 #[must_use]
 pub fn _timeout_wide(arg: Option<&Expr>, profile: &Profile) -> bool {
     _TIMEOUT_WIDE.with(|wide| {
-        intervals::timeout_value_with(arg, None, profile, &wide.borrow())
+        intervals::timeout_value(arg, None, profile, &wide.borrow())
             == Some(intervals::TimeoutValue::Wide)
     })
 }
@@ -626,9 +626,9 @@ pub fn _network_integer_problem(
     let tv = if let Some(Expr::Number(num)) = literal
         && matches!(num.value, NumberValue::Int(_) | NumberValue::BigInt(_))
     {
-        intervals::timeout_value_with(source, None, profile, &empty_wide)
+        intervals::timeout_value(source, None, profile, &empty_wide)
     } else {
-        intervals::timeout_value_with(Some(arg), Some(&ctx.env), profile, &empty_wide)
+        intervals::timeout_value(Some(arg), Some(&ctx.env), profile, &empty_wide)
     };
     let val = match tv {
         Some(intervals::TimeoutValue::Wide) => Some(NumOrWide::WideOrFloat),

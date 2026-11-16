@@ -854,7 +854,7 @@ pub fn constant_destination(expr: Option<&Expr>, env: &Env, variables: &BTreeSet
     if !_destination_expression(Some(expr)) {
         return false;
     }
-    let names: BTreeSet<String> = symbols::walk_names(Some(expr))
+    let names: BTreeSet<String> = symbols::_walk_names(Some(expr))
         .into_iter()
         .map(|n| pystr::upper(&n))
         .collect();

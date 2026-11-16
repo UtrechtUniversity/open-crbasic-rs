@@ -116,8 +116,8 @@ pub fn check(program: &ProgramRef, profile: &'static Profile, diags: &mut Diagno
             let (names, typer) = tablefile_context.get_or_insert_with(|| {
                 (
                     (
-                        longconv::float_names_in(&statements),
-                        longconv::literal_names_in(&statements),
+                        longconv::float_names(&statements),
+                        longconv::literal_names(&statements),
                     ),
                     var_types::Typer::new(program, None, Some(profile)),
                 )
@@ -150,8 +150,8 @@ pub fn _check_timed_sdm(
     }
     let scope = context::of(program, None, Some(env.clone())).scope_tables(true, false);
     let names = (
-        longconv::float_names_in(statements),
-        longconv::literal_names_in(statements),
+        longconv::float_names(statements),
+        longconv::literal_names(statements),
     );
     let sequential = part2::is_sequential(program, profile, env);
     let mut aliases: OrderedMap<String, (String, i64)> = OrderedMap::new();
@@ -228,13 +228,8 @@ pub fn _check_timed_sdm(
                 if !registered.contains(&target) {
                     continue;
                 }
-                let reps = longconv::long_value_with(
-                    stmt.args[1].as_deref(),
-                    env,
-                    profile,
-                    &names.0,
-                    &names.1,
-                );
+                let reps =
+                    longconv::long_value(stmt.args[1].as_deref(), env, profile, &names.0, &names.1);
                 let mut errors: Vec<String> = Vec::new();
                 if let Some(r) = reps
                     && part2::_byte(r) > 1
@@ -267,8 +262,7 @@ pub fn _check_periodavg_channels(
         return;
     }
     let empty = BTreeSet::new();
-    let Some(channel) =
-        longconv::long_value_with(stmt.args[2].as_deref(), env, profile, &empty, &empty)
+    let Some(channel) = longconv::long_value(stmt.args[2].as_deref(), env, profile, &empty, &empty)
     else {
         return;
     };
@@ -338,10 +332,7 @@ pub fn check_const_ranges(flat: &[StmtRef], profile: &Profile, diags: &mut Diagn
     if by_instr.is_empty() {
         return;
     }
-    let names = (
-        longconv::float_names_in(flat),
-        longconv::literal_names_in(flat),
-    );
+    let names = (longconv::float_names(flat), longconv::literal_names(flat));
     for stmt_ref in flat {
         let Stmt::Instruction(stmt) = stmt_ref.as_ref() else {
             continue;
@@ -743,7 +734,7 @@ pub fn _long_arg(
     if !rule.get("wrap16").and_then(Json::as_bool).unwrap_or(false) {
         let idx = usize::try_from(pos - 1).ok()?;
         let arg = stmt.args.get(idx).and_then(|a| a.as_deref());
-        let converted = longconv::long_value_with(arg, env, profile, &names.0, &names.1);
+        let converted = longconv::long_value(arg, env, profile, &names.0, &names.1);
         let result = converted.unwrap_or_else(|| consteval::to_long(&value));
         return Some(
             if rule.get("wrap8").and_then(Json::as_bool).unwrap_or(false) {
@@ -988,7 +979,7 @@ pub fn _check_tablefile(
         }
     }
     let option = if stmt.args.len() > 1 {
-        longconv::long_value_with(stmt.args[1].as_deref(), env, profile, &names.0, &names.1)
+        longconv::long_value(stmt.args[1].as_deref(), env, profile, &names.0, &names.1)
     } else {
         None
     };
@@ -1178,7 +1169,7 @@ pub fn check_pass1_values(
     let variable_names: BTreeSet<String> = ctx
         .declared_variable_names()
         .iter()
-        .filter(|name| !symbols::is_reserved_predefined_name_with_profile(name, profile))
+        .filter(|name| !symbols::is_reserved_predefined_name(name, profile))
         .cloned()
         .collect();
     let earlier: BTreeSet<(i64, String)> = diags

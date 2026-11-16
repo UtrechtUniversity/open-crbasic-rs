@@ -25,33 +25,28 @@ pub static _SNMP_VARIABLE_RE: LazyLock<pyre::Regex> =
     LazyLock::new(|| pyre::Regex::new(r"(?i)\s*SNMPVariable\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)", 0));
 
 /// Port of `checker/symbols.py::_walk_names`.
-pub fn _walk_names(_expr: Option<&Expr>) {
-    todo!("checker/symbols.py::_walk_names (signature returns () instead of Vec<String>)")
-}
-
-/// Port of `checker/symbols.py::_walk_names`.
-pub fn walk_names(expr: Option<&Expr>) -> Vec<String> {
+pub fn _walk_names(expr: Option<&Expr>) -> Vec<String> {
     let mut out = Vec::new();
     let Some(expr) = expr else {
         return out;
     };
     match expr {
         Expr::Name(n) => out.push(n.name.clone()),
-        Expr::Unary(u) => out.extend(walk_names(u.operand.as_deref())),
+        Expr::Unary(u) => out.extend(_walk_names(u.operand.as_deref())),
         Expr::Binary(b) => {
-            out.extend(walk_names(b.left.as_deref()));
-            out.extend(walk_names(b.right.as_deref()));
+            out.extend(_walk_names(b.left.as_deref()));
+            out.extend(_walk_names(b.right.as_deref()));
         }
         Expr::Index(idx) => {
             out.push(idx.name.clone());
             for a in &idx.args {
-                out.extend(walk_names(a.as_deref()));
+                out.extend(_walk_names(a.as_deref()));
             }
         }
-        Expr::Member(m) => out.extend(walk_names(m.base.as_deref())),
+        Expr::Member(m) => out.extend(_walk_names(m.base.as_deref())),
         Expr::ArrayLiteral(al) => {
             for item in &al.items {
-                out.extend(walk_names(item.as_deref()));
+                out.extend(_walk_names(item.as_deref()));
             }
         }
         Expr::Number(_) | Expr::String(_) | Expr::Juxtaposed(_) => {}
@@ -60,12 +55,7 @@ pub fn walk_names(expr: Option<&Expr>) -> Vec<String> {
 }
 
 /// Port of `checker/symbols.py::_stmt_exprs`.
-pub fn _stmt_exprs(_stmt: &Stmt) {
-    todo!("checker/symbols.py::_stmt_exprs (signature returns () instead of Vec<Option<ExprRef>>)")
-}
-
-/// Port of `checker/symbols.py::_stmt_exprs`.
-pub fn stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
+pub fn _stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
     let mut out = Vec::new();
     match stmt {
         Stmt::Declaration(d) => {
@@ -88,12 +78,12 @@ pub fn stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
             out.push(i.cond.clone());
             if let Some(inline) = &i.inline {
                 for s2 in inline {
-                    out.extend(stmt_exprs(s2));
+                    out.extend(_stmt_exprs(s2));
                 }
             }
             if let Some(inline_else) = &i.inline_else {
                 for s2 in inline_else {
-                    out.extend(stmt_exprs(s2));
+                    out.extend(_stmt_exprs(s2));
                 }
             }
         }
@@ -128,12 +118,7 @@ pub fn stmt_exprs(stmt: &Stmt) -> Vec<Option<ExprRef>> {
 }
 
 /// Port of `checker/symbols.py::_name_nodes`.
-pub fn _name_nodes(_expr: Option<&Expr>) {
-    todo!("checker/symbols.py::_name_nodes (signature returns () instead of Vec<ExprRef>)")
-}
-
-/// Port of `checker/symbols.py::_name_nodes`.
-pub fn name_nodes(expr: Option<&ExprRef>) -> Vec<ExprRef> {
+pub fn _name_nodes(expr: Option<&ExprRef>) -> Vec<ExprRef> {
     let mut out = Vec::new();
     let Some(expr) = expr else {
         return out;
@@ -143,25 +128,25 @@ pub fn name_nodes(expr: Option<&ExprRef>) -> Vec<ExprRef> {
         Expr::Index(idx) => {
             out.push(Rc::clone(expr));
             for a in &idx.args {
-                out.extend(name_nodes(a.as_ref()));
+                out.extend(_name_nodes(a.as_ref()));
             }
         }
-        Expr::Unary(u) => out.extend(name_nodes(u.operand.as_ref())),
+        Expr::Unary(u) => out.extend(_name_nodes(u.operand.as_ref())),
         Expr::Binary(b) => {
-            out.extend(name_nodes(b.left.as_ref()));
-            out.extend(name_nodes(b.right.as_ref()));
+            out.extend(_name_nodes(b.left.as_ref()));
+            out.extend(_name_nodes(b.right.as_ref()));
         }
         Expr::Member(m) => {
-            out.extend(name_nodes(m.base.as_ref()));
+            out.extend(_name_nodes(m.base.as_ref()));
             if let Some(args) = &m.args {
                 for a in args {
-                    out.extend(name_nodes(a.as_ref()));
+                    out.extend(_name_nodes(a.as_ref()));
                 }
             }
         }
         Expr::ArrayLiteral(al) => {
             for item in &al.items {
-                out.extend(name_nodes(item.as_ref()));
+                out.extend(_name_nodes(item.as_ref()));
             }
         }
         Expr::Number(_) | Expr::String(_) | Expr::Juxtaposed(_) => {}
@@ -170,33 +155,19 @@ pub fn name_nodes(expr: Option<&ExprRef>) -> Vec<ExprRef> {
 }
 
 /// Port of `checker/symbols.py::is_reserved_predefined_name`.
-pub fn is_reserved_predefined_name(_name: &str) -> bool {
-    todo!("checker/symbols.py::is_reserved_predefined_name (omitted: profile: untyped)")
-}
-
-/// Port of `checker/symbols.py::is_reserved_predefined_name`.
-pub fn is_reserved_predefined_name_with_profile(name: &str, profile: &Profile) -> bool {
+pub fn is_reserved_predefined_name(name: &str, profile: &Profile) -> bool {
     let key = pystr::upper(name);
     profile.symbols().contains(&key) && !profile.declarable_predefined_names.contains(&key.as_str())
 }
 
 /// Port of `checker/symbols.py::report_predefined_name_collision`.
 pub fn report_predefined_name_collision(
-    _stmt: &Stmt,
-    _name: &str,
-    _diags: &mut Diagnostics,
-) -> bool {
-    todo!("checker/symbols.py::report_predefined_name_collision (omitted: profile: untyped)")
-}
-
-/// Port of `checker/symbols.py::report_predefined_name_collision`.
-pub fn report_predefined_name_collision_with_profile(
     stmt: &Stmt,
     name: &str,
     profile: &Profile,
     diags: &mut Diagnostics,
 ) -> bool {
-    if !is_reserved_predefined_name_with_profile(name, profile) {
+    if !is_reserved_predefined_name(name, profile) {
         return false;
     }
     let node = &stmt.base().node;
@@ -213,12 +184,7 @@ pub fn report_predefined_name_collision_with_profile(
 }
 
 /// Port of `checker/symbols.py::report_function_name_collision`.
-pub fn report_function_name_collision(_stmt: &Stmt, _name: &str, _diags: &mut Diagnostics) -> bool {
-    todo!("checker/symbols.py::report_function_name_collision (omitted: profile: untyped)")
-}
-
-/// Port of `checker/symbols.py::report_function_name_collision`.
-pub fn report_function_name_collision_with_profile(
+pub fn report_function_name_collision(
     stmt: &Stmt,
     name: &str,
     profile: &Profile,
@@ -241,16 +207,7 @@ pub fn report_function_name_collision_with_profile(
 }
 
 /// Port of `checker/symbols.py::check_local_name_collision`.
-pub fn check_local_name_collision(_stmt: &Stmt, _diags: &mut Diagnostics) {
-    todo!("checker/symbols.py::check_local_name_collision (omitted: profile: untyped)")
-}
-
-/// Port of `checker/symbols.py::check_local_name_collision`.
-pub fn check_local_name_collision_with_profile(
-    stmt: &Stmt,
-    profile: &Profile,
-    diags: &mut Diagnostics,
-) {
+pub fn check_local_name_collision(stmt: &Stmt, profile: &Profile, diags: &mut Diagnostics) {
     let declaration_vars = match stmt {
         Stmt::Declaration(d) => Some(d.vars.borrow()),
         _ => None,
@@ -271,10 +228,9 @@ pub fn check_local_name_collision_with_profile(
     };
     let node = &stmt.base().node;
     for (index, name) in names.iter().enumerate() {
-        let mut collision = !shadows_functions
-            && report_function_name_collision_with_profile(stmt, name, profile, diags);
-        collision =
-            collision || report_predefined_name_collision_with_profile(stmt, name, profile, diags);
+        let mut collision =
+            !shadows_functions && report_function_name_collision(stmt, name, profile, diags);
+        collision = collision || report_predefined_name_collision(stmt, name, profile, diags);
         if collision && profile.single_pass {
             if index + 2 < names.len() {
                 diags.error(
@@ -323,8 +279,8 @@ mod tests {
                 operand: Some(Rc::clone(&y)),
             }))),
         }));
-        assert_eq!(walk_names(Some(&bin)), vec!["arr", "x", "y"]);
-        let nodes = name_nodes(Some(&bin));
+        assert_eq!(_walk_names(Some(&bin)), vec!["arr", "x", "y"]);
+        let nodes = _name_nodes(Some(&bin));
         assert_eq!(nodes.len(), 3);
     }
 
@@ -339,7 +295,7 @@ mod tests {
             value_span: None,
         });
         let mut diags = Diagnostics::default();
-        check_local_name_collision_with_profile(&stmt, profile, &mut diags);
+        check_local_name_collision(&stmt, profile, &mut diags);
         assert_eq!(diags.items.len(), 1);
         assert_eq!(
             diags.items[0].message,

@@ -25,7 +25,16 @@ fn baseline_path() -> PathBuf {
 
 fn compile_case(dir: &Path, program: &str, logger: &str) -> Result<(i32, String), String> {
     let profile = profiles::get(logger).map_err(|error| error.to_string())?;
-    let result = compiler::compile_file(&dir.join(program), Some(profile), None, false, true);
+    let result = compiler::compile_file(
+        &dir.join(program),
+        Some(profile),
+        None,
+        false,
+        None,
+        true,
+        true,
+        false,
+    );
     Ok((
         i32::from(!result.ok()),
         result.result_lines(false).join("\n"),

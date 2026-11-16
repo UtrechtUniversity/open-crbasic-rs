@@ -647,7 +647,7 @@ pub fn _units_key(
     truncate: bool,
 ) -> Result<Option<ConstValue>, NotConstant> {
     if truncate {
-        return Ok(crate::tables::_unit_value_with(Some(units_arg), env).map(ConstValue::Int));
+        return Ok(crate::tables::_unit_value(Some(units_arg), env).map(ConstValue::Int));
     }
     consteval::value_of(Some(units_arg), env).map(Some)
 }

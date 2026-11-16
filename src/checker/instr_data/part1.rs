@@ -301,8 +301,7 @@ pub fn _unknown_table_references(
         if kw == "GETRECORD"
             && let Some(prof) = profile
             && closed.contains(&pystr::upper(&name))
-            // TODO(wire): tables::build_tables needs a real BuildTablesHooks adapter for GetRecord fields.
-            && let Some(fields) = _getrecord_short(inst, &name, program, prof, &[])
+            && let Some(fields) = _getrecord_short(inst, &name, program, prof)
         {
             out.push((
                 stmt.clone(),
@@ -334,7 +333,6 @@ pub fn _getrecord_short(
     table: &str,
     program: &ProgramRef,
     profile: &'static Profile,
-    built: &[TdfTable],
 ) -> Option<i64> {
     let dest = stmt.args.first()?.as_deref()?;
     if !matches!(dest, Expr::Name(_) | Expr::Index(_)) {
@@ -346,6 +344,10 @@ pub fn _getrecord_short(
     if !matches!(ty, "FLOAT" | "LONG" | "BOOLEAN" | "DOUBLE") {
         return None;
     }
+    let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::tables::build_tables(program, profile, &program.consts).0
+    }))
+    .ok()?;
     let record = built
         .iter()
         .find(|t| pystr::upper(&t.name) == pystr::upper(table))?;
@@ -912,7 +914,7 @@ pub fn _dup_entries(
 pub fn check_duplicate_fields(
     program: &Program,
     tables: &[TdfTable],
-    dup_fields_by_table: Option<&[Vec<DupFieldEntry>]>,
+    dup_fields_by_table: Option<&[Option<Vec<DupFieldEntry>>]>,
     diags: &mut Diagnostics,
 ) {
     if tables.is_empty() {
@@ -944,7 +946,7 @@ pub fn check_duplicate_fields(
         let table = &tables[idx];
         let dup_fields = dup_fields_by_table
             .and_then(|all| all.get(idx))
-            .map(Vec::as_slice);
+            .and_then(|o| o.as_deref());
         let mut seen: HashMap<String, Vec<(bool, Option<(i64, i64)>)>> = HashMap::new();
         let shortest = format!("Duplicate field name x in DataTable {}.", table.name)
             .chars()

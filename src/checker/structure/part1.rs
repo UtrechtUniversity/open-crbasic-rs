@@ -230,11 +230,11 @@ pub fn _check_calltable_outside_scan(
     if let Some(env) = env
         && let Some(size) = size
     {
-        let mut raw = tables::_fold_with(Some(size), env, None);
+        let mut raw = tables::_fold(Some(size), env, None);
         if let Expr::Number(n) = size
             && pystr::startswith_any(&pystr::upper(&n.text), &["&H", "&B", "&O"])
         {
-            raw = longconv::long_value_with(
+            raw = longconv::long_value(
                 Some(size),
                 env,
                 env.profile,
@@ -251,9 +251,8 @@ pub fn _check_calltable_outside_scan(
         }
         if raw.is_some() {
             let cr3xx = env.profile.single_pass;
-            auto = tables::declared_size_with(raw.as_ref(), cr3xx, 1).is_none()
-                || (cr3xx
-                    && tables::size_class_with(raw.as_ref()) == Some(tables::SizeClass::Toxic));
+            auto = tables::declared_size(raw.as_ref(), cr3xx, 1).is_none()
+                || (cr3xx && tables::size_class(raw.as_ref()) == Some(tables::SizeClass::Toxic));
         } else if matches!(size, Expr::Name(n) if pystr::upper(&n.name) == "NAN") {
             auto = true;
         }
@@ -308,7 +307,7 @@ pub fn _check_accept_table(
             driven = false;
         } else if kw == "DATAINTERVAL" && table.is_some() {
             let val = st.args().get(3).map_or(Some(ConstValue::Int(10)), |v| {
-                tables::_fold_with(v.as_deref(), env, None)
+                tables::_fold(v.as_deref(), env, None)
             });
             driven = driven
                 || !matches!(val, Some(ConstValue::Int(0)))
@@ -330,9 +329,9 @@ pub fn _check_accept_table(
         },
         _ => false,
     };
-    let raw = tables::_fold_with(size, env, None);
+    let raw = tables::_fold(size, env, None);
     if raw.is_some() {
-        auto = tables::declared_size_with(
+        auto = tables::declared_size(
             raw.as_ref(),
             matches!(env.profile.name, "cr300" | "cr350"),
             1,
@@ -664,7 +663,7 @@ pub fn pipeline_task_errors(
         .iter()
         .any(|st| _keyword(st) == "PIPELINEMODE");
     let implicit =
-        !explicit && crate::mode::decide_with_env(&program.statements, profile, &env) == "Pipeline";
+        !explicit && crate::mode::decide(&program.statements, profile, &env) == "Pipeline";
     struct State {
         pipeline: bool,
         sequential: bool,

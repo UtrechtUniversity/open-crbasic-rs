@@ -42,8 +42,8 @@ pub fn check_fieldcal_variable_args(
     } else {
         None
     };
-    let float_names = longconv::float_names_in(&program.statements);
-    let literal_names = longconv::literal_names_in(&program.statements);
+    let float_names = longconv::float_names(&program.statements);
+    let literal_names = longconv::literal_names(&program.statements);
     let conv = DnpConv {
         env,
         profile,
@@ -386,7 +386,7 @@ pub fn _check_cdm_bridge_options(
         {
             return Some((1_i64 << 31) - 1);
         }
-        longconv::long_value_with(arg, env, profile, names, literals)
+        longconv::long_value(arg, env, profile, names, literals)
     };
     let settling = value(positions.0);
     let excitation = value(positions.1);
@@ -431,9 +431,8 @@ pub fn _check_cdm_mux_options(
     if stmt.args.len() < 5 {
         return;
     }
-    let conv = |i: usize| {
-        longconv::long_value_with(stmt.args[i].as_deref(), env, profile, names, literals)
-    };
+    let conv =
+        |i: usize| longconv::long_value(stmt.args[i].as_deref(), env, profile, names, literals);
     let (mut clock, mut reset, width) = (conv(2), conv(3), conv(4));
     let last_port = if module == 220 || module == 222 { 2 } else { 4 };
     let line = stmt.base.node.line;
@@ -593,8 +592,8 @@ pub fn check_cdm_address_types(
         {
             if conversion.is_none() {
                 conversion = Some((
-                    longconv::float_names_in(&program.statements),
-                    longconv::literal_names_in(&program.statements),
+                    longconv::float_names(&program.statements),
+                    longconv::literal_names(&program.statements),
                 ));
             }
             let (names, literals) = conversion.as_ref().expect("set above");
@@ -639,10 +638,10 @@ pub fn check_epi_scan_buffers(
     {
         return;
     }
-    let float_names = longconv::float_names_in(&program.statements);
-    let literal_names = longconv::literal_names_in(&program.statements);
+    let float_names = longconv::float_names(&program.statements);
+    let literal_names = longconv::literal_names(&program.statements);
     let names = (&float_names, &literal_names);
-    let execution = mode::decide_with_env(&program.statements, profile, env);
+    let execution = mode::decide(&program.statements, profile, env);
     if execution != "Pipeline" {
         if execution == "Sequential" {
             for st in &stmts {
@@ -739,9 +738,8 @@ pub fn _check_cdm_fft(
     if st.args.len() != 17 {
         return;
     }
-    let arg = |pos: usize| {
-        longconv::long_value_with(st.args[pos].as_deref(), env, profile, names.0, names.1)
-    };
+    let arg =
+        |pos: usize| longconv::long_value(st.args[pos].as_deref(), env, profile, names.0, names.1);
     if !matches!(arg(0), Some(260 | 261)) {
         return;
     }
@@ -847,7 +845,7 @@ pub fn check_avw200_scan_time(
     if !stmts.iter().any(|st| is_avw(st)) {
         return;
     }
-    if mode::decide_with_env(&program.statements, profile, env) != "Pipeline" {
+    if mode::decide(&program.statements, profile, env) != "Pipeline" {
         return;
     }
     // the open main-sequence Scan statement

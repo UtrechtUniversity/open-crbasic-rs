@@ -845,8 +845,7 @@ pub struct DnpConv<'a> {
 pub fn _dnp_long(arg: Option<&Expr>, conv: &DnpConv<'_>, wrap16: bool) -> Option<i64> {
     let env = conv.env?;
     let arg = arg?;
-    let number =
-        longconv::long_value_with(Some(arg), env, conv.profile, conv.names, conv.literals)?;
+    let number = longconv::long_value(Some(arg), env, conv.profile, conv.names, conv.literals)?;
     if wrap16 {
         Some(((number + 32768) & 0xFFFF) - 32768)
     } else {
@@ -964,8 +963,7 @@ pub fn _dnp_long_flag(
     routine_names: &BTreeSet<String>,
 ) -> Option<bool> {
     let arg = arg?;
-    if let Some(literal) = intervals::timeout_value_with(Some(arg), None, profile, &BTreeSet::new())
-    {
+    if let Some(literal) = intervals::timeout_value(Some(arg), None, profile, &BTreeSet::new()) {
         return Some(matches!(literal, intervals::TimeoutValue::Int(_)));
     }
     if let Expr::Name(n) = arg {
@@ -996,7 +994,7 @@ pub fn _dnp_long_flag(
                     };
                     let sign = if f < 0.0 { -1 } else { 1 };
                     let converted =
-                        intervals::_decimal_with(mag_int.unsigned_abs(), sign, profile, true);
+                        intervals::_decimal(mag_int.unsigned_abs(), sign, profile, true);
                     return Some(matches!(converted, Some(intervals::TimeoutValue::Int(_))));
                 }
                 ConstValue::Int(i) => {
@@ -1006,7 +1004,7 @@ pub fn _dnp_long_flag(
                         return Some(_f32_is_2_31(&ConstValue::Float(neg)));
                     }
                     let sign = if i < 0 { -1 } else { 1 };
-                    let converted = intervals::_decimal_with(i.unsigned_abs(), sign, profile, true);
+                    let converted = intervals::_decimal(i.unsigned_abs(), sign, profile, true);
                     return Some(matches!(converted, Some(intervals::TimeoutValue::Int(_))));
                 }
                 ConstValue::BigInt(s) => {
@@ -1245,8 +1243,8 @@ pub fn check_dnp_update(
     let ctx = context::of(program, Some(profile), env.cloned());
     let types = ctx.variable_types(false);
     let tables = env.map(|_| ctx.scope_tables(false, false));
-    let float_names = longconv::float_names_in(&program.statements);
-    let literal_names = longconv::literal_names_in(&program.statements);
+    let float_names = longconv::float_names(&program.statements);
+    let literal_names = longconv::literal_names(&program.statements);
     let conv = DnpConv {
         env,
         profile,

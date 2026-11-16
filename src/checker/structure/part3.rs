@@ -333,7 +333,7 @@ pub fn check_pass1(
                 );
             }
         } else if in_sub && !in_struct {
-            symbols::check_local_name_collision_with_profile(stmt, profile, diags);
+            symbols::check_local_name_collision(stmt, profile, diags);
             if let Stmt::ConstDecl(c) = stmt.as_ref()
                 && let Some(bad) = super::_bad_const_type(c)
             {
@@ -362,9 +362,8 @@ pub fn check_pass1(
                                 &format!("{} already declared as a variable.", c.name),
                                 file,
                             ),
-                            None if !symbols::is_reserved_predefined_name_with_profile(
-                                &c.name, profile,
-                            ) && !profile.functions().contains(&name) =>
+                            None if !symbols::is_reserved_predefined_name(&c.name, profile)
+                                && !profile.functions().contains(&name) =>
                             {
                                 declared_kinds.insert(name, "CONST".to_owned());
                             }

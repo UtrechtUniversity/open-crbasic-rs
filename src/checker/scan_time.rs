@@ -209,40 +209,40 @@ impl Model {
     /// Port of `checker/scan_time.py::Model::integ_time`.
     pub fn integ_time(&self, k: i64) -> i64 {
         match self.kind {
-            ModelKind::Cr6 => CR6::default().integ_time_with(k),
-            ModelKind::Cr1000x => CR1000X::default().integ_time_with(k),
+            ModelKind::Cr6 => CR6::default().integ_time(k),
+            ModelKind::Cr1000x => CR1000X::default().integ_time(k),
         }
     }
 
     /// Port of `checker/scan_time.py::Model::settle_code`.
     pub fn settle_code(&self, settling: i64) -> i64 {
         match self.kind {
-            ModelKind::Cr6 => CR6::default().settle_code_with(settling),
-            ModelKind::Cr1000x => CR1000X::default().settle_code_with(settling),
+            ModelKind::Cr6 => CR6::default().settle_code(settling),
+            ModelKind::Cr1000x => CR1000X::default().settle_code(settling),
         }
     }
 
     /// Port of `checker/scan_time.py::Model::settle_units`.
     pub fn settle_units(&self, code: i64) -> i64 {
         match self.kind {
-            ModelKind::Cr6 => CR6::default().settle_units_with(code),
-            ModelKind::Cr1000x => CR1000X::default().settle_units_with(code),
+            ModelKind::Cr6 => CR6::default().settle_units(code),
+            ModelKind::Cr1000x => CR1000X::default().settle_units(code),
         }
     }
 
     /// Port of `checker/scan_time.py::Model::open_detect_code`.
     pub fn open_detect_code(&self) -> i64 {
         match self.kind {
-            ModelKind::Cr6 => CR6::default().open_detect_code_with(),
-            ModelKind::Cr1000x => CR1000X::default().open_detect_code_with(),
+            ModelKind::Cr6 => CR6::default().open_detect_code(),
+            ModelKind::Cr1000x => CR1000X::default().open_detect_code(),
         }
     }
 
     /// Port of `checker/scan_time.py::Model::fixed_code`.
     pub fn fixed_code(&self, constant: i64) -> i64 {
         match self.kind {
-            ModelKind::Cr6 => CR6::default().fixed_code_with(constant),
-            ModelKind::Cr1000x => CR1000X::default().fixed_code_with(constant),
+            ModelKind::Cr6 => CR6::default().fixed_code(constant),
+            ModelKind::Cr1000x => CR1000X::default().fixed_code(constant),
         }
     }
 }
@@ -253,48 +253,28 @@ pub struct CR6 {}
 
 impl CR6 {
     /// Port of `checker/scan_time.py::_CR6::integ_time`.
-    pub fn integ_time(&self) {
-        let _ = self.integ_time_with(0);
-    }
-
-    pub fn integ_time_with(&self, k: i64) -> i64 {
+    pub fn integ_time(&self, k: i64) -> i64 {
         pystr::floordiv_i64(k << 5, 3).unwrap_or(0) + 1
     }
 
     /// Port of `checker/scan_time.py::_CR6::settle_code`.
-    pub fn settle_code(&self) {
-        let _ = self.settle_code_with(0);
-    }
-
-    pub fn settle_code_with(&self, settling: i64) -> i64 {
+    pub fn settle_code(&self, settling: i64) -> i64 {
         let s = if settling == 0 { 500 } else { settling };
         _cint(_f32(_f32(_f32(i32(s + 810) as f64) * 3.0) / 32.0) + 0.5)
     }
 
     /// Port of `checker/scan_time.py::_CR6::settle_units`.
-    pub fn settle_units(&self) {
-        let _ = self.settle_units_with(0);
-    }
-
-    pub fn settle_units_with(&self, code: i64) -> i64 {
+    pub fn settle_units(&self, code: i64) -> i64 {
         i32(_cint(_f32(_f32((code as f64) * 32.0) / 3.0)) + 5)
     }
 
     /// Port of `checker/scan_time.py::_CR6::open_detect_code`.
-    pub fn open_detect_code(&self) {
-        let _ = self.open_detect_code_with();
-    }
-
-    pub fn open_detect_code_with(&self) -> i64 {
+    pub fn open_detect_code(&self) -> i64 {
         5
     }
 
     /// Port of `checker/scan_time.py::_CR6::fixed_code`.
-    pub fn fixed_code(&self) {
-        let _ = self.fixed_code_with(0);
-    }
-
-    pub fn fixed_code_with(&self, constant: i64) -> i64 {
+    pub fn fixed_code(&self, constant: i64) -> i64 {
         pystr::py_int_from_f64(_f32(_f32((constant as f64) * 3.0) / 32.0) + 0.5).unwrap_or(0)
     }
 }
@@ -305,48 +285,28 @@ pub struct CR1000X {}
 
 impl CR1000X {
     /// Port of `checker/scan_time.py::_CR1000X::integ_time`.
-    pub fn integ_time(&self) {
-        let _ = self.integ_time_with(0);
-    }
-
-    pub fn integ_time_with(&self, k: i64) -> i64 {
+    pub fn integ_time(&self, k: i64) -> i64 {
         k * 32 + 180
     }
 
     /// Port of `checker/scan_time.py::_CR1000X::settle_code`.
-    pub fn settle_code(&self) {
-        let _ = self.settle_code_with(0);
-    }
-
-    pub fn settle_code_with(&self, settling: i64) -> i64 {
+    pub fn settle_code(&self, settling: i64) -> i64 {
         let s = if settling == 0 { 450 } else { settling };
         _cint(_f32(_f32(s as f64) / 32.0) + 0.5)
     }
 
     /// Port of `checker/scan_time.py::_CR1000X::settle_units`.
-    pub fn settle_units(&self) {
-        let _ = self.settle_units_with(0);
-    }
-
-    pub fn settle_units_with(&self, code: i64) -> i64 {
+    pub fn settle_units(&self, code: i64) -> i64 {
         i32(_cint(_f32((code as f64) * 32.0)) + 5)
     }
 
     /// Port of `checker/scan_time.py::_CR1000X::open_detect_code`.
-    pub fn open_detect_code(&self) {
-        let _ = self.open_detect_code_with();
-    }
-
-    pub fn open_detect_code_with(&self) -> i64 {
+    pub fn open_detect_code(&self) -> i64 {
         2
     }
 
     /// Port of `checker/scan_time.py::_CR1000X::fixed_code`.
-    pub fn fixed_code(&self) {
-        let _ = self.fixed_code_with(0);
-    }
-
-    pub fn fixed_code_with(&self, constant: i64) -> i64 {
+    pub fn fixed_code(&self, constant: i64) -> i64 {
         pystr::py_int_from_f64(_f32((constant as f64) / 32.0) + 0.5).unwrap_or(0)
     }
 }
@@ -451,12 +411,7 @@ impl Default for Budget {
 }
 
 /// Port of `checker/scan_time.py::_value`.
-pub fn _value(expr: Option<&Expr>) {
-    let env = Env::new(profiles::get("cr6").expect("cr6 profile"));
-    let _ = _value_with(expr, &env);
-}
-
-pub fn _value_with(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
+pub fn _value(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
     let expr = expr?;
     if !consteval::is_constant(Some(expr), env) {
         return None;
@@ -465,13 +420,8 @@ pub fn _value_with(expr: Option<&Expr>, env: &Env) -> Option<ConstValue> {
 }
 
 /// Port of `checker/scan_time.py::_num`.
-pub fn _num(expr: Option<&Expr>) -> Option<f64> {
-    let env = Env::new(profiles::get("cr6").expect("cr6 profile"));
-    _num_with(expr, &env)
-}
-
-pub fn _num_with(expr: Option<&Expr>, env: &Env) -> Option<f64> {
-    match _value_with(expr, env)? {
+pub fn _num(expr: Option<&Expr>, env: &Env) -> Option<f64> {
+    match _value(expr, env)? {
         ConstValue::Int(i) => Some(i as f64),
         ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() => Some(f),
         _ => None,
@@ -479,35 +429,25 @@ pub fn _num_with(expr: Option<&Expr>, env: &Env) -> Option<f64> {
 }
 
 /// Port of `checker/scan_time.py::_long`.
-pub fn _long(expr: Option<&Expr>) -> Option<i64> {
-    let env = Env::new(profiles::get("cr6").expect("cr6 profile"));
-    _long_with(expr, &env)
-}
-
-pub fn _long_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
-    match _value_with(expr, env)? {
+pub fn _long(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+    match _value(expr, env)? {
         ConstValue::Str(_) => None,
         v => Some(consteval::to_long(&v)),
     }
 }
 
 /// Port of `checker/scan_time.py::_settling`.
-pub fn _settling(expr: Option<&Expr>) -> Option<i64> {
-    let env = Env::new(profiles::get("cr6").expect("cr6 profile"));
-    _settling_with(expr, &env)
-}
-
-pub fn _settling_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+pub fn _settling(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     if let Some(Expr::Name(n)) = expr
         && pystr::upper(&n.name) == "INF"
         && !env.consts.borrow().contains_key("INF")
     {
         return Some(consteval::to_long(&ConstValue::Float(f64::INFINITY)));
     }
-    if let Some(ConstValue::Str(s)) = _value_with(expr, env) {
+    if let Some(ConstValue::Str(s)) = _value(expr, env) {
         return Some(consteval::to_long(&ConstValue::Str(s)));
     }
-    _long_with(expr, env)
+    _long(expr, env)
 }
 
 fn range_info(code: i64) -> Option<(i64, bool)> {
@@ -639,11 +579,7 @@ fn bridge_spec(kw: &str) -> Option<BridgeSpec> {
 }
 
 /// Port of `checker/scan_time.py::_bridge_units`.
-pub fn _bridge_units(_m: &Model) -> Option<(i64, bool, i64)> {
-    None
-}
-
-pub fn _bridge_units_with(
+pub fn _bridge_units(
     m: &Model,
     args: &[Option<ExprRef>],
     env: &Env,
@@ -653,20 +589,20 @@ pub fn _bridge_units_with(
         return None;
     }
     let arg_expr = |pos_1based: usize| args[pos_1based - 1].as_deref();
-    let reps = _long_with(arg_expr(2), env)?;
-    let chan = _long_with(arg_expr(spec.channel), env)?;
-    let mut meas = _long_with(arg_expr(spec.meas_pex), env)?;
-    let revex = _long_with(arg_expr(spec.rev_ex), env)?;
+    let reps = _long(arg_expr(2), env)?;
+    let chan = _long(arg_expr(spec.channel), env)?;
+    let mut meas = _long(arg_expr(spec.meas_pex), env)?;
+    let revex = _long(arg_expr(spec.rev_ex), env)?;
     let revdiff = match spec.rev_diff {
-        Some(dp) => _long_with(arg_expr(dp), env)?,
+        Some(dp) => _long(arg_expr(dp), env)?,
         None => 0,
     };
     let mut rngs = Vec::with_capacity(spec.ranges.len());
     for &r in spec.ranges {
-        rngs.push(_long_with(arg_expr(r), env)?);
+        rngs.push(_long(arg_expr(r), env)?);
     }
-    let settling = _settling_with(arg_expr(spec.settle), env)?;
-    let fn_val = _num_with(arg_expr(spec.fnotch), env)?;
+    let settling = _settling(arg_expr(spec.settle), env)?;
+    let fn_val = _num(arg_expr(spec.fnotch), env)?;
 
     if chan <= 0
         || !(1..=100_000).contains(&reps)
@@ -718,17 +654,12 @@ pub fn _bridge_units_with(
     ))
 }
 
-/// Port of `checker/scan_time.py::instruction_units`.
-pub fn instruction_units(stmt: &Instruction, profile: &Profile) -> Option<(i64, bool, i64)> {
-    let env = Env::new(profile_static(profile));
-    instruction_units_with(stmt, &env, profile)
-}
-
 fn profile_static(profile: &Profile) -> &'static Profile {
     profiles::get(profile.name).unwrap_or_else(|_| profiles::get("cr6").expect("cr6 profile"))
 }
 
-pub fn instruction_units_with(
+/// Port of `checker/scan_time.py::instruction_units`.
+pub fn instruction_units(
     stmt: &Instruction,
     env: &Env,
     profile: &Profile,
@@ -739,9 +670,9 @@ pub fn instruction_units_with(
         if args.len() != 3 {
             return None;
         }
-        let option = _num_with(args[0].as_deref(), env)?;
-        let value = _num_with(args[1].as_deref(), env)?;
-        let unit = _num_with(args[2].as_deref(), env)?;
+        let option = _num(args[0].as_deref(), env)?;
+        let value = _num(args[1].as_deref(), env)?;
+        let unit = _num(args[2].as_deref(), env)?;
         if pystr::py_int_from_f64(option) != Some(0) {
             return None;
         }
@@ -766,7 +697,7 @@ pub fn instruction_units_with(
     }
     if kw == "EXCITEV" {
         let delay = if args.len() == 3 {
-            _long_with(args[2].as_deref(), env)?
+            _long(args[2].as_deref(), env)?
         } else {
             return None;
         };
@@ -792,7 +723,7 @@ pub fn instruction_units_with(
         return Some((battery_units(m), true, 0));
     }
     if kw == "PANELTEMP" && args.len() == 2 {
-        let fn_val = _num_with(args[1].as_deref(), env)?;
+        let fn_val = _num(args[1].as_deref(), env)?;
         let units = panel_units(m, fn_val)?;
         if units == 0 {
             return None;
@@ -808,11 +739,11 @@ pub fn instruction_units_with(
         if args.len() < spec.fnotch {
             return None;
         }
-        let reps = _long_with(args[spec.reps - 1].as_deref(), env)?;
-        let rng = _long_with(args[spec.range - 1].as_deref(), env)?;
-        let flag = _long_with(args[spec.flag - 1].as_deref(), env)?;
-        let settling = _settling_with(args[spec.settle - 1].as_deref(), env)?;
-        let fn_val = _num_with(args[spec.fnotch - 1].as_deref(), env)?;
+        let reps = _long(args[spec.reps - 1].as_deref(), env)?;
+        let rng = _long(args[spec.range - 1].as_deref(), env)?;
+        let flag = _long(args[spec.flag - 1].as_deref(), env)?;
+        let settling = _settling(args[spec.settle - 1].as_deref(), env)?;
+        let fn_val = _num(args[spec.fnotch - 1].as_deref(), env)?;
         let (gain, mut open_detect) = range_info(rng)?;
         let cr6_current = kw == "CURRENTSE" && profile.name == "cr6";
         let on = (flag & 0xFF) != 0 && !cr6_current;
@@ -838,12 +769,12 @@ pub fn instruction_units_with(
         ));
     }
     if let Some(spec) = bridge_spec(&kw) {
-        return _bridge_units_with(m, args, env, spec);
+        return _bridge_units(m, args, env, spec);
     }
     if (kw == "THERM107" || kw == "THERM108" || kw == "THERM109") && args.len() >= 6 {
-        let reps = _long_with(args[1].as_deref(), env)?;
-        let settling = _long_with(args[4].as_deref(), env)?;
-        let fn_val = _num_with(args[5].as_deref(), env)?;
+        let reps = _long(args[1].as_deref(), env)?;
+        let settling = _long(args[4].as_deref(), env)?;
+        let fn_val = _num(args[5].as_deref(), env)?;
         if !(1..=255).contains(&reps) || !(0..6_000_000).contains(&settling) {
             return None;
         }
@@ -861,7 +792,7 @@ pub fn instruction_units_with(
         ));
     }
     if kw == "CS616" && args.len() >= 2 {
-        let reps = _long_with(args[1].as_deref(), env)?;
+        let reps = _long(args[1].as_deref(), env)?;
         if (1..=255).contains(&reps) {
             return Some((reps * 5 + 2, false, 0));
         }
@@ -968,17 +899,7 @@ fn is_known_timed(kw: &str) -> bool {
 }
 
 /// Port of `checker/scan_time.py::budgets`.
-pub fn budgets(program: &Program, profile: &Profile, include_zero: bool) {
-    let env = Env::new(profile_static(profile));
-    let _ = budgets_with(program, &env, profile, include_zero);
-}
-
-pub fn budgets_with(
-    program: &Program,
-    env: &Env,
-    profile: &Profile,
-    include_zero: bool,
-) -> Vec<Budget> {
+pub fn budgets(program: &Program, env: &Env, profile: &Profile, include_zero: bool) -> Vec<Budget> {
     let model = model_for(profile.name).unwrap_or(&CR6_MODEL);
     let mut slow = false;
     let mut cur: Option<Budget> = None;
@@ -1008,8 +929,8 @@ pub fn budgets_with(
         {
             let mut raw = scan_raw(instr, env);
             if include_zero && instr.args.len() > 1 {
-                let v = _value_with(instr.args[0].as_deref(), env);
-                let u = _value_with(instr.args[1].as_deref(), env);
+                let v = _value(instr.args[0].as_deref(), env);
+                let u = _value(instr.args[1].as_deref(), env);
                 #[allow(
                     clippy::float_cmp,
                     reason = "Python `u in (2, 3)` exact float equality"
@@ -1084,7 +1005,7 @@ pub fn budgets_with(
             let args: Vec<Option<ConstValue>> = instr
                 .args
                 .iter()
-                .map(|a| _value_with(a.as_deref(), env))
+                .map(|a| _value(a.as_deref(), env))
                 .collect();
             let count = if args.len() == 3 {
                 match args[2] {
@@ -1179,7 +1100,7 @@ pub fn budgets_with(
             continue;
         }
         if let Stmt::Instruction(instr) = stmt_rc.as_ref() {
-            if let Some(got) = instruction_units_with(instr, env, profile) {
+            if let Some(got) = instruction_units(instr, env, profile) {
                 total = i32(total + got.0);
                 if kw != "PULSECOUNT" {
                     b.pulse_only = false;
@@ -1313,7 +1234,7 @@ mod tests {
                 instr_stmt("Next", "Next Scan", vec![]),
             ],
         );
-        let bs = budgets_with(&prog, &env, cr6, false);
+        let bs = budgets(&prog, &env, cr6, false);
         assert_eq!(bs.len(), 1);
         let b = &bs[0];
         assert_eq!(b.interval, 10_000);
@@ -1336,7 +1257,7 @@ mod tests {
             let Stmt::Instruction(instr) = instr_stmt(kw, kw, args).as_ref().clone() else {
                 unreachable!()
             };
-            instruction_units_with(&instr, &env, prof)
+            instruction_units(&instr, &env, prof)
         };
 
         assert_eq!(

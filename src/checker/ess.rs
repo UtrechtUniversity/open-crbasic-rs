@@ -14,22 +14,12 @@ use crate::pystr;
 use crate::syntax::{ConstValue, Expr, Program, Stmt};
 
 /// Port of `checker/ess.py::_table`.
-pub fn _table(_data_dir: &str) {
-    // Table data is embedded per-profile via `Profile::ess_variables()`.
-}
-
-/// Port of `checker/ess.py::_table`.
-pub fn _table_for_profile(profile: &Profile) -> &'static [EssVariable] {
+pub fn _table(profile: &Profile) -> &'static [EssVariable] {
     profile.ess_variables()
 }
 
 /// Port of `checker/ess.py::_const_int`.
-pub fn _const_int(_expr: Option<&Expr>) -> Option<i64> {
-    todo!("checker/ess.py::_const_int (omitted: env: consteval.Env)")
-}
-
-/// Port of `checker/ess.py::_const_int`.
-pub fn _const_int_with_env(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+pub fn _const_int(expr: Option<&Expr>, env: &Env) -> Option<i64> {
     let expr = expr?;
     if !consteval::is_constant(Some(expr), env) {
         return None;
@@ -48,13 +38,8 @@ pub fn _const_int_with_env(expr: Option<&Expr>, env: &Env) -> Option<i64> {
 }
 
 /// Port of `checker/ess.py::check`.
-pub fn check(_program: &Program, _diags: &mut Diagnostics) {
-    todo!("checker/ess.py::check (omitted: profile: untyped, env: consteval.Env)")
-}
-
-/// Port of `checker/ess.py::check`.
-pub fn check_with_env(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
-    let table = _table_for_profile(profile);
+pub fn check(program: &Program, profile: &Profile, diags: &mut Diagnostics, env: &Env) {
+    let table = _table(profile);
     if table.is_empty() {
         return;
     }
@@ -67,7 +52,7 @@ pub fn check_with_env(program: &Program, profile: &Profile, diags: &mut Diagnost
                 for v in decl.vars.borrow().iter() {
                     let mut total: Option<i64> = Some(1);
                     for d in &v.dims {
-                        let n = _const_int_with_env(Some(d.as_ref()), env);
+                        let n = _const_int(Some(d.as_ref()), env);
                         total = match (total, n) {
                             (Some(t), Some(n)) => t.checked_mul(n),
                             _ => None,
@@ -75,7 +60,7 @@ pub fn check_with_env(program: &Program, profile: &Profile, diags: &mut Diagnost
                     }
                     let kind = pystr::upper(v.type_.as_deref().unwrap_or("FLOAT"));
                     let size = if let Some(ss) = &v.string_size {
-                        _const_int_with_env(Some(ss.as_ref()), env)
+                        _const_int(Some(ss.as_ref()), env)
                     } else {
                         Some(24)
                     };
@@ -221,7 +206,7 @@ mod tests {
         };
         let mut diags = Diagnostics::new();
         let env = Env::new(profile);
-        check_with_env(&prog, profile, &mut diags, &env);
+        check(&prog, profile, &mut diags, &env);
         let msgs: Vec<&str> = diags.items.iter().map(|d| d.message.as_str()).collect();
         assert_eq!(
             msgs,

@@ -11,7 +11,10 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::TdfTable;
-use super::{ConstTableDecl, VarInfo};
+use super::{
+    _as_int, _const_is_int, _dtype_code, _fold, _make_var_info, _resolve_alias_target,
+    _string_stored_len, _unit_seconds, ConstTableDecl, StructTypeDef, VarInfo, type_code_for,
+};
 use crate::consteval;
 use crate::diagnostics::{DiagRef, Diagnostic, Diagnostics};
 use crate::profiles::Profile;
@@ -22,41 +25,6 @@ use crate::syntax::{
     SubDef, Unparsed, VarDecl,
 };
 use crate::tdf::TdfField;
-
-/// Local mirror of `tables.py::TYPE_CODES` until `part1` exports it.
-fn type_code_by_name(name_upper: &str) -> Option<i64> {
-    match name_upper {
-        "FLOAT" | "IEEE4" => Some(9),
-        "FP2" => Some(7),
-        "LONG" => Some(6),
-        "BOOLEAN" => Some(28),
-        "BOOL8" => Some(17),
-        "STRING" => Some(11),
-        "DOUBLE" | "IEEE8" => Some(18),
-        "UINT2" => Some(2),
-        "NSEC" => Some(14),
-        "UINT1" => Some(1),
-        "UINT4" => Some(3),
-        _ => None,
-    }
-}
-
-/// Local mirror of `tables.py::_UNIT_SECONDS` until `part1` exports it.
-fn unit_seconds(unit_upper: &str) -> f64 {
-    match unit_upper {
-        "USEC" => 1e-6,
-        "MSEC" => 1e-3,
-        "MIN" => 60.0,
-        "HR" => 3600.0,
-        "DAY" => 86400.0,
-        _ => 1.0,
-    }
-}
-
-/// Local mirror of `tables.py::_fold` until `part1` exports the full signature.
-fn p1_fold(expr: Option<&Expr>, env: &consteval::Env) -> Option<ConstValue> {
-    consteval::value_of(expr, env).ok()
-}
 
 /// Helper to convert a `ConstValue` to `f64` (Python `float(v)`).
 fn const_to_f64(v: &ConstValue) -> Option<f64> {
@@ -80,153 +48,10 @@ fn const_to_i64(v: &ConstValue) -> Option<i64> {
 
 /// Helper to evaluate an expression as `f64` with a default.
 fn fold_f64(expr: Option<&Expr>, env: &consteval::Env, default: f64) -> f64 {
-    p1_fold(expr, env)
+    _fold(expr, env, None)
         .as_ref()
         .and_then(const_to_f64)
         .unwrap_or(default)
-}
-
-/// Local mirror of `tables.py::_as_int` until `part1` exports the full signature.
-fn p1_as_int(v: Option<&ConstValue>, default: i64) -> i64 {
-    let Some(v) = v else {
-        return default;
-    };
-    match v {
-        ConstValue::Int(i) => *i,
-        _ => const_to_f64(v).and_then(pystr::py_round).unwrap_or(default),
-    }
-}
-
-/// Local mirror of `tables.py::_dtype_code` until `part1` exports the full signature.
-fn p1_dtype_code(expr: Option<&Expr>, env: &consteval::Env) -> i64 {
-    if let Some(Expr::Name(n)) = expr
-        && let Some(code) = type_code_by_name(&pystr::upper(&n.name))
-    {
-        return code;
-    }
-    if let Some(v) = p1_fold(expr, env)
-        && let Some(code) = const_to_i64(&v)
-        && matches!(code, 9 | 7 | 6 | 28 | 17 | 11 | 18 | 2 | 14 | 1 | 3)
-    {
-        return code;
-    }
-    9
-}
-
-/// Local mirror of `tables.py::_string_stored_len` until `part1` exports it.
-fn p1_string_stored_len(n: i64) -> i64 {
-    (pystr::floordiv_i64(n, 4).unwrap_or(0) + 1) * 4
-}
-
-/// Local mirror of `tables.py::_const_is_int` until `part1` exports the full signature.
-fn p1_const_is_int(
-    expr: Option<&Expr>,
-    env: &consteval::Env,
-    int_names: &OrderedMap<String, bool>,
-) -> bool {
-    let Some(expr) = expr else {
-        return true;
-    };
-    match expr {
-        Expr::Number(n) => matches!(n.value, NumberValue::Int(_) | NumberValue::BigInt(_)),
-        Expr::Name(n) => {
-            let upper = pystr::upper(&n.name);
-            if let Some(&b) = int_names.get(&upper) {
-                return b;
-            }
-            if let Some(sym) = env.profile.symbols().get(&upper) {
-                // In profiles.json, integer symbols have `fvalue == value as f64` or `extra == 0`?
-                // In Python, `sym.get("value")` is always `int` in `symbols.json` (except NaN/INF).
-                // Wait: in `Symbol`, `value` is `i64` and `fvalue` is `f64` (loaded from JSON).
-                let _ = sym;
-                return true;
-            }
-            true
-        }
-        Expr::Unary(u) => {
-            if u.op == "NOT" {
-                return true;
-            }
-            p1_const_is_int(u.operand.as_deref(), env, int_names)
-        }
-        Expr::Binary(b) => {
-            if b.op == "/" {
-                return false;
-            }
-            if matches!(b.op.as_str(), "+" | "-" | "*") {
-                return p1_const_is_int(b.left.as_deref(), env, int_names)
-                    && p1_const_is_int(b.right.as_deref(), env, int_names);
-            }
-            if matches!(
-                b.op.as_str(),
-                "\\" | "MOD"
-                    | "AND"
-                    | "OR"
-                    | "XOR"
-                    | "="
-                    | "<>"
-                    | "<"
-                    | ">"
-                    | "<="
-                    | ">="
-                    | "EQV"
-                    | "IMP"
-                    | "<<"
-                    | ">>"
-            ) {
-                return true;
-            }
-            false
-        }
-        _ => true,
-    }
-}
-
-/// Local mirror of `tables.py::VarInfo` (struct body) until `part1` defines fields.
-#[derive(Debug, Clone, Default)]
-pub struct StructTypeInfo {
-    pub members: Vec<Rc<VarDecl>>,
-    pub units: OrderedMap<String, String>,
-    pub ro: BTreeSet<String>,
-}
-
-/// Local mirror of `tables.py::VarInfo` until `part1::VarInfo` defines fields.
-#[derive(Debug, Clone, Default)]
-pub struct VarInfoData {
-    pub type_code: i64,
-    pub shape: Vec<i64>,
-    pub stored_len: Option<i64>,
-    pub units: String,
-    pub struct_info: Option<StructTypeInfo>,
-    pub name: String,
-}
-
-impl VarInfoData {
-    pub fn full_shape(&self) -> Vec<i64> {
-        let mut s = self.shape.clone();
-        if let Some(sl) = self.stored_len {
-            s.push(sl);
-        }
-        s
-    }
-
-    pub fn collapsed(&self) -> (i64, Vec<i64>) {
-        let shape = self.full_shape();
-        if shape.is_empty() || (shape.len() == 1 && shape[0] == 1) {
-            return (1, Vec::new());
-        }
-        let dim = shape.iter().product();
-        (dim, shape)
-    }
-}
-
-/// Local mirror of `tables.py::ConstTableDecl` until `part1::ConstTableDecl` defines fields.
-#[derive(Debug, Clone, Default)]
-pub struct ConstTableDeclData {
-    pub name: Option<String>,
-    pub hidden: i64,
-    pub consts: Vec<ConstDecl>,
-    pub line: i64,
 }
 
 /// Wrapper for `TdfField` carrying the ad-hoc `alias_elem` and `alias_of` attributes
@@ -238,102 +63,13 @@ pub struct PublicTdfField {
     pub alias_of: Option<(String, i64)>,
 }
 
-/// Return type of `_build_public_table_impl`.
+/// Return type of `_build_public_table`.
 #[derive(Debug, Clone, Default)]
 pub struct PublicTableResult {
     pub table: Option<TdfTable>,
     pub fields_meta: Vec<PublicTdfField>,
     pub by_display: OrderedMap<String, PublicTdfField>,
     pub by_base: OrderedMap<String, Vec<PublicTdfField>>,
-}
-
-/// Local mirror of `tables.py::_make_var_info` until `part1` exports it.
-fn p1_make_var_info(v: &VarDecl, env: &consteval::Env) -> VarInfoData {
-    let t = v
-        .type_
-        .as_deref()
-        .map_or_else(|| "FLOAT".to_string(), pystr::upper);
-    let type_code = type_code_by_name(&t).unwrap_or(9);
-    let mut shape = Vec::with_capacity(v.dims.len());
-    for d in &v.dims {
-        let n = p1_as_int(p1_fold(Some(d.as_ref()), env).as_ref(), 1);
-        shape.push(n.max(1));
-    }
-    let stored_len = if t == "STRING" {
-        let size_expr = match v.string_size.as_deref() {
-            Some(Expr::Binary(b)) if b.op == "=" => b.left.as_deref(),
-            other => other,
-        };
-        let n = p1_as_int(p1_fold(size_expr, env).as_ref(), 20);
-        Some(p1_string_stored_len(n.max(1)))
-    } else {
-        None
-    };
-    VarInfoData {
-        type_code,
-        shape,
-        stored_len,
-        units: String::new(),
-        struct_info: None,
-        name: v.name.clone(),
-    }
-}
-
-/// Local mirror of `tables.py::_resolve_alias_target` until `part1` exports it.
-fn p1_resolve_alias_target(
-    expr: Option<&Expr>,
-    var_info: Option<&OrderedMap<String, VarInfoData>>,
-) -> (String, Option<i64>) {
-    let Some(expr) = expr else {
-        return (String::new(), None);
-    };
-    match expr {
-        Expr::Name(n) => (pystr::upper(&n.name), None),
-        Expr::Index(idx) => {
-            if idx.args.len() > 1
-                && let Some(vi) = var_info
-            {
-                let upper = pystr::upper(&idx.name);
-                let numbers: Vec<Option<&Number>> = idx
-                    .args
-                    .iter()
-                    .map(|a| match a.as_deref() {
-                        Some(Expr::Number(num)) => Some(num),
-                        _ => None,
-                    })
-                    .collect();
-                if let Some(info) = vi.get(&upper)
-                    && info.shape.len() == idx.args.len()
-                    && numbers.iter().all(Option::is_some)
-                {
-                    let mut flat = 0i64;
-                    for (k, num_opt) in numbers.iter().enumerate() {
-                        let num = num_opt.unwrap();
-                        let stride: i64 = info.shape[k + 1..].iter().product();
-                        let val = match &num.value {
-                            NumberValue::Int(i) => *i,
-                            NumberValue::Float(f) => pystr::py_round(*f).unwrap_or(0),
-                            NumberValue::BigInt(s) => pystr::parse_int(s).unwrap_or(0),
-                        };
-                        flat += (val - 1) * stride;
-                    }
-                    return (upper, Some(flat + 1));
-                }
-            }
-            if let Some(Some(first)) = idx.args.first()
-                && let Expr::Number(num) = first.as_ref()
-            {
-                let val = match &num.value {
-                    NumberValue::Int(i) => *i,
-                    NumberValue::Float(f) => pystr::py_round(*f).unwrap_or(0),
-                    NumberValue::BigInt(s) => pystr::parse_int(s).unwrap_or(0),
-                };
-                return (pystr::upper(&idx.name), Some(val));
-            }
-            (pystr::upper(&idx.name), None)
-        }
-        _ => (String::new(), None),
-    }
 }
 
 /// Helper to get `Name` or `Index` name from an `Expr`.
@@ -356,20 +92,10 @@ fn expr_name_upper(expr: Option<&Expr>) -> String {
 
 /// Port of `tables.py::_build_public_table`.
 pub fn _build_public_table(
-    _publics: &[Rc<VarDecl>],
-    _alias_stmts: &[StmtRef],
-    _units_stmts: &[StmtRef],
-    _readonly_names: &BTreeSet<String>,
-) {
-    // Full logic is in `_build_public_table_impl`; stub signature omits `var_info` and return value.
-}
-
-/// Full implementation of `tables.py::_build_public_table`.
-pub fn _build_public_table_impl(
     publics: &[Rc<VarDecl>],
-    var_info: &OrderedMap<String, VarInfoData>,
-    alias_stmts: &[StmtRef],
-    units_stmts: &[StmtRef],
+    var_info: &OrderedMap<String, VarInfo>,
+    alias_stmts: &[Instruction],
+    units_stmts: &[Instruction],
     readonly_names: &BTreeSet<String>,
 ) -> PublicTableResult {
     if publics.is_empty() {
@@ -378,17 +104,14 @@ pub fn _build_public_table_impl(
 
     let mut aliased_elements: OrderedMap<String, OrderedMap<i64, String>> = OrderedMap::new();
     let mut whole_alias: OrderedMap<String, String> = OrderedMap::new();
-    for s in alias_stmts {
-        let Stmt::Instruction(a) = s.as_ref() else {
-            continue;
-        };
+    for a in alias_stmts {
         if a.args.len() < 2 {
             continue;
         }
         let Some(Expr::Name(alias_n)) = a.args[1].as_deref() else {
             continue;
         };
-        let (base, idx) = p1_resolve_alias_target(a.args[0].as_deref(), Some(var_info));
+        let (base, idx) = _resolve_alias_target(a.args[0].as_deref(), Some(var_info));
         let alias_name = alias_n.name.clone();
         match idx {
             None => {
@@ -514,10 +237,7 @@ pub fn _build_public_table_impl(
         by_base_idx.insert(base, vec![idx]);
     }
 
-    for s in units_stmts {
-        let Stmt::Instruction(u) = s.as_ref() else {
-            continue;
-        };
+    for u in units_stmts {
         if u.args.len() < 2 {
             continue;
         }
@@ -584,16 +304,7 @@ pub fn _build_public_table_impl(
 }
 
 /// Port of `tables.py::_build_const_tables`.
-pub fn _build_const_tables(_const_tables: Vec<ConstTableDecl>) -> Vec<TdfTable> {
-    // Full logic is in `_build_const_tables_impl`; stub signature omits `env: &consteval::Env`.
-    Vec::new()
-}
-
-/// Full implementation of `tables.py::_build_const_tables`.
-pub fn _build_const_tables_impl(
-    const_tables: &[ConstTableDeclData],
-    env: &consteval::Env,
-) -> Vec<TdfTable> {
+pub fn _build_const_tables(const_tables: &[ConstTableDecl], env: &consteval::Env) -> Vec<TdfTable> {
     let mut tables = Vec::new();
     let mut int_names: OrderedMap<String, bool> = OrderedMap::new();
     for ct in const_tables {
@@ -601,7 +312,7 @@ pub fn _build_const_tables_impl(
         for c in &ct.consts {
             let is_str = matches!(c.value.as_deref(), Some(Expr::String(_)));
             if let Some(ty) = &c.type_ {
-                let type_code = type_code_by_name(&pystr::upper(ty)).unwrap_or(9);
+                let type_code = type_code_for(&pystr::upper(ty)).unwrap_or(9);
                 let is_ascii = type_code == 11;
                 let (dim, subdims) = if is_ascii {
                     (80, vec![80])
@@ -636,7 +347,7 @@ pub fn _build_const_tables_impl(
                 });
                 int_names.insert(pystr::upper(&c.name), true);
             } else {
-                let is_int = p1_const_is_int(c.value.as_deref(), env, &int_names);
+                let is_int = _const_is_int(c.value.as_deref(), env, &int_names);
                 int_names.insert(pystr::upper(&c.name), is_int);
                 let type_code = if is_int { 6 } else { 9 };
                 fields.push(TdfField {
@@ -786,16 +497,10 @@ pub fn _datatableinfo_table(n: i64) -> TdfTable {
 }
 
 /// Port of `tables.py::_source_info`.
-pub fn _source_info(_expr: Option<&Expr>) -> Option<VarInfo> {
-    // Full logic is in `_source_info_impl`; stub signature omits `var_info`.
-    None
-}
-
-/// Full implementation of `tables.py::_source_info`.
-pub fn _source_info_impl<'a>(
+pub fn _source_info<'a>(
     expr: Option<&Expr>,
-    var_info: &'a OrderedMap<String, VarInfoData>,
-) -> Option<&'a VarInfoData> {
+    var_info: &'a OrderedMap<String, VarInfo>,
+) -> Option<&'a VarInfo> {
     let expr = expr?;
     match expr {
         Expr::Name(n) => var_info.get(&pystr::upper(&n.name)),
@@ -810,17 +515,9 @@ pub fn _source_info_impl<'a>(
 }
 
 /// Port of `tables.py::_source_name`.
-pub fn _source_name(expr: Option<&Expr>) -> String {
-    _source_name_impl(expr, None)
-}
-
-/// Full implementation of `tables.py::_source_name`.
-pub fn _source_name_impl(
-    expr: Option<&Expr>,
-    var_info: Option<&OrderedMap<String, VarInfoData>>,
-) -> String {
+pub fn _source_name(expr: Option<&Expr>, var_info: Option<&OrderedMap<String, VarInfo>>) -> String {
     if let Some(vi) = var_info
-        && let Some(info) = _source_info_impl(expr, vi)
+        && let Some(info) = _source_info(expr, vi)
         && !info.name.is_empty()
     {
         return info.name.clone();
@@ -834,22 +531,16 @@ pub fn _source_name_impl(
 }
 
 /// Port of `tables.py::_is_anonymous_source`.
-pub fn _is_anonymous_source(_expr: Option<&Expr>) -> bool {
-    // Full logic is in `_is_anonymous_source_impl`; stub signature omits `var_info` and `env`.
-    false
-}
-
-/// Full implementation of `tables.py::_is_anonymous_source`.
-pub fn _is_anonymous_source_impl(
+pub fn _is_anonymous_source(
     expr: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
 ) -> bool {
     match expr {
         Some(Expr::Index(idx)) => !var_info.contains_key(&pystr::upper(&idx.name)),
         Some(Expr::Name(n)) => {
             let upper = pystr::upper(&n.name);
-            !var_info.contains_key(&upper) && (p1_fold(expr, env).is_some() || upper == "NAN")
+            !var_info.contains_key(&upper) && (_fold(expr, env, None).is_some() || upper == "NAN")
         }
         Some(Expr::Member(_)) | None => false,
         Some(_) => true,
@@ -857,26 +548,20 @@ pub fn _is_anonymous_source_impl(
 }
 
 /// Port of `tables.py::_anonymous_string_len`.
-pub fn _anonymous_string_len(_expr: Option<&Expr>) -> i64 {
-    // Full logic is in `_anonymous_string_len_impl`; stub signature omits `var_info` and `env`.
-    20
-}
-
-/// Full implementation of `tables.py::_anonymous_string_len`.
-pub fn _anonymous_string_len_impl(
+pub fn _anonymous_string_len(
     expr: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
 ) -> i64 {
     fn known(
         e: Option<&Expr>,
-        var_info: &OrderedMap<String, VarInfoData>,
+        var_info: &OrderedMap<String, VarInfo>,
         env: &consteval::Env,
     ) -> Option<i64> {
-        if let Some(ConstValue::Str(s)) = p1_fold(e, env) {
+        if let Some(ConstValue::Str(s)) = _fold(e, env, None) {
             return i64::try_from(pystr::len(&s)).ok();
         }
-        if let Some(info) = _source_info_impl(e, var_info) {
+        if let Some(info) = _source_info(e, var_info) {
             return info.stored_len;
         }
         let e = e?;
@@ -921,26 +606,21 @@ pub fn _anonymous_string_len_impl(
 }
 
 /// Port of `tables.py::_number_anonymous`.
-pub fn _number_anonymous(_src: Option<&Expr>, _anon: Option<Vec<i64>>) {
-    // Full logic is in `_number_anonymous_impl`; stub signature omits `fields`, `var_info`, `env`.
-}
-
-/// Full implementation of `tables.py::_number_anonymous`.
-pub fn _number_anonymous_impl(
+pub fn _number_anonymous(
     fields: &mut [OutField],
     src: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
     anon: Option<&mut i64>,
 ) {
     let Some(anon) = anon else {
         return;
     };
-    if !_is_anonymous_source_impl(src, var_info, env) {
+    if !_is_anonymous_source(src, var_info, env) {
         return;
     }
     *anon += 1;
-    let raw = _source_name_impl(src, Some(var_info));
+    let raw = _source_name(src, Some(var_info));
     let raw_len = i64::try_from(pystr::len(&raw)).unwrap_or(i64::MAX);
     for f in fields {
         if f.name.starts_with(&raw) {
@@ -951,14 +631,9 @@ pub fn _number_anonymous_impl(
 }
 
 /// Port of `tables.py::_source_shape`.
-pub fn _source_shape(_expr: Option<&Expr>, _reps: i64) {
-    // Full logic is in `_source_shape_impl`; stub signature omits `var_info`, `env`, and return type.
-}
-
-/// Full implementation of `tables.py::_source_shape`.
-pub fn _source_shape_impl(
+pub fn _source_shape(
     expr: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
     reps: i64,
 ) -> (i64, Vec<i64>) {
@@ -1005,7 +680,7 @@ pub fn _source_shape_impl(
             let idx_vals: Vec<i64> = idx
                 .args
                 .iter()
-                .map(|a| p1_as_int(p1_fold(a.as_deref(), env).as_ref(), 1))
+                .map(|a| _as_int(_fold(a.as_deref(), env, None).as_ref(), 1))
                 .collect();
             if let Some(inf) = info
                 && !inf.shape.is_empty()
@@ -1035,21 +710,15 @@ pub fn _source_shape_impl(
 }
 
 /// Port of `tables.py::_units_for_source`.
-pub fn _units_for_source(_expr: Option<&Expr>) -> String {
-    // Full logic is in `_units_for_source_impl`; stub signature omits `var_info` and `by_display`.
-    String::new()
-}
-
-/// Full implementation of `tables.py::_units_for_source`.
-pub fn _units_for_source_impl(
+pub fn _units_for_source(
     expr: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_display: &OrderedMap<String, PublicTdfField>,
 ) -> String {
     if let Some(Expr::Member(m)) = expr
         && let Some(base_name) = expr_name(m.base.as_deref())
         && let Some(info) = var_info.get(&pystr::upper(base_name))
-        && let Some(st) = &info.struct_info
+        && let Some(st) = &info.struct_def
     {
         return st
             .units
@@ -1057,7 +726,7 @@ pub fn _units_for_source_impl(
             .cloned()
             .unwrap_or_default();
     }
-    let name = pystr::upper(&_source_name_impl(expr, Some(var_info)));
+    let name = pystr::upper(&_source_name(expr, Some(var_info)));
     if let Some(f) = by_display.get(&name) {
         return f.field.units.clone();
     }
@@ -1091,6 +760,30 @@ pub struct OutField {
     pub member: String,
 }
 
+impl OutField {
+    /// Positional constructor mirroring the leading `_OutField` dataclass fields.
+    pub fn new(
+        name: impl Into<String>,
+        type_code: i64,
+        read_only: bool,
+        processing: impl Into<String>,
+        begin: i64,
+        dim: i64,
+        subdims: Vec<i64>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            type_code,
+            read_only,
+            processing: processing.into(),
+            begin,
+            dim,
+            subdims,
+            ..Self::default()
+        }
+    }
+}
+
 impl Default for OutField {
     fn default() -> Self {
         Self {
@@ -1117,15 +810,10 @@ impl Default for OutField {
     }
 }
 
-const _FFT_UNBOUNDED: i64 = 1 << 30;
+pub(crate) const _FFT_UNBOUNDED: i64 = 1 << 30;
 
 /// Port of `tables.py::_element_range`.
-pub fn _element_range(_src: Option<&Expr>, _begin: i64, _dim: i64) {
-    // Full logic is in `_element_range_impl`; stub signature omits `env` and return type.
-}
-
-/// Full implementation of `tables.py::_element_range`.
-pub fn _element_range_impl(
+pub fn _element_range(
     src: Option<&Expr>,
     begin: i64,
     dim: i64,
@@ -1139,7 +827,7 @@ pub fn _element_range_impl(
         }
         let mut flat = 0i64;
         for (k, a) in idx.args.iter().enumerate() {
-            let v = p1_fold(a.as_deref(), env)?;
+            let v = _fold(a.as_deref(), env, None)?;
             let int_v = match v {
                 ConstValue::Int(i) => i,
                 ConstValue::Float(f) | ConstValue::CFloat(f) => pystr::py_int_from_f64(f)?,
@@ -1167,15 +855,7 @@ pub fn _type_bytes(type_code: i64, dim_for_string: i64) -> i64 {
 }
 
 /// Port of `tables.py::_elem_size`.
-#[allow(clippy::needless_pass_by_value)]
-pub fn _elem_size(f: OutField, _info: &VarInfo) -> i64 {
-    // Full logic is in `_elem_size_impl`; `part1::VarInfo` currently has no fields.
-    let _ = f;
-    1
-}
-
-/// Full implementation of `tables.py::_elem_size`.
-pub fn _elem_size_impl(f: &OutField, stored_len: Option<i64>) -> i64 {
+pub fn _elem_size(f: &OutField, stored_len: Option<i64>) -> i64 {
     match stored_len {
         Some(sl) if sl != 0 && f.type_code == 11 => sl,
         _ => 1,
@@ -1183,16 +863,10 @@ pub fn _elem_size_impl(f: &OutField, stored_len: Option<i64>) -> i64 {
 }
 
 /// Port of `tables.py::_split_by_alias`.
-pub fn _split_by_alias(fields: Vec<OutField>) -> Vec<OutField> {
-    // Full logic is in `_split_by_alias_impl`; stub signature omits `src`, `var_info`, `by_base`, `env`.
-    fields
-}
-
-/// Full implementation of `tables.py::_split_by_alias`.
-pub fn _split_by_alias_impl(
+pub fn _split_by_alias(
     fields: Vec<OutField>,
     src: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_base: &OrderedMap<String, Vec<PublicTdfField>>,
     env: &consteval::Env,
 ) -> Vec<OutField> {
@@ -1222,11 +896,11 @@ pub fn _split_by_alias_impl(
             "0123456789",
         )
         .to_string();
-        let es = _elem_size_impl(&f, base_info.stored_len);
+        let es = _elem_size(&f, base_info.stored_len);
         let lo = f.begin;
         let hi = f.begin + f.dim - 1;
         if !f.splittable {
-            let first = (_source_shape_impl(src, var_info, env, 1).0 - 1) * es + 1;
+            let first = (_source_shape(src, var_info, env, 1).0 - 1) * es + 1;
             let mut pos = 1i64;
             for g in groups {
                 let n = if g.alias_elem { es } else { g.field.dimension };
@@ -1290,15 +964,9 @@ pub fn _split_by_alias_impl(
 }
 
 /// Port of `tables.py::_fft_field`.
-pub fn _fft_field(_s: &Instruction, _anon: Option<Vec<i64>>) -> OutField {
-    // Full logic is in `_fft_field_impl`; stub signature omits `var_info`, `by_display`, `env`.
-    OutField::default()
-}
-
-/// Full implementation of `tables.py::_fft_field`.
-pub fn _fft_field_impl(
+pub fn _fft_field(
     s: &Instruction,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_display: &OrderedMap<String, PublicTdfField>,
     env: &consteval::Env,
     anon: Option<&mut i64>,
@@ -1331,7 +999,7 @@ pub fn _fft_field_impl(
     }
 
     let n = if a.len() > 2 {
-        p1_as_int(p1_fold(a[2].as_deref(), env).as_ref(), 1)
+        _as_int(_fold(a[2].as_deref(), env, None).as_ref(), 1)
     } else {
         1
     };
@@ -1346,7 +1014,7 @@ pub fn _fft_field_impl(
         "SEC".to_string()
     };
     let opt = if a.len() > 5 {
-        p1_as_int(p1_fold(a[5].as_deref(), env).as_ref(), 0)
+        _as_int(_fold(a[5].as_deref(), env, None).as_ref(), 0)
     } else {
         0
     };
@@ -1360,12 +1028,12 @@ pub fn _fft_field_impl(
         _ => (2 * half, vec![half]),
     };
 
-    let (first, shape) = _source_shape_impl(src, var_info, env, 1);
+    let (first, shape) = _source_shape(src, var_info, env, 1);
     if dim == 1 {
         subdims = shape;
     }
 
-    let tint_sec = tint * unit_seconds(&unit);
+    let tint_sec = tint * _unit_seconds(&unit);
     let opt_mod = pystr::pymod_i64(opt, 100).unwrap_or(0);
     let proc = format!("FFT,{n},{},{opt_mod}", pystr::format_e(tint_sec, 4));
 
@@ -1374,13 +1042,13 @@ pub fn _fft_field_impl(
     } else {
         String::new()
     };
-    let name = format!("{}{suffix_idx}_FFT", _source_name_impl(src, Some(var_info)));
+    let name = format!("{}{suffix_idx}_FFT", _source_name(src, Some(var_info)));
     let type_code = if a.len() > 1 {
-        p1_dtype_code(a[1].as_deref(), env)
+        _dtype_code(a[1].as_deref(), env)
     } else {
         9
     };
-    let units = _units_for_source_impl(src, var_info, by_display);
+    let units = _units_for_source(src, var_info, by_display);
 
     let mut fields = [OutField {
         name,
@@ -1394,23 +1062,17 @@ pub fn _fft_field_impl(
         rng: Some((1, _FFT_UNBOUNDED)),
         ..Default::default()
     }];
-    _number_anonymous_impl(&mut fields, src, var_info, env, anon);
+    _number_anonymous(&mut fields, src, var_info, env, anon);
     fields.into_iter().next().unwrap()
 }
 
 /// Port of `tables.py::_idx_suffix`.
-pub fn _idx_suffix(_src: Option<&Expr>) -> String {
-    // Full logic is in `_idx_suffix_impl`; stub signature omits `var_info` and `env`.
-    String::new()
-}
-
-/// Full implementation of `tables.py::_idx_suffix`.
-pub fn _idx_suffix_impl(
+pub fn _idx_suffix(
     src: Option<&Expr>,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
 ) -> String {
-    let (first, _) = _source_shape_impl(src, var_info, env, 1);
+    let (first, _) = _source_shape(src, var_info, env, 1);
     if first > 1 {
         first.to_string()
     } else {
@@ -1419,14 +1081,9 @@ pub fn _idx_suffix_impl(
 }
 
 /// Port of `tables.py::_alias_source`.
-pub fn _alias_source(_instr: &Instruction) {
-    // Full logic is in `_alias_source_impl`; stub signature omits `var_info`, `by_display`, `by_base`, and return type.
-}
-
-/// Full implementation of `tables.py::_alias_source`.
-pub fn _alias_source_impl(
+pub fn _alias_source(
     instr: &Instruction,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_display: &OrderedMap<String, PublicTdfField>,
     by_base: Option<&OrderedMap<String, Vec<PublicTdfField>>>,
 ) -> Instruction {
@@ -1459,34 +1116,28 @@ pub fn _alias_source_impl(
 }
 
 /// Port of `tables.py::_emit_output_fields`.
-pub fn _emit_output_fields(_instr: &Instruction, _anon: Option<Vec<i64>>) -> Vec<OutField> {
-    // Full logic is in `_emit_output_fields_impl`; stub signature omits `var_info`, `by_display`, `env`, `by_base`.
-    Vec::new()
-}
-
-/// Full implementation of `tables.py::_emit_output_fields`.
-pub fn _emit_output_fields_impl(
+pub fn _emit_output_fields(
     instr: &Instruction,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_display: &OrderedMap<String, PublicTdfField>,
     env: &consteval::Env,
     by_base: Option<&OrderedMap<String, Vec<PublicTdfField>>>,
     anon: Option<&mut i64>,
 ) -> Vec<OutField> {
-    let instr = _alias_source_impl(instr, var_info, by_display, by_base);
-    let mut fields = if let Some(f) = _emit_struct_fields_impl(&instr, var_info, env) {
+    let instr = _alias_source(instr, var_info, by_display, by_base);
+    let mut fields = if let Some(f) = _emit_struct_fields(&instr, var_info, env) {
         f
     } else {
-        let mut raw = _emit_output_fields_raw_impl(&instr, var_info, by_display, env);
+        let mut raw = _emit_output_fields_raw(&instr, var_info, by_display, env);
         if instr.args.len() > 1
             && let Some(arg1_name) = expr_name(instr.args[1].as_deref())
             && let Some(info) = var_info.get(&pystr::upper(arg1_name))
-            && let Some(reps) = p1_fold(instr.args[0].as_deref(), env)
+            && let Some(reps) = _fold(instr.args[0].as_deref(), env, None)
             && consteval::is_finite_number(&reps)
             && let Some(reps_i) = const_to_i64(&reps)
         {
             for f in &mut raw {
-                f.elem = _elem_size_impl(f, info.stored_len);
+                f.elem = _elem_size(f, info.stored_len);
                 f.splittable = f.dim == reps_i * f.elem;
             }
         }
@@ -1506,11 +1157,11 @@ pub fn _emit_output_fields_impl(
     }
     for f in &mut fields {
         if f.rng.is_none() && !f.ch400 {
-            f.rng = _element_range_impl(src, f.begin, f.dim, env);
+            f.rng = _element_range(src, f.begin, f.dim, env);
         }
     }
     if kw_upper != "HISTOGRAM" {
-        _number_anonymous_impl(&mut fields, src, var_info, env, anon);
+        _number_anonymous(&mut fields, src, var_info, env, anon);
     }
     fields
 }
@@ -1527,14 +1178,9 @@ fn struct_suffix(kw: &str) -> Option<(&'static str, &'static str)> {
 }
 
 /// Port of `tables.py::_emit_struct_fields`.
-pub fn _emit_struct_fields(_instr: &Instruction) {
-    // Full logic is in `_emit_struct_fields_impl`; stub signature omits `var_info`, `env`, and return type.
-}
-
-/// Full implementation of `tables.py::_emit_struct_fields`.
-pub fn _emit_struct_fields_impl(
+pub fn _emit_struct_fields(
     instr: &Instruction,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     env: &consteval::Env,
 ) -> Option<Vec<OutField>> {
     let kw = pystr::upper(&instr.keyword);
@@ -1545,14 +1191,14 @@ pub fn _emit_struct_fields_impl(
     }
     let arg1_name = expr_name(a[1].as_deref())?;
     let info = var_info.get(&pystr::upper(arg1_name))?;
-    let st = info.struct_info.as_ref()?;
+    let st = info.struct_def.as_ref()?;
     if matches!(kw.as_str(), "MAXIMUM" | "MINIMUM")
         && a.len() > 4
         && expr_name_upper(a[4].as_deref()) == "TRUE"
     {
         return None;
     }
-    let mut reps = p1_as_int(p1_fold(a[0].as_deref(), env).as_ref(), 1);
+    let mut reps = _as_int(_fold(a[0].as_deref(), env, None).as_ref(), 1);
     if matches!(env.profile.name, "cr300" | "cr350") {
         reps = 1;
     }
@@ -1560,7 +1206,7 @@ pub fn _emit_struct_fields_impl(
     let member_count = i64::try_from(st.members.len()).unwrap_or(0);
     for _ in 0..reps {
         for m in &st.members {
-            let mi = p1_make_var_info(m, env);
+            let mi = _make_var_info(m, env);
             let (dim, subdims) = mi.collapsed();
             let m_upper = pystr::upper(&m.name);
             out.push(OutField {
@@ -1582,15 +1228,9 @@ pub fn _emit_struct_fields_impl(
 }
 
 /// Port of `tables.py::_emit_output_fields_raw`.
-pub fn _emit_output_fields_raw(_instr: &Instruction) -> Vec<OutField> {
-    // Full logic is in `_emit_output_fields_raw_impl`; stub signature omits `var_info`, `by_display`, `env`.
-    Vec::new()
-}
-
-/// Full implementation of `tables.py::_emit_output_fields_raw`.
-pub fn _emit_output_fields_raw_impl(
+pub fn _emit_output_fields_raw(
     instr: &Instruction,
-    var_info: &OrderedMap<String, VarInfoData>,
+    var_info: &OrderedMap<String, VarInfo>,
     by_display: &OrderedMap<String, PublicTdfField>,
     env: &consteval::Env,
 ) -> Vec<OutField> {
@@ -1599,7 +1239,7 @@ pub fn _emit_output_fields_raw_impl(
 
     let type_of = |idx: usize| -> i64 {
         if idx < a.len() {
-            p1_dtype_code(a[idx].as_deref(), env)
+            _dtype_code(a[idx].as_deref(), env)
         } else {
             9
         }
@@ -1607,14 +1247,14 @@ pub fn _emit_output_fields_raw_impl(
 
     let reps_of = || -> i64 {
         if let Some(first) = a.first() {
-            p1_as_int(p1_fold(first.as_deref(), env).as_ref(), 1)
+            _as_int(_fold(first.as_deref(), env, None).as_ref(), 1)
         } else {
             1
         }
     };
 
     let shaped = |src: Option<&Expr>, reps: i64| -> (i64, Vec<i64>, String) {
-        let (begin, shape) = _source_shape_impl(src, var_info, env, reps);
+        let (begin, shape) = _source_shape(src, var_info, env, reps);
         let subdims = if !shape.is_empty() {
             shape
         } else if reps == 1 {
@@ -1622,7 +1262,7 @@ pub fn _emit_output_fields_raw_impl(
         } else {
             vec![reps]
         };
-        let units = _units_for_source_impl(src, var_info, by_display);
+        let units = _units_for_source(src, var_info, by_display);
         (begin, subdims, units)
     };
 
@@ -1631,7 +1271,7 @@ pub fn _emit_output_fields_raw_impl(
         let src = a.get(1).and_then(|x| x.as_deref());
         let tcode = type_of(2);
         let (mut begin, mut subdims, units) = shaped(src, reps);
-        let info = _source_info_impl(src, var_info);
+        let info = _source_info(src, var_info);
         let mut dim = reps;
         if let Some(inf) = info
             && let Some(ln) = inf.stored_len
@@ -1644,12 +1284,12 @@ pub fn _emit_output_fields_raw_impl(
             {
                 begin = (begin - 1) * ln + 1;
             }
-        } else if tcode == 11 && _is_anonymous_source_impl(src, var_info, env) {
-            dim = p1_string_stored_len(_anonymous_string_len_impl(src, var_info, env));
+        } else if tcode == 11 && _is_anonymous_source(src, var_info, env) {
+            dim = _string_stored_len(_anonymous_string_len(src, var_info, env));
             subdims = vec![dim];
             begin = (begin.wrapping_sub(1).wrapping_mul(dim).wrapping_add(1)) & 0xFFFF_FFFF;
             return vec![OutField {
-                name: _source_name_impl(src, Some(var_info)),
+                name: _source_name(src, Some(var_info)),
                 type_code: tcode,
                 read_only: true,
                 processing: "Smp".to_string(),
@@ -1664,7 +1304,7 @@ pub fn _emit_output_fields_raw_impl(
             }];
         }
         return vec![OutField {
-            name: _source_name_impl(src, Some(var_info)),
+            name: _source_name(src, Some(var_info)),
             type_code: tcode,
             read_only: true,
             processing: "Smp".to_string(),
@@ -1687,7 +1327,7 @@ pub fn _emit_output_fields_raw_impl(
             "TOTALIZE" => ("_Tot", "Tot"),
             _ => ("_Std", "Std"),
         };
-        let name = format!("{}{suffix}", _source_name_impl(src, Some(var_info)));
+        let name = format!("{}{suffix}", _source_name(src, Some(var_info)));
         return vec![OutField {
             name,
             type_code: tcode,
@@ -1707,7 +1347,7 @@ pub fn _emit_output_fields_raw_impl(
         let tcode = type_of(2);
         let (begin, subdims, units) = shaped(src, reps);
         let time_flag = a.len() > 4 && expr_name_upper(a[4].as_deref()) == "TRUE";
-        let base = _source_name_impl(src, Some(var_info));
+        let base = _source_name(src, Some(var_info));
         let (vsuf, vtag, tsuf, ttag) = if kw == "MAXIMUM" {
             ("_Max", "Max", "_TMx", "TMx")
         } else {
@@ -1746,7 +1386,7 @@ pub fn _emit_output_fields_raw_impl(
         let tcode = type_of(3);
         let (begin, subdims, units) = shaped(src, reps);
         return vec![OutField {
-            name: format!("{}_Med", _source_name_impl(src, Some(var_info))),
+            name: format!("{}_Med", _source_name(src, Some(var_info))),
             type_code: tcode,
             read_only: true,
             processing: "Med".to_string(),
@@ -1764,7 +1404,7 @@ pub fn _emit_output_fields_raw_impl(
         let tcode = type_of(3);
         let (begin, subdims, units) = shaped(src, reps);
         return vec![OutField {
-            name: format!("{}_MMT", _source_name_impl(src, Some(var_info))),
+            name: format!("{}_MMT", _source_name(src, Some(var_info))),
             type_code: tcode,
             read_only: true,
             processing: "MMT".to_string(),
@@ -1782,7 +1422,7 @@ pub fn _emit_output_fields_raw_impl(
         let tcode = type_of(2);
         let (begin, subdims, units) = shaped(src, reps);
         return vec![OutField {
-            name: format!("{}_SMM", _source_name_impl(src, Some(var_info))),
+            name: format!("{}_SMM", _source_name(src, Some(var_info))),
             type_code: tcode,
             read_only: true,
             processing: "SMM".to_string(),
@@ -1798,16 +1438,16 @@ pub fn _emit_output_fields_raw_impl(
         let src = a.get(1).and_then(|x| x.as_deref());
         let tcode = type_of(2);
         let n_cov = if a.len() > 4 {
-            p1_as_int(p1_fold(a[4].as_deref(), env).as_ref(), 1)
+            _as_int(_fold(a[4].as_deref(), env, None).as_ref(), 1)
         } else {
             1
         };
-        let units = _units_for_source_impl(src, var_info, by_display);
+        let units = _units_for_source(src, var_info, by_display);
         return vec![OutField {
             name: format!(
                 "{}{}_Cov",
-                _source_name_impl(src, Some(var_info)),
-                _idx_suffix_impl(src, var_info, env)
+                _source_name(src, Some(var_info)),
+                _idx_suffix(src, var_info, env)
             ),
             type_code: tcode,
             read_only: true,
@@ -1824,7 +1464,7 @@ pub fn _emit_output_fields_raw_impl(
         let speed = a.get(1).and_then(|x| x.as_deref());
         let tcode = type_of(3);
         let output_opt = if a.len() > 7 {
-            p1_as_int(p1_fold(a[7].as_deref(), env).as_ref(), 0)
+            _as_int(_fold(a[7].as_deref(), env, None).as_ref(), 0)
         } else {
             0
         };
@@ -1834,7 +1474,7 @@ pub fn _emit_output_fields_raw_impl(
             3 => 1,
             _ => 3,
         };
-        let units = _units_for_source_impl(speed, var_info, by_display);
+        let units = _units_for_source(speed, var_info, by_display);
         let ulist = match output_opt {
             0 => vec![units.clone(), "Deg".to_string(), "Deg".to_string()],
             1 => vec![units.clone(), "Deg".to_string()],
@@ -1852,8 +1492,8 @@ pub fn _emit_output_fields_raw_impl(
         return vec![OutField {
             name: format!(
                 "{}{}_WVc",
-                _source_name_impl(speed, Some(var_info)),
-                _idx_suffix_impl(speed, var_info, env)
+                _source_name(speed, Some(var_info)),
+                _idx_suffix(speed, var_info, env)
             ),
             type_code: tcode,
             read_only: true,
@@ -1871,7 +1511,7 @@ pub fn _emit_output_fields_raw_impl(
         let bin_select = a.first().and_then(|x| x.as_deref());
         let tcode = type_of(1);
         let bins = if a.len() > 3 {
-            p1_as_int(p1_fold(a[3].as_deref(), env).as_ref(), 1)
+            _as_int(_fold(a[3].as_deref(), env, None).as_ref(), 1)
         } else {
             1
         };
@@ -1896,12 +1536,12 @@ pub fn _emit_output_fields_raw_impl(
             pystr::format_e(lolim, 4),
             pystr::format_e(uplim, 4)
         );
-        let units = _units_for_source_impl(bin_select, var_info, by_display);
+        let units = _units_for_source(bin_select, var_info, by_display);
         return vec![OutField {
             name: format!(
                 "{}{}_Hst",
-                _source_name_impl(bin_select, Some(var_info)),
-                _idx_suffix_impl(bin_select, var_info, env)
+                _source_name(bin_select, Some(var_info)),
+                _idx_suffix(bin_select, var_info, env)
             ),
             type_code: tcode,
             read_only: true,
@@ -2003,13 +1643,13 @@ mod tests {
             match s.as_ref() {
                 Stmt::Declaration(d) => {
                     for v in d.vars.borrow().iter() {
-                        var_info.insert(pystr::upper(&v.name), p1_make_var_info(v, &env));
+                        var_info.insert(pystr::upper(&v.name), _make_var_info(v, &env));
                         publics.push(Rc::clone(v));
                     }
                 }
                 Stmt::Instruction(ins) => match pystr::upper(&ins.keyword).as_str() {
-                    "ALIAS" => alias_stmts.push(Rc::clone(s)),
-                    "UNITS" => units_stmts.push(Rc::clone(s)),
+                    "ALIAS" => alias_stmts.push(ins.clone()),
+                    "UNITS" => units_stmts.push(ins.clone()),
                     "READONLY" => {
                         for a in &ins.args {
                             if let Some(name) = expr_name(a.as_deref()) {
@@ -2023,7 +1663,7 @@ mod tests {
             }
         }
 
-        let res = _build_public_table_impl(
+        let res = _build_public_table(
             &publics,
             &var_info,
             &alias_stmts,
@@ -2123,20 +1763,20 @@ mod tests {
             }
         }
         let decls = vec![
-            ConstTableDeclData {
+            ConstTableDecl {
                 name: Some("MyCT".to_string()),
                 hidden: 0,
                 consts: consts_my,
                 line: 1,
             },
-            ConstTableDeclData {
+            ConstTableDecl {
                 name: None,
                 hidden: 0,
                 consts: consts_bare,
                 line: 7,
             },
         ];
-        let tables = _build_const_tables_impl(&decls, &env);
+        let tables = _build_const_tables(&decls, &env);
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0].name, "MyCT");
         let summary: Vec<(&str, i64, i64, &[i64])> = tables[0]
@@ -2172,12 +1812,12 @@ mod tests {
         let mut vi = OrderedMap::new();
         vi.insert(
             "X".to_string(),
-            VarInfoData {
+            VarInfo {
                 type_code: 9,
                 shape: vec![64],
                 stored_len: None,
                 units: "m/s".to_string(),
-                struct_info: None,
+                struct_def: None,
                 name: "X".to_string(),
             },
         );
@@ -2187,9 +1827,9 @@ mod tests {
             .statements
             .iter()
             .filter_map(|s| match s.as_ref() {
-                Stmt::Instruction(ins) if pystr::upper(&ins.keyword) == "FFT" => Some(
-                    _fft_field_impl(ins, &vi, &by_display, &env, Some(&mut anon)),
-                ),
+                Stmt::Instruction(ins) if pystr::upper(&ins.keyword) == "FFT" => {
+                    Some(_fft_field(ins, &vi, &by_display, &env, Some(&mut anon)))
+                }
                 _ => None,
             })
             .collect();
@@ -2229,29 +1869,29 @@ mod tests {
             match s.as_ref() {
                 Stmt::Declaration(d) => {
                     for v in d.vars.borrow().iter() {
-                        vi.insert(pystr::upper(&v.name), p1_make_var_info(v, &env));
+                        vi.insert(pystr::upper(&v.name), _make_var_info(v, &env));
                         publics.push(Rc::clone(v));
                     }
                 }
                 Stmt::Instruction(ins) if pystr::upper(&ins.keyword) == "ALIAS" => {
-                    alias_stmts.push(Rc::clone(s));
+                    alias_stmts.push(ins.clone());
                 }
                 Stmt::Instruction(ins) if pystr::upper(&ins.keyword) == "UNITS" => {
-                    units_stmts.push(Rc::clone(s));
+                    units_stmts.push(ins.clone());
                 }
                 _ => {}
             }
         }
         let pub_res =
-            _build_public_table_impl(&publics, &vi, &alias_stmts, &units_stmts, &BTreeSet::new());
+            _build_public_table(&publics, &vi, &alias_stmts, &units_stmts, &BTreeSet::new());
         vi.insert(
             "WS".to_string(),
-            VarInfoData {
+            VarInfo {
                 type_code: 9,
                 shape: Vec::new(),
                 stored_len: None,
                 units: "m/s".to_string(),
-                struct_info: None,
+                struct_def: None,
                 name: "ws".to_string(),
             },
         );
@@ -2285,7 +1925,7 @@ mod tests {
             .collect();
 
         let mut anon0 = 0;
-        let f_str = _emit_output_fields_impl(
+        let f_str = _emit_output_fields(
             instrs[0],
             &vi,
             &pub_res.by_display,
@@ -2300,7 +1940,7 @@ mod tests {
         assert_eq!(f_str[0].subdims, vec![8]);
         assert!(f_str[0].placeholder);
 
-        let f_wv = _emit_output_fields_impl(
+        let f_wv = _emit_output_fields(
             instrs[1],
             &vi,
             &pub_res.by_display,
@@ -2320,7 +1960,7 @@ mod tests {
             ])
         );
 
-        let f_hst = _emit_output_fields_impl(
+        let f_hst = _emit_output_fields(
             instrs[2],
             &vi,
             &pub_res.by_display,
@@ -2335,7 +1975,7 @@ mod tests {
         );
         assert_eq!(f_hst[0].dim, 5);
 
-        let f_arr = _emit_output_fields_impl(
+        let f_arr = _emit_output_fields(
             instrs[3],
             &vi,
             &pub_res.by_display,
@@ -2343,7 +1983,7 @@ mod tests {
             Some(&pub_res.by_base),
             None,
         );
-        let split = _split_by_alias_impl(
+        let split = _split_by_alias(
             f_arr,
             instrs[3].args[1].as_deref(),
             &vi,
@@ -2369,7 +2009,7 @@ mod tests {
             ("arr", 3, 2)
         );
 
-        let f_mid = _emit_output_fields_impl(
+        let f_mid = _emit_output_fields(
             instrs[4],
             &vi,
             &pub_res.by_display,
@@ -2393,7 +2033,7 @@ mod tests {
         units.insert("A".to_string(), "V".to_string());
         let mut ro = BTreeSet::new();
         ro.insert("A".to_string());
-        let st = StructTypeInfo {
+        let st = StructTypeDef {
             members: vec![
                 var_decl("a", Vec::new(), Some("Long")),
                 var_decl("b", Vec::new(), None),
@@ -2404,12 +2044,12 @@ mod tests {
         let mut vi = OrderedMap::new();
         vi.insert(
             "S".to_string(),
-            VarInfoData {
+            VarInfo {
                 type_code: 9,
                 shape: vec![2],
                 stored_len: None,
                 units: String::new(),
-                struct_info: Some(st),
+                struct_def: Some(st),
                 name: "s".to_string(),
             },
         );
@@ -2418,7 +2058,7 @@ mod tests {
             args: vec![Some(num_expr(2)), Some(name_expr("s"))],
             ..Instruction::default()
         };
-        let out6 = _emit_struct_fields_impl(&ins, &vi, &env_cr6).expect("struct fields");
+        let out6 = _emit_struct_fields(&ins, &vi, &env_cr6).expect("struct fields");
         assert_eq!(out6.len(), 4);
         assert_eq!(out6[0].name, "a_Avg");
         assert_eq!(out6[0].type_code, 6);
@@ -2426,7 +2066,7 @@ mod tests {
         assert_eq!(out6[0].units, "V");
         assert_eq!(out6[0].struct_members, 2);
 
-        let out300 = _emit_struct_fields_impl(&ins, &vi, &env_cr300).expect("struct fields");
+        let out300 = _emit_struct_fields(&ins, &vi, &env_cr300).expect("struct fields");
         assert_eq!(out300.len(), 2);
 
         let ins_max_t = Instruction {
@@ -2440,7 +2080,7 @@ mod tests {
             ],
             ..Instruction::default()
         };
-        assert!(_emit_struct_fields_impl(&ins_max_t, &vi, &env_cr6).is_none());
+        assert!(_emit_struct_fields(&ins_max_t, &vi, &env_cr6).is_none());
     }
 
     #[test]
@@ -2455,12 +2095,12 @@ mod tests {
             type_code: 11,
             ..OutField::default()
         };
-        assert_eq!(_elem_size_impl(&f_str, Some(24)), 24);
+        assert_eq!(_elem_size(&f_str, Some(24)), 24);
         let f_num = OutField {
             type_code: 9,
             ..OutField::default()
         };
-        assert_eq!(_elem_size_impl(&f_num, Some(24)), 1);
+        assert_eq!(_elem_size(&f_num, Some(24)), 1);
 
         let profile = profiles::get("cr6").expect("cr6");
         let env = consteval::Env::new(profile);
@@ -2470,9 +2110,9 @@ mod tests {
             args: vec![Some(num_expr(2)), Some(num_expr(3))],
         });
         assert_eq!(
-            _element_range_impl(Some(&idx_2d), 1, 1, &env),
+            _element_range(Some(&idx_2d), 1, 1, &env),
             Some((2 + (3 << 20), 2 + (3 << 20)))
         );
-        assert_eq!(_element_range_impl(Some(&idx_2d), 1, 2, &env), None);
+        assert_eq!(_element_range(Some(&idx_2d), 1, 2, &env), None);
     }
 }

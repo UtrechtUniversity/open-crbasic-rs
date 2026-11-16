@@ -61,19 +61,13 @@ fn is_valid_type_code(v: i64) -> bool {
 }
 
 /// Port of `tables.py::_dtype_code`.
-pub fn _dtype_code(expr: Option<&Expr>) -> i64 {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _dtype_code_with(expr, &env)
-}
-
-/// Port of `tables.py::_dtype_code`.
-pub fn _dtype_code_with(expr: Option<&Expr>, env: &Env) -> i64 {
+pub fn _dtype_code(expr: Option<&Expr>, env: &Env) -> i64 {
     if let Some(Expr::Name(n)) = expr
         && let Some(code) = type_code_for(&pystr::upper(&n.name))
     {
         return code;
     }
-    match _fold_with(expr, env, None) {
+    match _fold(expr, env, None) {
         Some(ConstValue::Int(i)) if is_valid_type_code(i) => i,
         Some(ConstValue::Float(f) | ConstValue::CFloat(f))
             if f.is_finite() && pystr::is_integer(f) =>
@@ -113,7 +107,7 @@ pub(crate) fn _unit_ns(name: &str) -> Option<i64> {
     }
 }
 
-fn _unit_name_by_value(v: i64) -> Option<&'static str> {
+pub(crate) fn _unit_name_by_value(v: i64) -> Option<&'static str> {
     match v {
         0 => Some("USEC"),
         1 => Some("MSEC"),
@@ -168,12 +162,7 @@ pub fn _f32(x: f64) -> f64 {
 }
 
 /// Port of `tables.py::_f32_safe`.
-pub fn _f32_safe() -> f64 {
-    0.0
-}
-
-/// Port of `tables.py::_f32_safe`.
-pub fn _f32_safe_with(x: f64) -> f64 {
+pub fn _f32_safe(x: f64) -> f64 {
     _f32(x)
 }
 
@@ -190,25 +179,22 @@ pub enum SizeClass {
 }
 
 /// Port of `tables.py::size_class`.
-pub fn size_class() {}
-
-/// Port of `tables.py::size_class`.
-pub fn size_class_with(raw: Option<&ConstValue>) -> Option<SizeClass> {
+pub fn size_class(raw: Option<&ConstValue>) -> Option<SizeClass> {
     let raw = raw?;
     let v = match raw {
         ConstValue::Int(i) if *i >= -2_147_483_648 && *i < 2_147_483_648 => *i,
         ConstValue::Int(i) => {
             #[allow(clippy::cast_precision_loss, reason = "Python int to float")]
-            let f = _f32_safe_with(*i as f64);
+            let f = _f32_safe(*i as f64);
             return classify_f32(f);
         }
         ConstValue::Float(f) | ConstValue::CFloat(f) => {
-            let f32v = _f32_safe_with(*f);
+            let f32v = _f32_safe(*f);
             return classify_f32(f32v);
         }
         ConstValue::BigInt(s) => {
             let f = pystr::parse_float(s).unwrap_or(f64::INFINITY);
-            let f32v = _f32_safe_with(f);
+            let f32v = _f32_safe(f);
             return classify_f32(f32v);
         }
         ConstValue::Str(_) => return None,
@@ -249,17 +235,8 @@ fn classify_i64(v: i64) -> SizeClass {
 }
 
 /// Port of `tables.py::declared_size`.
-pub fn declared_size(_cr3xx: bool, _bytes_per_record: i64) -> Option<i64> {
-    None
-}
-
-/// Port of `tables.py::declared_size`.
-pub fn declared_size_with(
-    raw: Option<&ConstValue>,
-    cr3xx: bool,
-    bytes_per_record: i64,
-) -> Option<i64> {
-    let c = size_class_with(raw)?;
+pub fn declared_size(raw: Option<&ConstValue>, cr3xx: bool, bytes_per_record: i64) -> Option<i64> {
+    let c = size_class(raw)?;
     match c {
         SizeClass::Inf => Some(_INT32_MAX),
         SizeClass::Edge(_) if cr3xx => Some(_INT32_MAX),
@@ -276,14 +253,7 @@ pub fn declared_size_with(
 }
 
 /// Port of `tables.py::_fold`.
-pub fn _fold(_expr: Option<&Expr>) {}
-
-/// Port of `tables.py::_fold`.
-pub fn _fold_with(
-    expr: Option<&Expr>,
-    env: &Env,
-    default: Option<ConstValue>,
-) -> Option<ConstValue> {
+pub fn _fold(expr: Option<&Expr>, env: &Env, default: Option<ConstValue>) -> Option<ConstValue> {
     let e = expr?;
     match consteval::value_of(Some(e), env) {
         Ok(v) => Some(v),
@@ -292,14 +262,8 @@ pub fn _fold_with(
 }
 
 /// Port of `tables.py::_unit_value`.
-pub fn _unit_value(expr: Option<&Expr>) -> Option<i64> {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _unit_value_with(expr, &env)
-}
-
-/// Port of `tables.py::_unit_value`.
-pub fn _unit_value_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
-    let v = _fold_with(expr, env, None)?;
+pub fn _unit_value(expr: Option<&Expr>, env: &Env) -> Option<i64> {
+    let v = _fold(expr, env, None)?;
     match v {
         ConstValue::Int(i) => Some(i),
         ConstValue::Float(f) | ConstValue::CFloat(f) if f.is_finite() => pystr::py_int_from_f64(f),
@@ -308,26 +272,15 @@ pub fn _unit_value_with(expr: Option<&Expr>, env: &Env) -> Option<i64> {
 }
 
 /// Port of `tables.py::_scan_unit_name`.
-pub fn _scan_unit_name(expr: Option<&Expr>) -> String {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _scan_unit_name_with(expr, &env)
-}
-
-/// Port of `tables.py::_scan_unit_name`.
-pub fn _scan_unit_name_with(expr: Option<&Expr>, env: &Env) -> String {
-    let Some(v) = _unit_value_with(expr, env) else {
+pub fn _scan_unit_name(expr: Option<&Expr>, env: &Env) -> String {
+    let Some(v) = _unit_value(expr, env) else {
         return "SEC".to_string();
     };
     _unit_name_by_value(v).unwrap_or("USEC").to_string()
 }
 
 /// Port of `tables.py::_as_int`.
-pub fn _as_int() -> i64 {
-    0
-}
-
-/// Port of `tables.py::_as_int`.
-pub fn _as_int_with(v: Option<&ConstValue>, default: i64) -> i64 {
+pub fn _as_int(v: Option<&ConstValue>, default: i64) -> i64 {
     let Some(v) = v else {
         return default;
     };
@@ -359,17 +312,7 @@ fn _number_as_int(v: &NumberValue, default: i64) -> i64 {
 }
 
 /// Port of `tables.py::_const_is_int`.
-pub fn _const_is_int(expr: Option<&Expr>) -> bool {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _const_is_int_with(expr, &env, &OrderedMap::new())
-}
-
-/// Port of `tables.py::_const_is_int`.
-pub fn _const_is_int_with(
-    expr: Option<&Expr>,
-    env: &Env,
-    int_names: &OrderedMap<String, bool>,
-) -> bool {
+pub fn _const_is_int(expr: Option<&Expr>, env: &Env, int_names: &OrderedMap<String, bool>) -> bool {
     let Some(expr) = expr else {
         return true;
     };
@@ -389,15 +332,15 @@ pub fn _const_is_int_with(
             if u.op == "NOT" {
                 return true;
             }
-            _const_is_int_with(u.operand.as_deref(), env, int_names)
+            _const_is_int(u.operand.as_deref(), env, int_names)
         }
         Expr::Binary(b) => {
             if b.op == "/" {
                 return false;
             }
             if matches!(b.op.as_str(), "+" | "-" | "*") {
-                return _const_is_int_with(b.left.as_deref(), env, int_names)
-                    && _const_is_int_with(b.right.as_deref(), env, int_names);
+                return _const_is_int(b.left.as_deref(), env, int_names)
+                    && _const_is_int(b.right.as_deref(), env, int_names);
             }
             matches!(
                 b.op.as_str(),
@@ -443,12 +386,7 @@ impl VarInfo {
     }
 
     /// Port of `tables.py::VarInfo::collapsed`.
-    pub fn collapsed(&self) {
-        let _ = self.collapsed_impl();
-    }
-
-    /// Port of `tables.py::VarInfo::collapsed`.
-    pub fn collapsed_impl(&self) -> (i64, Vec<i64>) {
+    pub fn collapsed(&self) -> (i64, Vec<i64>) {
         let shape = self.full_shape();
         if shape.is_empty() {
             return (1, Vec::new());
@@ -470,16 +408,10 @@ pub fn _string_stored_len(n: i64) -> i64 {
 }
 
 /// Port of `tables.py::_var_shape`.
-pub fn _var_shape(v: &VarDecl) -> Vec<i64> {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _var_shape_with(v, &env)
-}
-
-/// Port of `tables.py::_var_shape`.
-pub fn _var_shape_with(v: &VarDecl, env: &Env) -> Vec<i64> {
+pub fn _var_shape(v: &VarDecl, env: &Env) -> Vec<i64> {
     let mut dims = Vec::with_capacity(v.dims.len());
     for d in &v.dims {
-        let n = _as_int_with(_fold_with(Some(d.as_ref()), env, None).as_ref(), 1);
+        let n = _as_int(_fold(Some(d.as_ref()), env, None).as_ref(), 1);
         dims.push(n.max(1));
     }
     dims
@@ -503,19 +435,13 @@ pub fn _string_size_expr(v: &VarDecl) -> Option<ExprRef> {
 }
 
 /// Port of `tables.py::_make_var_info`.
-pub fn _make_var_info(v: &VarDecl) -> VarInfo {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _make_var_info_with(v, &env)
-}
-
-/// Port of `tables.py::_make_var_info`.
-pub fn _make_var_info_with(v: &VarDecl, env: &Env) -> VarInfo {
+pub fn _make_var_info(v: &VarDecl, env: &Env) -> VarInfo {
     let type_code = _var_type_code(v);
-    let shape = _var_shape_with(v, env);
+    let shape = _var_shape(v, env);
     let mut stored_len = None;
     if pystr::upper(v.type_.as_deref().unwrap_or("")) == "STRING" {
         let size_expr = _string_size_expr(v);
-        let n = _as_int_with(_fold_with(size_expr.as_deref(), env, None).as_ref(), 20);
+        let n = _as_int(_fold(size_expr.as_deref(), env, None).as_ref(), 20);
         stored_len = Some(_string_stored_len(n.max(1)));
     }
     VarInfo {
@@ -762,7 +688,7 @@ pub fn _scan_program(program: &Program) -> Scanned {
     }
 
     let mut called: BTreeSet<String> = BTreeSet::new();
-    for s in _flat_impl(stmts) {
+    for s in _flat(stmts) {
         let kw2 = _kw(&s);
         if kw2 == "CALLTABLE"
             && let Stmt::Instruction(inst) = s.as_ref()
@@ -808,10 +734,7 @@ pub fn _scan_program(program: &Program) -> Scanned {
 }
 
 /// Port of `tables.py::_flat`.
-pub fn _flat() {}
-
-/// Port of `tables.py::_flat`.
-pub fn _flat_impl(ss: &[StmtRef]) -> Vec<StmtRef> {
+pub fn _flat(ss: &[StmtRef]) -> Vec<StmtRef> {
     fn push(ss: &[StmtRef], out: &mut Vec<StmtRef>) {
         for x in ss {
             out.push(Rc::clone(x));
@@ -844,13 +767,7 @@ fn const_numeric_f64(val: &ConstValue) -> Option<f64> {
 }
 
 /// Port of `tables.py::_scan_weights`.
-pub fn _scan_weights(stmts: &[StmtRef]) -> OrderedMap<String, f64> {
-    let env = Env::new(&profiles::PROFILES[0]);
-    _scan_weights_with(stmts, &env)
-}
-
-/// Port of `tables.py::_scan_weights`.
-pub fn _scan_weights_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, f64> {
+pub fn _scan_weights(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, f64> {
     let mut stack: Vec<f64> = Vec::new();
     let mut weights: OrderedMap<String, f64> = OrderedMap::new();
     for s in stmts {
@@ -860,11 +777,11 @@ pub fn _scan_weights_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, f6
         {
             let mut secs: Option<f64> = None;
             if let Some(Some(arg0)) = inst.args.first()
-                && let Some(val) = _fold_with(Some(arg0.as_ref()), env, None)
+                && let Some(val) = _fold(Some(arg0.as_ref()), env, None)
                 && let Some(f) = const_numeric_f64(&val)
             {
                 let unit_name = if let Some(Some(arg1)) = inst.args.get(1) {
-                    _scan_unit_name_with(Some(arg1.as_ref()), env)
+                    _scan_unit_name(Some(arg1.as_ref()), env)
                 } else {
                     "SEC".to_string()
                 };
@@ -889,24 +806,21 @@ pub fn _scan_weights_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, f6
 }
 
 /// Port of `tables.py::_scan_calls`.
-pub fn _scan_calls(_stmts: &[StmtRef]) {}
-
-/// Port of `tables.py::_scan_calls`.
-pub fn _scan_calls_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, Vec<Option<f64>>> {
+pub fn _scan_calls(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, Vec<Option<f64>>> {
     let mut stack: Vec<Option<f64>> = Vec::new();
     let mut calls: OrderedMap<String, Vec<Option<f64>>> = OrderedMap::new();
-    for s in _flat_impl(stmts) {
+    for s in _flat(stmts) {
         let kw = _kw(&s);
         if let Stmt::Instruction(inst) = s.as_ref() {
             if kw == "SCAN" {
                 let mut secs: Option<f64> = None;
                 if let Some(Some(arg0)) = inst.args.first()
-                    && let Some(val) = _fold_with(Some(arg0.as_ref()), env, None)
+                    && let Some(val) = _fold(Some(arg0.as_ref()), env, None)
                     && let Some(f) = const_numeric_f64(&val)
                     && f > 0.0
                 {
                     let unit_name = if let Some(Some(arg1)) = inst.args.get(1) {
-                        _scan_unit_name_with(Some(arg1.as_ref()), env)
+                        _scan_unit_name(Some(arg1.as_ref()), env)
                     } else {
                         "SEC".to_string()
                     };
@@ -932,24 +846,21 @@ pub fn _scan_calls_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, Vec<
 }
 
 /// Port of `tables.py::_last_call_interval`.
-pub fn _last_call_interval(_stmts: &[StmtRef]) {}
-
-/// Port of `tables.py::_last_call_interval`.
-pub fn _last_call_interval_with(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, Option<f64>> {
+pub fn _last_call_interval(stmts: &[StmtRef], env: &Env) -> OrderedMap<String, Option<f64>> {
     let mut stack: Vec<Option<f64>> = Vec::new();
     let mut last: OrderedMap<String, Option<f64>> = OrderedMap::new();
-    for s in _flat_impl(stmts) {
+    for s in _flat(stmts) {
         let kw = _kw(&s);
         if let Stmt::Instruction(inst) = s.as_ref() {
             if kw == "SCAN" {
                 let mut secs: Option<f64> = None;
                 if let Some(Some(arg0)) = inst.args.first()
-                    && let Some(val) = _fold_with(Some(arg0.as_ref()), env, None)
+                    && let Some(val) = _fold(Some(arg0.as_ref()), env, None)
                     && let Some(f) = const_numeric_f64(&val)
                     && f > 0.0
                 {
                     let unit_name = if let Some(Some(arg1)) = inst.args.get(1) {
-                        _scan_unit_name_with(Some(arg1.as_ref()), env)
+                        _scan_unit_name(Some(arg1.as_ref()), env)
                     } else {
                         "SEC".to_string()
                     };
@@ -1033,10 +944,7 @@ pub fn _status_table(slow_seq_count: i64) -> TdfTable {
 }
 
 /// Port of `tables.py::_build_struct_tables`.
-pub fn _build_struct_tables(_all_vars: &[Rc<VarDecl>]) {}
-
-/// Port of `tables.py::_build_struct_tables`.
-pub fn _build_struct_tables_with(
+pub fn _build_struct_tables(
     all_vars: &[Rc<VarDecl>],
     struct_types: &OrderedMap<String, StructTypeDef>,
     env: &Env,
@@ -1047,13 +955,13 @@ pub fn _build_struct_tables_with(
             continue;
         };
         let mut size = 1;
-        for d in _var_shape_with(v, env) {
+        for d in _var_shape(v, env) {
             size *= d;
         }
         let mut fields = Vec::with_capacity(st.members.len());
         for m in &st.members {
-            let info = _make_var_info_with(m, env);
-            let (dim, subdims) = info.collapsed_impl();
+            let info = _make_var_info(m, env);
+            let (dim, subdims) = info.collapsed();
             let m_upper = pystr::upper(&m.name);
             fields.push(TdfField {
                 r#type: info.type_code,
@@ -1181,10 +1089,7 @@ pub fn _cpistatus_table() -> TdfTable {
 }
 
 /// Port of `tables.py::_resolve_alias_target`.
-pub fn _resolve_alias_target(_expr: Option<&Expr>) {}
-
-/// Port of `tables.py::_resolve_alias_target`.
-pub fn _resolve_alias_target_with(
+pub fn _resolve_alias_target(
     expr: Option<&Expr>,
     var_info: Option<&OrderedMap<String, VarInfo>>,
 ) -> (String, Option<i64>) {
@@ -1246,98 +1151,80 @@ mod tests {
     #[test]
     fn size_class_and_declared_size_match_python() {
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(-1))),
+            size_class(Some(&ConstValue::Int(-1))),
             Some(SizeClass::Auto)
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(0))),
+            size_class(Some(&ConstValue::Int(0))),
             Some(SizeClass::Fixed(1, false))
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(-5))),
+            size_class(Some(&ConstValue::Int(-5))),
             Some(SizeClass::Fixed(5, true))
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(100))),
+            size_class(Some(&ConstValue::Int(100))),
             Some(SizeClass::Fixed(100, false))
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(1_i64 << 31))),
+            size_class(Some(&ConstValue::Int(1_i64 << 31))),
             Some(SizeClass::Edge(1))
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Int(-(1_i64 << 31)))),
+            size_class(Some(&ConstValue::Int(-(1_i64 << 31)))),
             Some(SizeClass::Fixed(2_147_483_647, true))
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Float(1e20))),
+            size_class(Some(&ConstValue::Float(1e20))),
             Some(SizeClass::Toxic)
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Float(f64::INFINITY))),
+            size_class(Some(&ConstValue::Float(f64::INFINITY))),
             Some(SizeClass::Inf)
         );
         assert_eq!(
-            size_class_with(Some(&ConstValue::Float(f64::NEG_INFINITY))),
+            size_class(Some(&ConstValue::Float(f64::NEG_INFINITY))),
             Some(SizeClass::Toxic)
         );
-        assert_eq!(size_class_with(Some(&ConstValue::Float(f64::NAN))), None);
-        assert_eq!(
-            size_class_with(Some(&ConstValue::Str("abc".to_string()))),
-            None
-        );
+        assert_eq!(size_class(Some(&ConstValue::Float(f64::NAN))), None);
+        assert_eq!(size_class(Some(&ConstValue::Str("abc".to_string()))), None);
 
+        assert_eq!(declared_size(Some(&ConstValue::Int(-1)), false, 4), None);
+        assert_eq!(declared_size(Some(&ConstValue::Int(0)), false, 4), Some(1));
+        assert_eq!(declared_size(Some(&ConstValue::Int(-5)), false, 4), None);
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(-1)), false, 4),
-            None
-        );
-        assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(0)), false, 4),
-            Some(1)
-        );
-        assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(-5)), false, 4),
-            None
-        );
-        assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(100)), false, 4),
+            declared_size(Some(&ConstValue::Int(100)), false, 4),
             Some(100)
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(1_i64 << 31)), false, 4),
+            declared_size(Some(&ConstValue::Int(1_i64 << 31)), false, 4),
             None
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Float(1e20)), false, 4),
+            declared_size(Some(&ConstValue::Float(1e20)), false, 4),
             None
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Float(f64::INFINITY)), false, 4),
+            declared_size(Some(&ConstValue::Float(f64::INFINITY)), false, 4),
             Some(2_147_483_647)
         );
 
+        assert_eq!(declared_size(Some(&ConstValue::Int(-1)), true, 4), None);
+        assert_eq!(declared_size(Some(&ConstValue::Int(-5)), true, 4), Some(5));
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(-1)), true, 4),
-            None
-        );
-        assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(-5)), true, 4),
-            Some(5)
-        );
-        assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(1_i64 << 31)), true, 4),
+            declared_size(Some(&ConstValue::Int(1_i64 << 31)), true, 4),
             Some(2_147_483_647)
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Int(-(1_i64 << 31))), true, 4),
+            declared_size(Some(&ConstValue::Int(-(1_i64 << 31))), true, 4),
             Some(2_147_483_647)
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Float(1e20)), true, 4),
+            declared_size(Some(&ConstValue::Float(1e20)), true, 4),
             Some(409)
         );
         assert_eq!(
-            declared_size_with(Some(&ConstValue::Float(f64::INFINITY)), true, 4),
+            declared_size(Some(&ConstValue::Float(f64::INFINITY)), true, 4),
             Some(2_147_483_647)
         );
     }
@@ -1349,60 +1236,60 @@ mod tests {
             node: Node::default(),
             name: "fp2".to_string(),
         });
-        assert_eq!(_dtype_code_with(Some(&fp2), &env), 7);
+        assert_eq!(_dtype_code(Some(&fp2), &env), 7);
 
         let num7 = Expr::Number(Number {
             node: Node::default(),
             value: NumberValue::Int(7),
             text: "7".to_string(),
         });
-        assert_eq!(_dtype_code_with(Some(&num7), &env), 7);
+        assert_eq!(_dtype_code(Some(&num7), &env), 7);
 
         let num75 = Expr::Number(Number {
             node: Node::default(),
             value: NumberValue::Float(7.5),
             text: "7.5".to_string(),
         });
-        assert_eq!(_dtype_code_with(Some(&num75), &env), 9);
+        assert_eq!(_dtype_code(Some(&num75), &env), 9);
 
         let min_name = Expr::Name(Name {
             node: Node::default(),
             name: "Min".to_string(),
         });
-        assert_eq!(_unit_value_with(Some(&min_name), &env), Some(3));
-        assert_eq!(_scan_unit_name_with(Some(&min_name), &env), "MIN");
+        assert_eq!(_unit_value(Some(&min_name), &env), Some(3));
+        assert_eq!(_scan_unit_name(Some(&min_name), &env), "MIN");
 
         let num_neg = Expr::Number(Number {
             node: Node::default(),
             value: NumberValue::Float(-0.5),
             text: "-0.5".to_string(),
         });
-        assert_eq!(_unit_value_with(Some(&num_neg), &env), Some(0));
-        assert_eq!(_scan_unit_name_with(Some(&num_neg), &env), "USEC");
-        assert_eq!(_scan_unit_name_with(None, &env), "SEC");
+        assert_eq!(_unit_value(Some(&num_neg), &env), Some(0));
+        assert_eq!(_scan_unit_name(Some(&num_neg), &env), "USEC");
+        assert_eq!(_scan_unit_name(None, &env), "SEC");
 
         let mut int_names = OrderedMap::new();
         int_names.insert("FCONST".to_string(), false);
-        assert!(_const_is_int_with(Some(&num7), &env, &int_names));
-        assert!(!_const_is_int_with(Some(&num75), &env, &int_names));
+        assert!(_const_is_int(Some(&num7), &env, &int_names));
+        assert!(!_const_is_int(Some(&num75), &env, &int_names));
         let div = Expr::Binary(Binary {
             node: Node::default(),
             op: "/".to_string(),
             left: Some(Rc::new(num7.clone())),
             right: Some(Rc::new(num7.clone())),
         });
-        assert!(!_const_is_int_with(Some(&div), &env, &int_names));
+        assert!(!_const_is_int(Some(&div), &env, &int_names));
         let neg = Expr::Unary(Unary {
             node: Node::default(),
             op: "-".to_string(),
             operand: Some(Rc::new(num7)),
         });
-        assert!(_const_is_int_with(Some(&neg), &env, &int_names));
+        assert!(_const_is_int(Some(&neg), &env, &int_names));
         let fref = Expr::Name(Name {
             node: Node::default(),
             name: "fconst".to_string(),
         });
-        assert!(!_const_is_int_with(Some(&fref), &env, &int_names));
+        assert!(!_const_is_int(Some(&fref), &env, &int_names));
 
         assert_eq!(_string_stored_len(1), 4);
         assert_eq!(_string_stored_len(4), 8);
@@ -1540,7 +1427,7 @@ EndProg
         assert_eq!(sc.data_tables[1].name, "Other");
         assert_eq!(sc.data_tables[1].line, 20);
 
-        let weights = _scan_weights_with(&prog.statements, &env);
+        let weights = _scan_weights(&prog.statements, &env);
         assert_eq!(
             weights
                 .iter()
@@ -1549,18 +1436,18 @@ EndProg
             vec![("OTHER", 120.0), ("MYDYNTABLE", 120.0)]
         );
 
-        let calls = _scan_calls_with(&prog.statements, &env);
+        let calls = _scan_calls(&prog.statements, &env);
         assert_eq!(
             calls.get("MYDYNTABLE").cloned(),
             Some(vec![Some(5.0), Some(120.0)])
         );
         assert_eq!(calls.get("OTHER").cloned(), Some(vec![Some(120.0)]));
 
-        let last_call = _last_call_interval_with(&prog.statements, &env);
+        let last_call = _last_call_interval(&prog.statements, &env);
         assert_eq!(last_call.get("MYDYNTABLE").copied(), Some(Some(120.0)));
         assert_eq!(last_call.get("OTHER").copied(), Some(Some(120.0)));
 
-        let st_tables = _build_struct_tables_with(&sc.all_vars, &sc.struct_types, &env);
+        let st_tables = _build_struct_tables(&sc.all_vars, &sc.struct_types, &env);
         assert_eq!(st_tables.len(), 1);
         assert_eq!(st_tables[0].name, "s");
         assert_eq!(st_tables[0].size, 2);
@@ -1577,17 +1464,17 @@ EndProg
 
         let mut vi = OrderedMap::new();
         for v in &sc.all_vars {
-            vi.insert(pystr::upper(&v.name), _make_var_info_with(v, &env));
+            vi.insert(pystr::upper(&v.name), _make_var_info(v, &env));
         }
-        assert_eq!(vi.get("ARR").unwrap().collapsed_impl(), (6, vec![2, 3]));
-        assert_eq!(vi.get("D").unwrap().collapsed_impl(), (24, vec![24]));
+        assert_eq!(vi.get("ARR").unwrap().collapsed(), (6, vec![2, 3]));
+        assert_eq!(vi.get("D").unwrap().collapsed(), (24, vec![24]));
 
         assert_eq!(
-            _resolve_alias_target_with(sc.alias_stmts[0].args[0].as_deref(), Some(&vi)),
+            _resolve_alias_target(sc.alias_stmts[0].args[0].as_deref(), Some(&vi)),
             ("ARR".to_string(), Some(4))
         );
         assert_eq!(
-            _resolve_alias_target_with(sc.alias_stmts[1].args[0].as_deref(), Some(&vi)),
+            _resolve_alias_target(sc.alias_stmts[1].args[0].as_deref(), Some(&vi)),
             ("ARR".to_string(), Some(3))
         );
     }
