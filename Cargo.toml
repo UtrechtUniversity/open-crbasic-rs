@@ -1,12 +1,15 @@
 [package]
 name = "opencrbasic"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Rust implementation of the opencrbasic CRBasic compiler (reference verdict)"
 license = "MIT"
 repository = "https://github.com/UtrechtUniversity/open-crbasic-rs"
-publish = false
+readme = "README.md"
+keywords = ["crbasic", "campbell", "datalogger", "compiler"]
+categories = ["compilers", "command-line-utilities", "science"]
+include = ["src/**", "data/**", "README.md", "LICENSE", "Cargo.toml", "Cargo.lock"]
 
 [[bin]]
 name = "crbc"
