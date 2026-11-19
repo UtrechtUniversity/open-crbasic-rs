@@ -29,6 +29,8 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          cache-dependency-glob: open-crbasic-py/uv.lock
       - run: uv run --project "$OPENCRBASIC_PY" python tools/pydump.py
       - run: cargo test --release
       - run: python3 tools/crbc_compare.py
