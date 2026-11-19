@@ -82,7 +82,9 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ matrix.target }}
-          path: crbc-*.*
+          path: |
+            crbc-*.tar.gz
+            crbc-*.zip
 
   release:
     needs: [release-check, build]
