@@ -35,7 +35,7 @@ jobs:
       - run: uvx pre-commit run --all-files --show-diff-on-failure
 
   # main creates GitHub release v<version> with prebuilt crbc binaries when the version in
-  # Cargo.toml has no release yet. crates.io publishing is `cargo publish` (README, "Releasing").
+  # Cargo.toml has no release yet, after publishing that version to crates.io (README, "Releasing").
   release-check:
     needs: check
     if: github.event_name == 'push' && github.ref_name == 'main'
@@ -86,8 +86,34 @@ jobs:
             crbc-*.tar.gz
             crbc-*.zip
 
-  release:
+  # Trusted publishing (OIDC) through the crates-io environment: no token is stored. Skipped when
+  # the version is already on crates.io, so a re-run after a failed release job still works.
+  publish:
     needs: [release-check, build]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        run: |
+          v="${TAG#v}"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -A "open-crbasic-rs CI" "https://crates.io/api/v1/crates/opencrbasic/$v")
+          [ "$code" = 200 ] && echo exists=true >> "$GITHUB_OUTPUT" || echo exists=false >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ needs.release-check.outputs.tag }}
+      - if: steps.v.outputs.exists == 'false'
+        uses: rust-lang/crates-io-auth-action@v1.0.6
+        id: auth
+      - if: steps.v.outputs.exists == 'false'
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  release:
+    needs: [release-check, build, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write

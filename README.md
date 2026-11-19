@@ -90,5 +90,6 @@ conventions are in [AGENTS.md](AGENTS.md).
 ## Releasing
 
 Bump `version` in `Cargo.toml` and push to `main`. When CI passes and no GitHub release for that
-version exists, it builds `crbc` for Linux, macOS (arm64, x86_64) and Windows and creates release
-`v<version>` with those archives and the `.crate`. Publish to crates.io with `cargo publish`.
+version exists, it builds `crbc` for Linux, macOS (arm64, x86_64) and Windows, publishes the crate to
+crates.io through trusted publishing (OIDC, environment `crates-io`; no token is stored) and creates
+release `v<version>` with those archives and the `.crate`.
