@@ -7,7 +7,9 @@ resolve). Stdout, exit status and the message-file bytes must be equal.
     cargo build --release
     python3 tools/crbc_compare.py            # exit 1 and a list when anything differs
 
-The Python checkout is `../open-crbasic` or `$OPENCRBASIC_PY`; its `.venv/bin/crbc` is the oracle.
+The Python checkout is `../open-crbasic` or `$OPENCRBASIC_PY`; its `.venv/bin/crbc`
+(`.venv/Scripts/crbc.exe` on Windows) is the oracle. Stdout is compared with CRLF read as LF: Python
+writes text-mode stdout, which is CRLF on Windows.
 """
 
 import json
@@ -21,8 +23,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = Path(os.environ.get("OPENCRBASIC_PY", ROOT.parent / "open-crbasic")).resolve()
-RUST = ROOT / "target" / "release" / "crbc"
-ORACLE = PY / ".venv" / "bin" / "crbc"
+EXE = ".exe" if os.name == "nt" else ""
+RUST = ROOT / "target" / "release" / f"crbc{EXE}"
+ORACLE = PY / ".venv" / ("Scripts" if os.name == "nt" else "bin") / f"crbc{EXE}"
 STATION = PY / "tests" / "corpus" / "station"
 LOGGERS = ("cr6", "cr1000x", "cr300", "cr350")
 
@@ -37,7 +40,8 @@ def run(exe: Path, program: Path, logger: str) -> tuple[int, bytes, bytes]:
             [exe, "--logger", logger, program.name, "msg.xxx"], cwd=work, capture_output=True, timeout=300
         )
         message = work / "msg.xxx"
-        return done.returncode, done.stdout, message.read_bytes() if message.exists() else b"<none>"
+        stdout = done.stdout.replace(b"\r\n", b"\n")
+        return done.returncode, stdout, message.read_bytes() if message.exists() else b"<none>"
 
 
 def cases() -> list[tuple[Path, str]]:
