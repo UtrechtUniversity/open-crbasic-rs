@@ -43,6 +43,15 @@ crbc [options] program [messagefile]
 `messagefile` (default `<LOGGER>cmple.xxx`, e.g. `CR6cmple.xxx`, in the current directory). The exit
 status is 0 when the program compiles and 1 otherwise.
 
+### In VS Code
+
+The [CRBasic extension](https://github.com/UtrechtUniversity/open-crbasic-vsix) builds programs with
+this `crbc` when `opencrbasic.compiler` is `rust` (Logger: Build and Show Compiler Output). It runs
+`crbc [--logger L] --no-message-file <program>` on the saved file. It looks for `crbc` in Cargo's
+bin directory (where `cargo install` puts it), else on `PATH`; set `opencrbasic.crbcPath` when the
+Python `crbc` comes first on `PATH`. The two print the same version line. Diagnostics, hover and
+the other editor features still come from the Python language server.
+
 ## Library
 
 The crate also exposes the compiler as a library; the modules are public, but the interface is the
